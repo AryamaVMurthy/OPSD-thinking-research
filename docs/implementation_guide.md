@@ -46,22 +46,36 @@ The generic evaluation launcher uses eight one-GPU workers. Each worker owns
 an independent JSONL shard with deterministic seeds, so preemption can resume
 without duplicates. LoRA checkpoints are loaded directly by vLLM.
 
-After the 1.7B training job is submitted, queue its complete evaluation matrix
-with:
+Before queuing the full matrix, run one AIME problem through the saved LoRA
+adapter. The gate loads the adapter through vLLM, produces all 12 configured
+samples, verifies non-empty thinking and non-truncated completion, and records
+the adapter SHA-256 in its manifest:
 
 ```bash
-infra/turing/submit_posttrain_1p7b.sh TRAIN_JOB_ID
+smoke_job="$(
+  sbatch --parsable \
+    --dependency=afterok:TRAIN_JOB_ID \
+    --export=ALL,CONFIG=reproductions/01_qwen3_thinking_math/configs/qwen3-1p7b-aime25.yaml,RUN_NAME=adapter-smoke-qwen3-1p7b-step200,ADAPTER=/scratch/node10/${USER}/opsd-thinking-research/training/qwen3-1p7b-opsd-thinking/checkpoint-200,CHECKPOINT=200 \
+    infra/turing/smoke_adapter_inference.sbatch
+)"
+infra/turing/submit_posttrain_1p7b.sh TRAIN_JOB_ID "${smoke_job}"
 ```
 
-Every evaluation depends on successful training completion. The LCB official
-execution-scoring job additionally depends on successful LCB generation. The
-submission command writes an immutable TSV mapping training, generation, and
-scoring job IDs under `logs/`.
+Every evaluation depends on both successful training and the adapter smoke
+gate. The LCB official execution-scoring job additionally depends on
+successful LCB generation. The submission command writes an immutable TSV
+mapping training, smoke, generation, and scoring job IDs under `logs/`.
 
-The 4B run has the same independent submission entry point:
+The 4B run uses the corresponding config and adapter:
 
 ```bash
-infra/turing/submit_posttrain_4b.sh TRAIN_JOB_ID
+smoke_job="$(
+  sbatch --parsable \
+    --dependency=afterok:TRAIN_JOB_ID \
+    --export=ALL,CONFIG=reproductions/01_qwen3_thinking_math/configs/qwen3-4b-aime25.yaml,RUN_NAME=adapter-smoke-qwen3-4b-step200,ADAPTER=/scratch/node10/${USER}/opsd-thinking-research/training/qwen3-4b-opsd-thinking/checkpoint-200,CHECKPOINT=200 \
+    infra/turing/smoke_adapter_inference.sbatch
+)"
+infra/turing/submit_posttrain_4b.sh TRAIN_JOB_ID "${smoke_job}"
 ```
 
 ## Observability and acceptance
@@ -70,7 +84,9 @@ infra/turing/submit_posttrain_4b.sh TRAIN_JOB_ID
 and recent log tails. Every GPU job records 30-second utilization, memory,
 power, and temperature telemetry. Generation records contain the prompt
 hash, seed, full response, separated reasoning/final text, token count,
-finish reason, and task-specific extraction fields.
+finish reason, task-specific extraction fields, and the exact adapter
+SHA-256. Summarizers reject shards whose model, revision, method, checkpoint,
+dataset, or adapter digest disagree.
 
 A run is accepted only if:
 

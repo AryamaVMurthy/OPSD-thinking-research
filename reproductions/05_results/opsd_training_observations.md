@@ -86,6 +86,9 @@ dumps, telemetry, logs, and manifests were copied locally. Every local
 checkpoint checksum and the run manifest verifies. The checkpoint-200
 adapter SHA-256 is
 `18b17aedf89519813f5f9e352412d503f03a8c5c73519546dd39f252c0053042`.
+The 418 MiB minimal evidence archive (four adapters, trainer states,
+generations, log, telemetry, review packet, and manifests) has SHA-256
+`7269e5845358e1b35c130ffc0bdc28c33941d9d434749b2cb036a3d7a67f97f5`.
 
 Across the 39 saved dumps through step 195, all 784 stored rollouts started
 non-empty thinking, 17 closed the thinking segment, and 16 emitted a boxed
