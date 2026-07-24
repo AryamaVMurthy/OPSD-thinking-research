@@ -58,6 +58,12 @@ execution-scoring job additionally depends on successful LCB generation. The
 submission command writes an immutable TSV mapping training, generation, and
 scoring job IDs under `logs/`.
 
+The 4B run has the same independent submission entry point:
+
+```bash
+infra/turing/submit_posttrain_4b.sh TRAIN_JOB_ID
+```
+
 ## Observability and acceptance
 
 `infra/turing/monitor.sh` shows queue state, accounting state, exit codes,
