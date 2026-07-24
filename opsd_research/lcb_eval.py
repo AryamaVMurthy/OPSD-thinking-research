@@ -100,6 +100,16 @@ def main() -> None:
         )
         if "<think>" not in prompt:
             raise RuntimeError("Qwen chat template did not enable the thinking prefix")
+        prompt_tokens = len(tokenizer.encode(prompt, add_special_tokens=False))
+        effective_max_tokens = min(
+            int(config["max_new_tokens"]),
+            int(config["max_model_len"]) - prompt_tokens,
+        )
+        if effective_max_tokens <= 0:
+            raise RuntimeError(
+                f"problem {problem.question_id} prompt has {prompt_tokens} tokens, "
+                f"exceeding max_model_len={config['max_model_len']}"
+            )
         for sample_index in range(config["samples_per_problem"]):
             flat_index = problem_index * config["samples_per_problem"] + sample_index
             if flat_index % args.num_shards != args.shard_id:
@@ -123,7 +133,16 @@ def main() -> None:
                 str(problem.question_id),
                 sample_index,
             )
-            requests.append((problem, sample_index, prompt, seed))
+            requests.append(
+                (
+                    problem,
+                    sample_index,
+                    prompt,
+                    seed,
+                    prompt_tokens,
+                    effective_max_tokens,
+                )
+            )
             prompts.append(prompt)
             params.append(
                 SamplingParams(
@@ -133,7 +152,7 @@ def main() -> None:
                     top_k=config["top_k"],
                     min_p=config["min_p"],
                     presence_penalty=config["presence_penalty"],
-                    max_tokens=config["max_new_tokens"],
+                    max_tokens=effective_max_tokens,
                     seed=seed,
                 )
             )
@@ -165,7 +184,17 @@ def main() -> None:
         lora_request=lora_request,
         use_tqdm=True,
     )
-    for ordinal, ((problem, sample_index, prompt, seed), request_output) in enumerate(
+    for ordinal, (
+        (
+            problem,
+            sample_index,
+            prompt,
+            seed,
+            prompt_tokens,
+            effective_max_tokens,
+        ),
+        request_output,
+    ) in enumerate(
         zip(requests, outputs), start=1
     ):
         generated = request_output.outputs[0]
@@ -185,6 +214,9 @@ def main() -> None:
             "seed": seed,
             "enable_thinking": True,
             "prompt_hash": prompt_hash(prompt),
+            "prompt_tokens": prompt_tokens,
+            "requested_max_new_tokens": config["max_new_tokens"],
+            "effective_max_new_tokens": effective_max_tokens,
             "question_title": problem.question_title,
             "problem": problem.question_content,
             "response": text,
