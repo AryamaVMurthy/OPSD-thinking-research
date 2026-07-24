@@ -5,7 +5,7 @@ import json
 import torch
 from transformers import AutoTokenizer
 
-from .prompts import math_messages
+from .prompts import math_messages, render_thinking_prompt
 
 
 def main() -> None:
@@ -15,14 +15,7 @@ def main() -> None:
         "Qwen/Qwen3-1.7B",
         revision="70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
     )
-    prompt = tokenizer.apply_chat_template(
-        math_messages("Compute 1+1."),
-        tokenize=False,
-        add_generation_prompt=True,
-        enable_thinking=True,
-    )
-    if "<think>" not in prompt:
-        raise RuntimeError("thinking prefix is absent")
+    render_thinking_prompt(tokenizer, math_messages("Compute 1+1."))
     import flash_attn
     import vllm
 
@@ -35,7 +28,7 @@ def main() -> None:
                 "torch": torch.__version__,
                 "vllm": vllm.__version__,
                 "flash_attn": flash_attn.__version__,
-                "thinking_prefix": True,
+                "thinking_template_switch": True,
             },
             sort_keys=True,
         )

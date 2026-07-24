@@ -15,7 +15,7 @@ from .generation_common import (
     output_token_ids,
     split_thinking,
 )
-from .prompts import math_messages
+from .prompts import math_messages, render_thinking_prompt
 from .records import append_jsonl, key, prompt_hash, read_jsonl, stable_seed
 
 
@@ -120,14 +120,7 @@ def main() -> None:
     prompts: list[str] = []
     params: list[Any] = []
     for problem_index, row in enumerate(rows):
-        prompt = tokenizer.apply_chat_template(
-            math_messages(row["problem"]),
-            tokenize=False,
-            add_generation_prompt=True,
-            enable_thinking=True,
-        )
-        if "<think>" not in prompt:
-            raise RuntimeError("Qwen chat template did not enable the thinking prefix")
+        prompt = render_thinking_prompt(tokenizer, math_messages(row["problem"]))
         prompt_tokens = len(tokenizer.encode(prompt, add_special_tokens=False))
         effective_max_tokens = min(
             int(config["max_new_tokens"]),

@@ -28,8 +28,8 @@ with less than 200 GiB free. No unrelated home or scratch data is deleted.
 1. Sync the source tree and create `logs/`.
 2. Submit `infra/turing/setup_env.sbatch`. It installs the official OPSD
    dependency versions, caches both models and all four datasets, validates
-   row counts, checks CUDA/FlashAttention/vLLM, and asserts the Qwen thinking
-   prefix.
+   row counts, checks CUDA/FlashAttention/vLLM, and asserts that the Qwen
+   thinking-mode template switch changes the rendered prompt correctly.
 3. Run untouched 1.7B math configs, then untouched 1.7B LCB.
 4. Run untouched 4B math configs, then untouched 4B LCB.
 5. Score each LCB generation job separately with the official execution

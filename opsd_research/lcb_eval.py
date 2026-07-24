@@ -10,7 +10,7 @@ from typing import Any
 from .config import load_config
 from .generation_common import finish_reason, output_token_ids, split_thinking
 from .lcb_data import load_lcb_v6, upstream_path
-from .prompts import lcb_messages
+from .prompts import lcb_messages, render_thinking_prompt
 from .records import append_jsonl, key, prompt_hash, read_jsonl, stable_seed
 
 
@@ -92,14 +92,10 @@ def main() -> None:
     prompts = []
     params = []
     for problem_index, problem in enumerate(benchmark):
-        prompt = tokenizer.apply_chat_template(
+        prompt = render_thinking_prompt(
+            tokenizer,
             lcb_messages(problem.question_content, problem.starter_code),
-            tokenize=False,
-            add_generation_prompt=True,
-            enable_thinking=True,
         )
-        if "<think>" not in prompt:
-            raise RuntimeError("Qwen chat template did not enable the thinking prefix")
         prompt_tokens = len(tokenizer.encode(prompt, add_special_tokens=False))
         effective_max_tokens = min(
             int(config["max_new_tokens"]),

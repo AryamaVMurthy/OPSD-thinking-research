@@ -37,3 +37,26 @@ def lcb_messages(question_content: str, starter_code: str = "") -> list[dict[str
         {"role": "system", "content": LCB_SYSTEM},
         {"role": "user", "content": user},
     ]
+
+
+def render_thinking_prompt(tokenizer, messages: list[dict[str, str]]) -> str:
+    """Render and assert Qwen3's enable/disable thinking switch is active."""
+    thinking_prompt = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=True,
+    )
+    disabled_prompt = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False,
+    )
+    if thinking_prompt == disabled_prompt:
+        raise RuntimeError("chat template ignored enable_thinking")
+    if "</think>" not in disabled_prompt:
+        raise RuntimeError("disabled Qwen3 prompt lacks its forced empty thinking block")
+    if "</think>" in thinking_prompt:
+        raise RuntimeError("thinking-enabled Qwen3 prompt was prematurely closed")
+    return thinking_prompt

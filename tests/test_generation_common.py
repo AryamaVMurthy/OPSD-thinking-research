@@ -3,7 +3,14 @@ from __future__ import annotations
 import unittest
 
 from opsd_research.generation_common import extract_last_boxed, split_thinking
-from opsd_research.prompts import lcb_messages, math_messages
+from opsd_research.prompts import lcb_messages, math_messages, render_thinking_prompt
+
+
+class FakeQwenTokenizer:
+    def apply_chat_template(self, _messages, *, enable_thinking, **_kwargs):
+        if enable_thinking:
+            return "<assistant>"
+        return "<assistant><think>\n\n</think>\n\n"
 
 
 class GenerationTests(unittest.TestCase):
@@ -24,6 +31,12 @@ class GenerationTests(unittest.TestCase):
         self.assertIn(r"\boxed{}", math_messages("x")[0]["content"])
         messages = lcb_messages("solve", "")
         self.assertIn("Python code block", messages[1]["content"])
+
+    def test_qwen_thinking_switch_is_checked(self):
+        self.assertEqual(
+            render_thinking_prompt(FakeQwenTokenizer(), math_messages("x")),
+            "<assistant>",
+        )
 
 
 if __name__ == "__main__":
