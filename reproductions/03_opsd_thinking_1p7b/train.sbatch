@@ -41,6 +41,7 @@ accelerate launch \
   -m opsd_research.launch_official_opsd \
   --model_name_or_path Qwen/Qwen3-1.7B \
   --model_revision 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e \
+  --student_model_revision 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e \
   --learning_rate 5e-6 \
   --max_grad_norm 0.1 \
   --per_device_train_batch_size 4 \

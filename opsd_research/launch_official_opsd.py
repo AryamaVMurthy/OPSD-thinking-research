@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 
 from .config import ALLOWED_MODELS
-from .training_data import load_math_cot_20k
 
 
 PINNED_DATASET = "jasonrqh/Math-CoT-20k"
@@ -27,6 +26,7 @@ def _flag(name: str) -> bool:
 def _validate_invocation() -> None:
     model = _argument("--model_name_or_path")
     revision = _argument("--model_revision")
+    student_revision = _argument("--student_model_revision")
     max_steps = _argument("--max_steps")
     if model not in ALLOWED_MODELS:
         raise SystemExit(f"forbidden model {model!r}; expected an instruction Qwen3 checkpoint")
@@ -34,6 +34,11 @@ def _validate_invocation() -> None:
         raise SystemExit("Qwen3 Base checkpoints are forbidden")
     if not revision or revision in {"main", "latest"}:
         raise SystemExit("--model_revision must be an immutable commit")
+    if student_revision != revision:
+        raise SystemExit(
+            "--student_model_revision must match --model_revision so vLLM rollouts "
+            "use the pinned training checkpoint"
+        )
     if max_steps != "200":
         raise SystemExit("--max_steps must be exactly 200")
     for flag in ("--student_thinking", "--teacher_thinking", "--fixed_teacher", "--use_peft"):
@@ -42,6 +47,8 @@ def _validate_invocation() -> None:
 
 
 def _install_dataset_redirect() -> None:
+    from .training_data import load_math_cot_20k
+
     revision = os.environ.get("OPSD_DATASET_REVISION")
     if not revision or revision in {"main", "latest"}:
         raise SystemExit("OPSD_DATASET_REVISION must be an immutable commit")

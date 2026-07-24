@@ -41,6 +41,7 @@ accelerate launch \
   -m opsd_research.launch_official_opsd \
   --model_name_or_path Qwen/Qwen3-4B \
   --model_revision 1cfa9a7208912126459214e8b04321603b3df60c \
+  --student_model_revision 1cfa9a7208912126459214e8b04321603b3df60c \
   --learning_rate 5e-6 \
   --max_grad_norm 0.1 \
   --per_device_train_batch_size 4 \
