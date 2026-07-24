@@ -17,6 +17,7 @@ def main() -> None:
     )
     render_thinking_prompt(tokenizer, math_messages("Compute 1+1."))
     import flash_attn
+    import flashinfer
     import vllm
 
     print(
@@ -28,6 +29,7 @@ def main() -> None:
                 "torch": torch.__version__,
                 "vllm": vllm.__version__,
                 "flash_attn": flash_attn.__version__,
+                "flashinfer": flashinfer.__version__,
                 "thinking_template_switch": True,
             },
             sort_keys=True,
