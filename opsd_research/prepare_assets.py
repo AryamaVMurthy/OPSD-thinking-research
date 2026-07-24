@@ -5,6 +5,7 @@ from huggingface_hub import snapshot_download
 
 from .config import MATH_DATASETS
 from .lcb_data import load_lcb_v6
+from .training_data import load_math_cot_20k
 
 
 MODELS = (
@@ -36,14 +37,7 @@ def main() -> None:
     lcb = load_lcb_v6("0fe84c3912ea0c4d4a78037083943e8f0c4dd505")
     if len(lcb) != 175:
         raise RuntimeError(f"LCB v6: expected 175, found {len(lcb)}")
-    training = load_dataset(
-        "jasonrqh/Math-CoT-20k",
-        split="train",
-        revision="1435fb21d4fecc8ad4966a26f22a874cf2b527f1",
-    )
-    required = {"question", "response"}
-    if not required.issubset(training.column_names):
-        raise RuntimeError(f"training dataset missing columns: {required - set(training.column_names)}")
+    training = load_math_cot_20k()["train"]
     print(f"cached Math-CoT-20k: {len(training)} rows", flush=True)
 
 

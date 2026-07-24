@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from .config import ALLOWED_MODELS
+from .training_data import load_math_cot_20k
 
 
 PINNED_DATASET = "jasonrqh/Math-CoT-20k"
@@ -52,12 +53,12 @@ def _install_dataset_redirect() -> None:
     def pinned_load_dataset(path, *args, **kwargs):
         if path != OFFICIAL_HARDCODED_DATASET:
             return original_load_dataset(path, *args, **kwargs)
-        loaded = original_load_dataset(
-            PINNED_DATASET,
-            *args,
-            revision=revision,
-            **kwargs,
-        )
+        if args or kwargs:
+            raise RuntimeError(
+                "official OPSD dataset call unexpectedly supplied arguments; "
+                "refusing an ambiguous redirect"
+            )
+        loaded = load_math_cot_20k(revision)
 
         def normalize(example):
             return {
