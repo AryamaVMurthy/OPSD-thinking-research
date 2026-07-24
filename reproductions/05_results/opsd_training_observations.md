@@ -73,6 +73,28 @@ non-negative per-sequence-token divergence.
 - Checkpoint contains eight optimizer shards, model state, adapter, trainer
   state, scheduler, tokenizer, and all eight RNG states.
 
+## Completed Qwen3-1.7B execution
+
+Job 16051 completed all 200 optimizer steps with exit `0:0` in 1h30m40s.
+The losses and gradients remained finite; the final logged loss was -0.0173,
+the final gradient norm was 0.0221662, and the reported aggregate training
+loss was -0.0130393.
+
+Full resumable checkpoints 50, 100, 150, and 200 remain on node10 scratch.
+The corresponding adapters, configurations, trainer states, generation
+dumps, telemetry, logs, and manifests were copied locally. Every local
+checkpoint checksum and the run manifest verifies. The checkpoint-200
+adapter SHA-256 is
+`18b17aedf89519813f5f9e352412d503f03a8c5c73519546dd39f252c0053042`.
+
+Across the 39 saved dumps through step 195, all 784 stored rollouts started
+non-empty thinking, 17 closed the thinking segment, and 16 emitted a boxed
+answer. Of 6,366 logged vLLM calls, 6,350 reached exactly 1,024 tokens; mean
+length was 1,023.15 and the shortest was 150. Peak memory was 37,211 MiB,
+mean utilization including setup was 85–87%, and maximum temperature was
+62°C. The absent step-200 dump is the upstream final-buffer bug described
+above; checkpoint 200 itself is complete and verified.
+
 ## Qwen3-4B memory gate
 
 The first 4B smoke attempt (job 16052) failed before its first optimizer step.
