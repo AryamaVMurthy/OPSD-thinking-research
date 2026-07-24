@@ -10,7 +10,7 @@ CONFIG="$1"
 EVAL_MODULE="$2"
 RUN_NAME="$3"
 ADAPTER="${4:-}"
-METHOD="${5:-qwen3-instruct}"
+METHOD="${5:-untouched}"
 CHECKPOINT="${6:-none}"
 
 sbatch \

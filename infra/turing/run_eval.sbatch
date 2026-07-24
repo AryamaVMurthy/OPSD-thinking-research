@@ -25,14 +25,18 @@ mkdir -p "${OUTPUT_DIR}"
 cp "${PROJECT_SOURCE}/${CONFIG}" "${OUTPUT_DIR}/config.yaml"
 python3 -m opsd_research.cli validate-config "${PROJECT_SOURCE}/${CONFIG}"
 
-METHOD="${METHOD:-qwen3-instruct}"
+METHOD="${METHOD:-untouched}"
 CHECKPOINT="${CHECKPOINT:-none}"
 export CONFIG EVAL_MODULE RUN_NAME ADAPTER METHOD CHECKPOINT
 
 start_gpu_telemetry "${RUN_NAME}"
 trap stop_gpu_telemetry EXIT
 
-srun --kill-on-bad-exit=1 "${PROJECT_SOURCE}/infra/turing/eval_worker.sh"
+srun \
+  --kill-on-bad-exit=1 \
+  --gpus-per-task=1 \
+  --gpu-bind=single:1 \
+  "${PROJECT_SOURCE}/infra/turing/eval_worker.sh"
 
 if [[ "${EVAL_MODULE}" == "math_eval" ]]; then
   python3 -m opsd_research.summarize_math \
