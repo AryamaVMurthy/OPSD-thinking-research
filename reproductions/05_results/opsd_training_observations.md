@@ -28,6 +28,13 @@ This means the run is a faithful measurement of the requested protocol, but
 the student is usually distilled on prefixes of reasoning rather than
 complete reasoning-answer trajectories.
 
+At step 100, the sole closed trace exposes an additional data-quality issue:
+the source example asks for an English translation of an already-English
+geometry sentence and requests the translated text directly, while the OPSD
+collator appends a conflicting step-by-step/boxed-answer instruction. The
+model repeats the sentence instead of solving it. Thus, a closed thinking tag
+does not by itself imply a usable mathematical training trajectory.
+
 ## The clipped objective is not guaranteed non-negative
 
 For `beta=0`, the upstream loss first computes each vocabulary element of
