@@ -58,6 +58,9 @@ stop_gpu_telemetry() {
 
 record_run_manifest() {
   local output_dir="$1"
+  local run_id="${SLURM_JOB_ID:-manual}"
+  local runtime_file="runtime-${run_id}.txt"
+  local checksum_file="manifest-${run_id}.sha256"
   if ! git -C "${PROJECT_SOURCE}" diff --quiet ||
     ! git -C "${PROJECT_SOURCE}" diff --cached --quiet; then
     echo "Refusing to run from a source tree with tracked modifications" >&2
@@ -70,13 +73,13 @@ record_run_manifest() {
   fi
   {
     printf 'recorded_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    printf 'slurm_job_id=%s\n' "${SLURM_JOB_ID:-manual}"
+    printf 'slurm_job_id=%s\n' "${run_id}"
     printf 'node=%s\n' "${NODE_NAME}"
     printf 'cuda_visible_devices=%s\n' "${CUDA_VISIBLE_DEVICES:-unset}"
-  } > "${output_dir}/runtime.txt"
+  } > "${output_dir}/${runtime_file}"
   (
     cd "${output_dir}"
-    sha256sum config.yaml source-commit.txt environment-freeze.txt runtime.txt \
-      > manifest.sha256
+    sha256sum config.yaml source-commit.txt environment-freeze.txt "${runtime_file}" \
+      > "${checksum_file}"
   )
 }
