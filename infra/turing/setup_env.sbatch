@@ -19,7 +19,9 @@ export UV_CACHE_DIR="${SCRATCH_ROOT}/uv-cache"
 export UV_PYTHON_INSTALL_DIR="${SCRATCH_ROOT}/uv-python"
 
 "${UV_BIN}" python install 3.10
-"${UV_BIN}" venv --python 3.10 "${ENV_DIR}"
+if [[ ! -x "${ENV_DIR}/bin/python3" ]]; then
+  "${UV_BIN}" venv --python 3.10 "${ENV_DIR}"
+fi
 source "${ENV_DIR}/bin/activate"
 
 "${UV_BIN}" pip install \
