@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if (( $# != 1 )); then
-  echo "usage: $0 TRAIN_JOB_ID" >&2
+if (( $# < 1 || $# > 2 )); then
+  echo "usage: $0 TRAIN_JOB_ID [ADAPTER_SMOKE_JOB_ID]" >&2
   exit 2
 fi
 
 train_job_id="$1"
+smoke_job_id="${2:-}"
 if [[ ! "${train_job_id}" =~ ^[0-9]+$ ]]; then
   echo "TRAIN_JOB_ID must be numeric" >&2
+  exit 2
+fi
+if [[ -n "${smoke_job_id}" && ! "${smoke_job_id}" =~ ^[0-9]+$ ]]; then
+  echo "ADAPTER_SMOKE_JOB_ID must be numeric" >&2
   exit 2
 fi
 
@@ -21,11 +26,14 @@ fi
 
 adapter_root="/scratch/node10/${USER}/opsd-thinking-research/training/qwen3-1p7b-opsd-thinking"
 dependency="afterok:${train_job_id}"
+if [[ -n "${smoke_job_id}" ]]; then
+  dependency+=":${smoke_job_id}"
+fi
 source_commit="$(git rev-parse HEAD)"
 submission_id="$(date -u +%Y%m%dT%H%M%SZ)"
 manifest="${project_source}/logs/posttrain-1p7b-${submission_id}.tsv"
 
-printf 'source_commit\ttraining_job\teval_job\tscore_job\trun_name\tcheckpoint\tconfig\tadapter\n' \
+printf 'source_commit\ttraining_job\tadapter_smoke_job\teval_job\tscore_job\trun_name\tcheckpoint\tconfig\tadapter\n' \
   > "${manifest}"
 
 submit_eval() {
@@ -49,8 +57,8 @@ for checkpoint in 50 100 150 200; do
     config="reproductions/01_qwen3_thinking_math/configs/qwen3-1p7b-${benchmark}.yaml"
     run_name="opsd-qwen3-1p7b-step${checkpoint}-${benchmark}"
     eval_job="$(submit_eval "${config}" math_eval "${run_name}" "${checkpoint}")"
-    printf '%s\t%s\t%s\t\t%s\t%s\t%s\t%s\n' \
-      "${source_commit}" "${train_job_id}" "${eval_job}" "${run_name}" \
+    printf '%s\t%s\t%s\t%s\t\t%s\t%s\t%s\t%s\n' \
+      "${source_commit}" "${train_job_id}" "${smoke_job_id}" "${eval_job}" "${run_name}" \
       "${checkpoint}" "${config}" "${adapter_root}/checkpoint-${checkpoint}" \
       >> "${manifest}"
   done
@@ -60,8 +68,8 @@ checkpoint=200
 config="reproductions/01_qwen3_thinking_math/configs/qwen3-1p7b-aime26.yaml"
 run_name="opsd-qwen3-1p7b-step200-aime26"
 eval_job="$(submit_eval "${config}" math_eval "${run_name}" "${checkpoint}")"
-printf '%s\t%s\t%s\t\t%s\t%s\t%s\t%s\n' \
-  "${source_commit}" "${train_job_id}" "${eval_job}" "${run_name}" \
+printf '%s\t%s\t%s\t%s\t\t%s\t%s\t%s\t%s\n' \
+  "${source_commit}" "${train_job_id}" "${smoke_job_id}" "${eval_job}" "${run_name}" \
   "${checkpoint}" "${config}" "${adapter_root}/checkpoint-${checkpoint}" \
   >> "${manifest}"
 
@@ -74,8 +82,8 @@ score_job="$(
     --export=ALL,CONFIG="${config}",RUN_NAME="${run_name}" \
     infra/turing/run_lcb_score.sbatch
 )"
-printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-  "${source_commit}" "${train_job_id}" "${lcb_job}" "${score_job}" \
+printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+  "${source_commit}" "${train_job_id}" "${smoke_job_id}" "${lcb_job}" "${score_job}" \
   "${run_name}" "${checkpoint}" "${config}" \
   "${adapter_root}/checkpoint-${checkpoint}" >> "${manifest}"
 

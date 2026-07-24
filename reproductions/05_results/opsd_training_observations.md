@@ -72,3 +72,45 @@ non-negative per-sequence-token divergence.
 - Maximum observed temperature: 62°C.
 - Checkpoint contains eight optimizer shards, model state, adapter, trainer
   state, scheduler, tokenizer, and all eight RNG states.
+
+## Qwen3-4B memory gate
+
+The first 4B smoke attempt (job 16052) failed before its first optimizer step.
+The upstream trainer computed vocabulary logits for every token in the long
+privileged-teacher prompt and then immediately sliced those prompt positions
+away. That unused tensor required another 4.10 GiB on rank 0; another rank
+also had only 13.56 MiB free when an exact-KL chunk needed 20 MiB.
+
+The repaired path asks Qwen3 for only the final
+`generation_length + 1` logit positions. Dropping the final unscored position
+then gives exactly the same generation-token slice as the upstream
+`prompt_length - 1 : -1` expression. A pinned-Transformers Turing test
+compared both prompt lengths, output logits, and LM-head gradients and passed
+exactly. This changes allocation only; the full-vocabulary clipped forward-KL
+objective is unchanged.
+
+The five-step 4B gate then passed as Slurm job 16056 from source commit
+`5e4af436c1b38dc72a8346863af5926f125d07af`:
+
+- state `COMPLETED`, exit `0:0`, wall time 5m36s;
+- all five logged losses finite, from -0.0029 to -0.0042;
+- peak GPU memory 38,769 MiB, leaving about 2.1 GiB on a 40,960 MiB A100;
+- steady training samples at 94–95% utilization, with maximum temperature
+  62°C;
+- full checkpoint 5 is 2,908,453,766 bytes and contains the adapter, model
+  state, eight optimizer shards, eight RNG states, scheduler, tokenizer, and
+  trainer state;
+- the run manifest verifies, and the final-buffer repair produced
+  `generations_step_5.json` with 20 non-empty samples that covers checkpoint
+  5.
+
+All 160 vLLM calls reached the 1,024-token completion cap. Manual inspection
+of all 20 saved rank-0 rollouts found no closed thinking tag or boxed answer.
+Several traces had a correct solution in progress before cutoff: the normal
+line derivative and slope, the minimum dice score, the AM-GM minimum, the
+multinomial term count, and the mark-recapture estimate. Other traces stalled
+in repeated alternatives, remained at setup, depended on a missing source
+figure, or had not yet resolved the main optimization. Therefore the gate
+proves execution and checkpoint correctness, but it reinforces the 1.7B
+finding that the official 1,024-token training budget mostly distills
+incomplete reasoning prefixes when thinking is enabled.

@@ -15,7 +15,11 @@ cd "${PROJECT_SOURCE}"
 
 adapter_args=()
 if [[ -n "${ADAPTER:-}" ]]; then
-  adapter_args=(--adapter "${ADAPTER}")
+  : "${ADAPTER_SHA256:?ADAPTER_SHA256 is required with ADAPTER}"
+  adapter_args=(
+    --adapter "${ADAPTER}"
+    --adapter-sha256 "${ADAPTER_SHA256}"
+  )
 fi
 
 python3 -m "opsd_research.${EVAL_MODULE}" \

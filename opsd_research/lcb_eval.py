@@ -11,7 +11,14 @@ from .config import load_config
 from .generation_common import finish_reason, output_token_ids, split_thinking
 from .lcb_data import load_lcb_v6, upstream_path
 from .prompts import lcb_messages, render_thinking_prompt
-from .records import append_jsonl, key, prompt_hash, read_jsonl, stable_seed
+from .records import (
+    append_jsonl,
+    key,
+    prompt_hash,
+    read_jsonl,
+    stable_seed,
+    validate_adapter_identity,
+)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -19,6 +26,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--adapter", type=Path)
+    parser.add_argument("--adapter-sha256")
     parser.add_argument("--method", default="qwen3-instruct")
     parser.add_argument("--checkpoint", default="none")
     parser.add_argument("--shard-id", type=int, default=0)
@@ -34,6 +42,10 @@ def main() -> None:
         raise SystemExit("lcb_eval requires kind=lcb_eval")
     if not 0 <= args.shard_id < args.num_shards:
         raise SystemExit("shard-id must be in [0, num-shards)")
+    try:
+        validate_adapter_identity(args.adapter, args.adapter_sha256)
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
 
     sys.path.insert(0, str(upstream_path()))
     from lcb_runner.lm_styles import LMStyle
@@ -161,6 +173,7 @@ def main() -> None:
                 "model": config["model"],
                 "method": args.method,
                 "checkpoint": str(args.checkpoint),
+                "adapter_sha256": args.adapter_sha256,
                 "shard_id": args.shard_id,
                 "num_shards": args.num_shards,
                 "requests": len(requests),
@@ -203,6 +216,7 @@ def main() -> None:
             "model_revision": config["model_revision"],
             "method": args.method,
             "checkpoint": str(args.checkpoint),
+            "adapter_sha256": args.adapter_sha256,
             "benchmark": "livecodebench-v6-thinking",
             "dataset_revision": config["dataset_revision"],
             "problem_id": str(problem.question_id),

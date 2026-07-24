@@ -35,6 +35,18 @@ def prompt_hash(prompt: str) -> str:
     return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
 
 
+def validate_adapter_identity(
+    adapter: str | Path | None, adapter_sha256: str | None
+) -> None:
+    if bool(adapter) != bool(adapter_sha256):
+        raise ValueError("adapter and adapter_sha256 must be supplied together")
+    if adapter_sha256 and (
+        len(adapter_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in adapter_sha256)
+    ):
+        raise ValueError("adapter_sha256 must be a lowercase SHA-256 digest")
+
+
 def read_jsonl(path: str | Path) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     with Path(path).open("r", encoding="utf-8") as handle:

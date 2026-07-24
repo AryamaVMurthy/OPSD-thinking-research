@@ -58,9 +58,16 @@ stop_gpu_telemetry() {
 
 record_run_manifest() {
   local output_dir="$1"
+  shift
   local run_id="${SLURM_JOB_ID:-manual}"
   local runtime_file="runtime-${run_id}.txt"
   local checksum_file="manifest-${run_id}.sha256"
+  local -a manifest_files=(
+    config.yaml
+    source-commit.txt
+    environment-freeze.txt
+    "${runtime_file}"
+  )
   if ! git -C "${PROJECT_SOURCE}" diff --quiet ||
     ! git -C "${PROJECT_SOURCE}" diff --cached --quiet; then
     echo "Refusing to run from a source tree with tracked modifications" >&2
@@ -77,9 +84,16 @@ record_run_manifest() {
     printf 'node=%s\n' "${NODE_NAME}"
     printf 'cuda_visible_devices=%s\n' "${CUDA_VISIBLE_DEVICES:-unset}"
   } > "${output_dir}/${runtime_file}"
+  local extra_file
+  for extra_file in "$@"; do
+    if [[ "${extra_file}" == */* || ! -f "${output_dir}/${extra_file}" ]]; then
+      echo "Invalid manifest extra file: ${extra_file}" >&2
+      return 1
+    fi
+    manifest_files+=("${extra_file}")
+  done
   (
     cd "${output_dir}"
-    sha256sum config.yaml source-commit.txt environment-freeze.txt "${runtime_file}" \
-      > "${checksum_file}"
+    sha256sum "${manifest_files[@]}" > "${checksum_file}"
   )
 }

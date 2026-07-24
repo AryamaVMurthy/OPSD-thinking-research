@@ -23,12 +23,30 @@ OUTPUT_DIR="${RESULTS_ROOT}/${RUN_NAME}"
 export OUTPUT_DIR
 mkdir -p "${OUTPUT_DIR}"
 cp "${PROJECT_SOURCE}/${CONFIG}" "${OUTPUT_DIR}/config.yaml"
-record_run_manifest "${OUTPUT_DIR}"
 python3 -m opsd_research.cli validate-config "${PROJECT_SOURCE}/${CONFIG}"
 
 METHOD="${METHOD:-untouched}"
 CHECKPOINT="${CHECKPOINT:-none}"
-export CONFIG EVAL_MODULE RUN_NAME ADAPTER METHOD CHECKPOINT
+ADAPTER="${ADAPTER:-}"
+ADAPTER_SHA256=""
+manifest_extras=()
+if [[ -n "${ADAPTER}" ]]; then
+  adapter_file="${ADAPTER}/adapter_model.safetensors"
+  if [[ ! -f "${adapter_file}" ]]; then
+    echo "Missing LoRA adapter: ${adapter_file}" >&2
+    exit 1
+  fi
+  ADAPTER_SHA256="$(sha256sum "${adapter_file}" | awk '{print $1}')"
+  {
+    printf 'adapter_path=%s\n' "${ADAPTER}"
+    printf 'adapter_sha256=%s\n' "${ADAPTER_SHA256}"
+    printf 'method=%s\n' "${METHOD}"
+    printf 'checkpoint=%s\n' "${CHECKPOINT}"
+  } > "${OUTPUT_DIR}/adapter-metadata.txt"
+  manifest_extras+=(adapter-metadata.txt)
+fi
+record_run_manifest "${OUTPUT_DIR}" "${manifest_extras[@]}"
+export CONFIG EVAL_MODULE RUN_NAME ADAPTER ADAPTER_SHA256 METHOD CHECKPOINT
 
 start_gpu_telemetry "${RUN_NAME}"
 trap stop_gpu_telemetry EXIT

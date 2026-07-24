@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
-from opsd_research.records import stable_seed, validate_unique_complete
+from opsd_research.records import (
+    stable_seed,
+    validate_adapter_identity,
+    validate_unique_complete,
+)
 
 
 def record(problem_id: str, sample_index: int):
@@ -34,6 +39,15 @@ class RecordTests(unittest.TestCase):
     def test_missing_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "incomplete"):
             validate_unique_complete([record("a", 0)], ("a",), 2)
+
+    def test_adapter_and_digest_are_coupled(self):
+        digest = "a" * 64
+        validate_adapter_identity(Path("/adapter"), digest)
+        validate_adapter_identity(None, None)
+        with self.assertRaisesRegex(ValueError, "together"):
+            validate_adapter_identity(Path("/adapter"), None)
+        with self.assertRaisesRegex(ValueError, "SHA-256"):
+            validate_adapter_identity(Path("/adapter"), "A" * 64)
 
 
 if __name__ == "__main__":
