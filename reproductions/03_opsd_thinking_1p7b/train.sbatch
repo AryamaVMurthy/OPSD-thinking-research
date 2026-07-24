@@ -4,7 +4,7 @@
 #SBATCH --partition=u22
 #SBATCH --qos=high
 #SBATCH --nodelist=node10
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:8
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=384G
 #SBATCH --time=48:00:00
@@ -37,8 +37,8 @@ trap stop_gpu_telemetry EXIT
 
 accelerate launch \
   --config_file third_party/opsd/accelerate.yaml \
-  --num_processes 4 \
-  --gradient_accumulation_steps 2 \
+  --num_processes 8 \
+  --gradient_accumulation_steps 4 \
   --main_process_port 12949 \
   -m opsd_research.launch_official_opsd \
   --model_name_or_path Qwen/Qwen3-1.7B \
@@ -46,9 +46,9 @@ accelerate launch \
   --student_model_revision 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e \
   --learning_rate 5e-6 \
   --max_grad_norm 0.1 \
-  --per_device_train_batch_size 4 \
+  --per_device_train_batch_size 1 \
   --gradient_checkpointing \
-  --gradient_accumulation_steps 2 \
+  --gradient_accumulation_steps 4 \
   --output_dir "${TRAIN_ROOT}" \
   --run_config "${run_name}" \
   --num_train_epochs 30 \
