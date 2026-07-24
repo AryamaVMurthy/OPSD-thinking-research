@@ -164,6 +164,15 @@ def _validate_train(data: dict[str, Any], source: str) -> None:
     }
     if set(data.get("lora_target_modules", [])) != expected_modules:
         raise ConfigError(f"{source}: LoRA must target every projection module")
+    chunk_size = data.get("exact_jsd_vocab_chunk_size")
+    if chunk_size is not None and (
+        not isinstance(chunk_size, int)
+        or isinstance(chunk_size, bool)
+        or chunk_size <= 0
+    ):
+        raise ConfigError(
+            f"{source}: exact_jsd_vocab_chunk_size must be a positive integer"
+        )
 
 
 def validate_config(data: dict[str, Any], source: str = "<config>") -> None:

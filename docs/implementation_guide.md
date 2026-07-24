@@ -46,6 +46,18 @@ The generic evaluation launcher uses eight one-GPU workers. Each worker owns
 an independent JSONL shard with deterministic seeds, so preemption can resume
 without duplicates. LoRA checkpoints are loaded directly by vLLM.
 
+After the 1.7B training job is submitted, queue its complete evaluation matrix
+with:
+
+```bash
+infra/turing/submit_posttrain_1p7b.sh TRAIN_JOB_ID
+```
+
+Every evaluation depends on successful training completion. The LCB official
+execution-scoring job additionally depends on successful LCB generation. The
+submission command writes an immutable TSV mapping training, generation, and
+scoring job IDs under `logs/`.
+
 ## Observability and acceptance
 
 `infra/turing/monitor.sh` shows queue state, accounting state, exit codes,

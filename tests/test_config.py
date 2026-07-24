@@ -46,6 +46,15 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "batch factors"):
             validate_config(changed)
 
+    def test_bad_exact_jsd_chunk_size_is_rejected(self):
+        data = load_config(
+            ROOT / "reproductions/04_opsd_thinking_4b/configs/train.yaml"
+        ).data
+        changed = copy.deepcopy(data)
+        changed["exact_jsd_vocab_chunk_size"] = 0
+        with self.assertRaisesRegex(ConfigError, "positive integer"):
+            validate_config(changed)
+
 
 if __name__ == "__main__":
     unittest.main()

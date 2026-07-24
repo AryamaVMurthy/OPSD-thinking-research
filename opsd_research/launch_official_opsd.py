@@ -101,12 +101,65 @@ def _install_structured_dataset_compat() -> None:
     opsd_trainer.OPSDTrainer.__init__ = compatible_init
 
 
+def _install_exact_jsd_chunking() -> None:
+    raw_chunk_size = os.environ.get("OPSD_EXACT_JSD_VOCAB_CHUNK_SIZE")
+    if raw_chunk_size is None:
+        return
+    try:
+        chunk_size = int(raw_chunk_size)
+    except ValueError as error:
+        raise SystemExit(
+            "OPSD_EXACT_JSD_VOCAB_CHUNK_SIZE must be a positive integer"
+        ) from error
+    if chunk_size <= 0:
+        raise SystemExit(
+            "OPSD_EXACT_JSD_VOCAB_CHUNK_SIZE must be a positive integer"
+        )
+
+    import opsd_trainer
+
+    from .jsd import exact_forward_kl_vocab_chunked
+
+    def chunked_loss(
+        student_logits,
+        teacher_logits,
+        labels=None,
+        beta=0.5,
+        temperature=1.0,
+        reduction="batchmean",
+        logits_are_probs=False,
+        top_k=None,
+        token_clip=None,
+    ):
+        return exact_forward_kl_vocab_chunked(
+            student_logits,
+            teacher_logits,
+            labels,
+            beta=beta,
+            temperature=temperature,
+            reduction=reduction,
+            logits_are_probs=logits_are_probs,
+            top_k=top_k,
+            token_clip=token_clip,
+            chunk_size=chunk_size,
+        )
+
+    opsd_trainer.OPSDTrainer.generalized_jsd_loss = staticmethod(chunked_loss)
+    print(
+        '{"event":"exact_jsd_chunking_enabled",'
+        f'"vocab_chunk_size":{chunk_size},'
+        '"objective":"full_vocab_forward_kl"}',
+        flush=True,
+    )
+
+
 def main() -> None:
     _validate_invocation()
     _install_dataset_redirect()
     upstream = Path(__file__).resolve().parents[1] / "third_party" / "opsd"
     sys.path.insert(0, str(upstream))
     _install_structured_dataset_compat()
+    _install_exact_jsd_chunking()
     runpy.run_path(str(upstream / "opsd_train.py"), run_name="__main__")
 
 

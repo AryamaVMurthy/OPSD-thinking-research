@@ -18,6 +18,7 @@ cd "${PROJECT_SOURCE}"
 CONFIG="reproductions/04_opsd_thinking_4b/configs/train.yaml"
 python3 -m opsd_research.cli validate-config "${CONFIG}"
 export OPSD_DATASET_REVISION=1435fb21d4fecc8ad4966a26f22a874cf2b527f1
+export OPSD_EXACT_JSD_VOCAB_CHUNK_SIZE=4096
 
 run_name="qwen3-4b-opsd-thinking"
 output_dir="${TRAIN_ROOT}/${run_name}"
@@ -38,7 +39,7 @@ trap stop_gpu_telemetry EXIT
 accelerate launch \
   --config_file third_party/opsd/accelerate.yaml \
   --num_processes 8 \
-  --gradient_accumulation_steps 1 \
+  --gradient_accumulation_steps 4 \
   --main_process_port 12949 \
   -m opsd_research.launch_official_opsd \
   --model_name_or_path Qwen/Qwen3-4B \
@@ -46,9 +47,9 @@ accelerate launch \
   --student_model_revision 1cfa9a7208912126459214e8b04321603b3df60c \
   --learning_rate 5e-6 \
   --max_grad_norm 0.1 \
-  --per_device_train_batch_size 4 \
+  --per_device_train_batch_size 1 \
   --gradient_checkpointing \
-  --gradient_accumulation_steps 1 \
+  --gradient_accumulation_steps 4 \
   --output_dir "${TRAIN_ROOT}" \
   --run_config "${run_name}" \
   --num_train_epochs 30 \
