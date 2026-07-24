@@ -82,3 +82,9 @@ accelerate launch \
   --report_to wandb \
   --wandb_project OPSD-thinking-reproduction \
   "${resume_args[@]}"
+
+python3 -m opsd_research.summarize_training \
+  --training-dir "${output_dir}" \
+  --training-log "${PROJECT_SOURCE}/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out" \
+  --output "${output_dir}/training-summary.json" \
+  --max-completion-length 1024
