@@ -35,6 +35,16 @@ collator appends a conflicting step-by-step/boxed-answer instruction. The
 model repeats the sentence instead of solving it. Thus, a closed thinking tag
 does not by itself imply a usable mathematical training trajectory.
 
+## Upstream final-buffer logging gap
+
+The upstream trainer checks its five-step rollout-save condition before the
+trainer increments the final global step. The completed 1.7B run therefore
+contains dumps through step 195 but no `generations_step_200.json`, even
+though checkpoint 200 is complete. The wrapper now flushes any non-empty
+generation buffer on the main process after `train()` returns and records a
+structured flush event. This observability fix does not change optimization;
+it applies to subsequent runs.
+
 ## The clipped objective is not guaranteed non-negative
 
 For `beta=0`, the upstream loss first computes each vocabulary element of

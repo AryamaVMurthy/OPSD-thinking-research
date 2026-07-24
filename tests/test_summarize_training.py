@@ -35,7 +35,7 @@ class TrainingSummaryTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            checkpoint = root / "checkpoint-50"
+            checkpoint = root / "checkpoint-5"
             checkpoint.mkdir()
             (checkpoint / "adapter_model.safetensors").write_bytes(b"adapter")
             (checkpoint / "trainer_state.json").write_text("{}", encoding="utf-8")
@@ -71,6 +71,9 @@ class TrainingSummaryTests(unittest.TestCase):
             self.assertEqual(result["vllm_rollout_calls"]["at_completion_cap"], 1)
             self.assertTrue(result["checkpoints"][0]["adapter_present"])
             self.assertTrue(result["checkpoints"][0]["trainer_state_present"])
+            self.assertTrue(
+                result["rollout_dump_integrity"]["covers_latest_checkpoint"]
+            )
             gpu = result["gpu_telemetry"][0]
             self.assertEqual(gpu["mean_utilization_percent"], 90)
             self.assertEqual(gpu["max_memory_mib"], 35000)

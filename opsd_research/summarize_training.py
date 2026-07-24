@@ -147,6 +147,12 @@ def summarize(
         )
 
     latest_loss = losses[-1] if losses else None
+    latest_generation_step = max(generation_steps) if generation_steps else None
+    latest_checkpoint_step = (
+        max(record["step"] for record in checkpoint_records)
+        if checkpoint_records
+        else None
+    )
     summary = {
         "schema_version": 1,
         "training_dir": str(training_dir),
@@ -160,6 +166,15 @@ def summarize(
         ),
         "checkpoints": checkpoint_records,
         "generation_dumps": generation_file_records,
+        "rollout_dump_integrity": {
+            "latest_generation_step": latest_generation_step,
+            "latest_checkpoint_step": latest_checkpoint_step,
+            "covers_latest_checkpoint": (
+                latest_generation_step is not None
+                and latest_checkpoint_step is not None
+                and latest_generation_step >= latest_checkpoint_step
+            ),
+        },
         "recorded_rollouts": {
             "count": len(completions),
             "nonempty": sum(bool(text.strip()) for text in completions),

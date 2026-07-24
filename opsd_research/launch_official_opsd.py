@@ -158,6 +158,28 @@ def _install_exact_jsd_chunking() -> None:
     )
 
 
+def _install_final_generation_flush() -> None:
+    import opsd_trainer
+
+    from .training_observability import flush_final_generation_buffer
+
+    original_train = opsd_trainer.OPSDTrainer.train
+
+    def train_with_final_flush(self, *args, **kwargs):
+        result = original_train(self, *args, **kwargs)
+        flushed = flush_final_generation_buffer(self)
+        if self.accelerator.is_main_process:
+            print(
+                '{"event":"final_generation_buffer_flush",'
+                f'"step":{self.state.global_step},'
+                f'"flushed":{str(flushed).lower()}' + "}",
+                flush=True,
+            )
+        return result
+
+    opsd_trainer.OPSDTrainer.train = train_with_final_flush
+
+
 def main() -> None:
     _validate_invocation()
     _install_dataset_redirect()
@@ -165,6 +187,7 @@ def main() -> None:
     sys.path.insert(0, str(upstream))
     _install_structured_dataset_compat()
     _install_exact_jsd_chunking()
+    _install_final_generation_flush()
     runpy.run_path(str(upstream / "opsd_train.py"), run_name="__main__")
 
 
