@@ -23,6 +23,8 @@ run_name="qwen3-1p7b-opsd-thinking"
 output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"
 cp "${CONFIG}" "${output_dir}/protocol.yaml"
+cp "${CONFIG}" "${output_dir}/config.yaml"
+record_run_manifest "${output_dir}"
 
 resume_args=()
 latest="$(find "${output_dir}" -maxdepth 1 -type d -name 'checkpoint-*' -printf '%f\n' 2>/dev/null | sort -V | tail -n 1)"

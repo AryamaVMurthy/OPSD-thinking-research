@@ -23,6 +23,7 @@ OUTPUT_DIR="${RESULTS_ROOT}/${RUN_NAME}"
 export OUTPUT_DIR
 mkdir -p "${OUTPUT_DIR}"
 cp "${PROJECT_SOURCE}/${CONFIG}" "${OUTPUT_DIR}/config.yaml"
+record_run_manifest "${OUTPUT_DIR}"
 python3 -m opsd_research.cli validate-config "${PROJECT_SOURCE}/${CONFIG}"
 
 METHOD="${METHOD:-untouched}"

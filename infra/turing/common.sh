@@ -55,3 +55,28 @@ stop_gpu_telemetry() {
     wait "${GPU_TELEMETRY_PID}" 2>/dev/null || true
   fi
 }
+
+record_run_manifest() {
+  local output_dir="$1"
+  if ! git -C "${PROJECT_SOURCE}" diff --quiet ||
+    ! git -C "${PROJECT_SOURCE}" diff --cached --quiet; then
+    echo "Refusing to run from a source tree with tracked modifications" >&2
+    return 1
+  fi
+
+  git -C "${PROJECT_SOURCE}" rev-parse HEAD > "${output_dir}/source-commit.txt"
+  if [[ -f "${SCRATCH_ROOT}/environment-freeze.txt" ]]; then
+    cp "${SCRATCH_ROOT}/environment-freeze.txt" "${output_dir}/environment-freeze.txt"
+  fi
+  {
+    printf 'recorded_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'slurm_job_id=%s\n' "${SLURM_JOB_ID:-manual}"
+    printf 'node=%s\n' "${NODE_NAME}"
+    printf 'cuda_visible_devices=%s\n' "${CUDA_VISIBLE_DEVICES:-unset}"
+  } > "${output_dir}/runtime.txt"
+  (
+    cd "${output_dir}"
+    sha256sum config.yaml source-commit.txt environment-freeze.txt runtime.txt \
+      > manifest.sha256
+  )
+}
