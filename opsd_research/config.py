@@ -173,6 +173,13 @@ def _validate_train(data: dict[str, Any], source: str) -> None:
         raise ConfigError(
             f"{source}: exact_jsd_vocab_chunk_size must be a positive integer"
         )
+    tail_logits_only = data.get("tail_logits_only")
+    if tail_logits_only not in (None, True):
+        raise ConfigError(f"{source}: tail_logits_only must be true when set")
+    if data["model"] == "Qwen/Qwen3-4B" and tail_logits_only is not True:
+        raise ConfigError(
+            f"{source}: Qwen3-4B training requires tail_logits_only=true"
+        )
 
 
 def validate_config(data: dict[str, Any], source: str = "<config>") -> None:

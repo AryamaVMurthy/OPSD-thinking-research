@@ -158,6 +158,24 @@ def _install_exact_jsd_chunking() -> None:
     )
 
 
+def _install_tail_logits_loss() -> None:
+    if os.environ.get("OPSD_TAIL_LOGITS_ONLY") is None:
+        return
+    if os.environ["OPSD_TAIL_LOGITS_ONLY"] != "1":
+        raise SystemExit("OPSD_TAIL_LOGITS_ONLY must be exactly 1 when set")
+
+    import opsd_trainer
+
+    from .tail_logits_loss import compute_loss_with_tail_logits
+
+    opsd_trainer.OPSDTrainer.compute_loss = compute_loss_with_tail_logits
+    print(
+        '{"event":"tail_logits_loss_enabled",'
+        '"scope":"generation_tokens_only"}',
+        flush=True,
+    )
+
+
 def _install_final_generation_flush() -> None:
     import opsd_trainer
 
@@ -187,6 +205,7 @@ def main() -> None:
     sys.path.insert(0, str(upstream))
     _install_structured_dataset_compat()
     _install_exact_jsd_chunking()
+    _install_tail_logits_loss()
     _install_final_generation_flush()
     runpy.run_path(str(upstream / "opsd_train.py"), run_name="__main__")
 

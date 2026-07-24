@@ -55,6 +55,15 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "positive integer"):
             validate_config(changed)
 
+    def test_4b_training_requires_tail_logits(self):
+        data = load_config(
+            ROOT / "reproductions/04_opsd_thinking_4b/configs/train.yaml"
+        ).data
+        changed = copy.deepcopy(data)
+        del changed["tail_logits_only"]
+        with self.assertRaisesRegex(ConfigError, "tail_logits_only"):
+            validate_config(changed)
+
 
 if __name__ == "__main__":
     unittest.main()

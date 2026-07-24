@@ -24,6 +24,7 @@ lmbda: 1.0
 beta: 0.0
 jsd_token_clip: 0.05
 exact_jsd_vocab_chunk_size: 4096
+tail_logits_only: true
 lora_r: 64
 lora_alpha: 128
 lora_target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]

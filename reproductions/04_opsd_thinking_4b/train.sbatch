@@ -19,6 +19,7 @@ CONFIG="reproductions/04_opsd_thinking_4b/configs/train.yaml"
 python3 -m opsd_research.cli validate-config "${CONFIG}"
 export OPSD_DATASET_REVISION=1435fb21d4fecc8ad4966a26f22a874cf2b527f1
 export OPSD_EXACT_JSD_VOCAB_CHUNK_SIZE=4096
+export OPSD_TAIL_LOGITS_ONLY=1
 
 run_name="qwen3-4b-opsd-thinking"
 output_dir="${TRAIN_ROOT}/${run_name}"
