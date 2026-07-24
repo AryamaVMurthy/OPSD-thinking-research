@@ -53,5 +53,5 @@ source "${ENV_DIR}/bin/activate"
 python3 -m opsd_research.cli validate-all
 python3 -m opsd_research.prepare_assets
 python3 -m opsd_research.smoke
-python3 -m pip freeze > "${SCRATCH_ROOT}/environment-freeze.txt"
+"${UV_BIN}" pip freeze > "${SCRATCH_ROOT}/environment-freeze.txt"
 df -h "${SCRATCH_ROOT}"
