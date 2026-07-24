@@ -86,6 +86,24 @@ def key(record: dict[str, Any]) -> tuple[str, str, str, str, str, int]:
     )
 
 
+def validate_consistent_fields(
+    records: Iterable[dict[str, Any]], fields: Iterable[str]
+) -> dict[str, Any]:
+    materialized = list(records)
+    if not materialized:
+        raise ValueError("no generation records were provided")
+    identity: dict[str, Any] = {}
+    for field in fields:
+        values = {record.get(field) for record in materialized}
+        if len(values) != 1:
+            raise ValueError(
+                f"inconsistent generation field {field!r}: "
+                f"{sorted(str(value) for value in values)}"
+            )
+        identity[field] = next(iter(values))
+    return identity
+
+
 def validate_unique_complete(
     records: Iterable[dict[str, Any]],
     expected_problem_ids: Iterable[str],

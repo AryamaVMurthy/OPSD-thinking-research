@@ -9,7 +9,11 @@ from statistics import mean, median
 
 from .config import load_config
 from .lcb_data import load_lcb_v6, upstream_path
-from .records import read_jsonl, validate_unique_complete
+from .records import (
+    read_jsonl,
+    validate_consistent_fields,
+    validate_unique_complete,
+)
 
 
 def main() -> None:
@@ -23,6 +27,18 @@ def main() -> None:
     args = parser.parse_args()
     config = load_config(args.config).data
     records = [record for path in args.input for record in read_jsonl(path)]
+    identity = validate_consistent_fields(
+        records,
+        (
+            "model",
+            "model_revision",
+            "method",
+            "checkpoint",
+            "benchmark",
+            "dataset_revision",
+            "adapter_sha256",
+        ),
+    )
     problem_ids = sorted({str(record["problem_id"]) for record in records})
     if len(problem_ids) != config["expected_count"]:
         raise ValueError(
@@ -68,10 +84,13 @@ def main() -> None:
     lengths = sorted(int(record["output_tokens"]) for record in records)
     summary = {
         "schema_version": 1,
-        "model": records[0]["model"],
-        "method": records[0]["method"],
-        "checkpoint": records[0]["checkpoint"],
+        "model": identity["model"],
+        "model_revision": identity["model_revision"],
+        "method": identity["method"],
+        "checkpoint": identity["checkpoint"],
+        "adapter_sha256": identity["adapter_sha256"],
         "benchmark": "livecodebench-v6-thinking",
+        "dataset_revision": identity["dataset_revision"],
         "num_problems": len(benchmark),
         "samples_per_problem": config["samples_per_problem"],
         "pass_at_1": metrics["pass@1"],

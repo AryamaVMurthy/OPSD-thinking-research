@@ -9,7 +9,11 @@ from statistics import mean, median
 
 from .config import MATH_DATASETS, load_config
 from .generation_common import grade_math
-from .records import read_jsonl, validate_unique_complete
+from .records import (
+    read_jsonl,
+    validate_consistent_fields,
+    validate_unique_complete,
+)
 
 
 def _bootstrap_problem_mean(values: dict[str, list[bool]], seed: int = 42) -> list[float]:
@@ -32,6 +36,18 @@ def main() -> None:
     args = parser.parse_args()
     config = load_config(args.config).data
     records = [record for path in args.input for record in read_jsonl(path)]
+    identity = validate_consistent_fields(
+        records,
+        (
+            "model",
+            "model_revision",
+            "method",
+            "checkpoint",
+            "benchmark",
+            "dataset_revision",
+            "adapter_sha256",
+        ),
+    )
     expected_ids = [str(index) for index in range(MATH_DATASETS[config["dataset"]]["expected_count"])]
     observed_ids = sorted({str(record["problem_id"]) for record in records})
     # MathArena IDs are not guaranteed to be contiguous, so validate against observed
@@ -69,10 +85,13 @@ def main() -> None:
     lengths = sorted(int(record["output_tokens"]) for record in records)
     summary = {
         "schema_version": 1,
-        "model": records[0]["model"],
-        "method": records[0]["method"],
-        "checkpoint": records[0]["checkpoint"],
-        "benchmark": records[0]["benchmark"],
+        "model": identity["model"],
+        "model_revision": identity["model_revision"],
+        "method": identity["method"],
+        "checkpoint": identity["checkpoint"],
+        "adapter_sha256": identity["adapter_sha256"],
+        "benchmark": identity["benchmark"],
+        "dataset_revision": identity["dataset_revision"],
         "num_problems": len(by_problem),
         "samples_per_problem": config["samples_per_problem"],
         "avg_at_12": avg,

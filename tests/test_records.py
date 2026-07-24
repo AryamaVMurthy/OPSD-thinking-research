@@ -6,6 +6,7 @@ from pathlib import Path
 from opsd_research.records import (
     stable_seed,
     validate_adapter_identity,
+    validate_consistent_fields,
     validate_unique_complete,
 )
 
@@ -48,6 +49,18 @@ class RecordTests(unittest.TestCase):
             validate_adapter_identity(Path("/adapter"), None)
         with self.assertRaisesRegex(ValueError, "SHA-256"):
             validate_adapter_identity(Path("/adapter"), "A" * 64)
+
+    def test_consistent_record_identity_is_required(self):
+        records = [record("a", 0), record("b", 0)]
+        self.assertEqual(
+            validate_consistent_fields(records, ("model", "method")),
+            {"model": "Qwen/Qwen3-1.7B", "method": "untouched"},
+        )
+        records[1]["method"] = "different"
+        with self.assertRaisesRegex(ValueError, "inconsistent"):
+            validate_consistent_fields(records, ("model", "method"))
+        with self.assertRaisesRegex(ValueError, "no generation"):
+            validate_consistent_fields([], ("model",))
 
 
 if __name__ == "__main__":
