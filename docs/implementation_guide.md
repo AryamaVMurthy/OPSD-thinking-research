@@ -81,6 +81,16 @@ smoke_job="$(
 infra/turing/submit_posttrain_4b.sh TRAIN_JOB_ID "${smoke_job}"
 ```
 
+Once both training job IDs are known, the same two smoke gates and both
+dependency-chained matrices can be submitted atomically:
+
+```bash
+infra/turing/submit_posttrain_pipeline.sh TRAIN_1P7B_JOB_ID TRAIN_4B_JOB_ID
+```
+
+This submits the 1.7B jobs first, so the two model sizes remain separate in
+execution order even though the complete dependency graph is queued at once.
+
 ## Observability and acceptance
 
 `infra/turing/monitor.sh` shows queue state, accounting state, exit codes,
