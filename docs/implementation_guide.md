@@ -44,7 +44,10 @@ with less than 200 GiB free. No unrelated home or scratch data is deleted.
 
 The generic evaluation launcher uses eight one-GPU workers. Each worker owns
 an independent JSONL shard with deterministic seeds, so preemption can resume
-without duplicates. LoRA checkpoints are loaded directly by vLLM.
+without duplicates. Every trained method and checkpoint reuses the exact
+accepted untouched seed for the same model, benchmark, problem, and sample
+index, giving paired random streams across the comparison. LoRA checkpoints
+are loaded directly by vLLM.
 
 Before queuing the full matrix, run one AIME problem through the saved LoRA
 adapter. The gate loads the adapter through vLLM, produces all 12 configured

@@ -31,6 +31,25 @@ def stable_seed(
     return int.from_bytes(digest[:4], "big") & 0x7FFFFFFF
 
 
+def paired_evaluation_seed(
+    base_seed: int,
+    model: str,
+    benchmark: str,
+    problem_id: str,
+    sample_index: int,
+) -> int:
+    """Reuse the accepted untouched random stream for every method/checkpoint."""
+    return stable_seed(
+        base_seed,
+        model,
+        "untouched",
+        "none",
+        benchmark,
+        problem_id,
+        sample_index,
+    )
+
+
 def prompt_hash(prompt: str) -> str:
     return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
 

@@ -37,6 +37,7 @@ def main() -> None:
             "benchmark",
             "dataset_revision",
             "adapter_sha256",
+            "seed_protocol",
         ),
     )
     problem_ids = sorted({str(record["problem_id"]) for record in records})
@@ -89,6 +90,7 @@ def main() -> None:
         "method": identity["method"],
         "checkpoint": identity["checkpoint"],
         "adapter_sha256": identity["adapter_sha256"],
+        "seed_protocol": identity["seed_protocol"],
         "benchmark": "livecodebench-v6-thinking",
         "dataset_revision": identity["dataset_revision"],
         "num_problems": len(benchmark),

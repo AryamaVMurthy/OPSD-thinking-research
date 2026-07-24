@@ -14,9 +14,9 @@ from .prompts import lcb_messages, render_thinking_prompt
 from .records import (
     append_jsonl,
     key,
+    paired_evaluation_seed,
     prompt_hash,
     read_jsonl,
-    stable_seed,
     validate_adapter_identity,
 )
 
@@ -132,11 +132,9 @@ def main() -> None:
             )
             if record_key in existing:
                 continue
-            seed = stable_seed(
+            seed = paired_evaluation_seed(
                 int(config["base_seed"]),
                 config["model"],
-                args.method,
-                str(args.checkpoint),
                 "livecodebench-v6-thinking",
                 str(problem.question_id),
                 sample_index,
@@ -178,6 +176,7 @@ def main() -> None:
                 "num_shards": args.num_shards,
                 "requests": len(requests),
                 "thinking": True,
+                "seed_protocol": "paired-to-untouched-v1",
             },
             sort_keys=True,
         ),
@@ -222,6 +221,7 @@ def main() -> None:
             "problem_id": str(problem.question_id),
             "sample_index": sample_index,
             "seed": seed,
+            "seed_protocol": "paired-to-untouched-v1",
             "enable_thinking": True,
             "prompt_hash": prompt_hash(prompt),
             "prompt_tokens": prompt_tokens,

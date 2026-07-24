@@ -46,6 +46,7 @@ def main() -> None:
             "benchmark",
             "dataset_revision",
             "adapter_sha256",
+            "seed_protocol",
         ),
     )
     expected_ids = [str(index) for index in range(MATH_DATASETS[config["dataset"]]["expected_count"])]
@@ -90,6 +91,7 @@ def main() -> None:
         "method": identity["method"],
         "checkpoint": identity["checkpoint"],
         "adapter_sha256": identity["adapter_sha256"],
+        "seed_protocol": identity["seed_protocol"],
         "benchmark": identity["benchmark"],
         "dataset_revision": identity["dataset_revision"],
         "num_problems": len(by_problem),

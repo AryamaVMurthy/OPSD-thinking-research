@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from opsd_research.records import (
+    paired_evaluation_seed,
     stable_seed,
     validate_adapter_identity,
     validate_consistent_fields,
@@ -27,6 +28,27 @@ class RecordTests(unittest.TestCase):
         args = (42, "m", "method", "none", "bench", "p")
         self.assertEqual(stable_seed(*args, 0), stable_seed(*args, 0))
         self.assertNotEqual(stable_seed(*args, 0), stable_seed(*args, 1))
+
+    def test_paired_seed_matches_the_accepted_untouched_stream(self):
+        expected = stable_seed(
+            42,
+            "Qwen/Qwen3-1.7B",
+            "untouched",
+            "none",
+            "aime25",
+            "7",
+            3,
+        )
+        self.assertEqual(
+            paired_evaluation_seed(
+                42,
+                "Qwen/Qwen3-1.7B",
+                "aime25",
+                "7",
+                3,
+            ),
+            expected,
+        )
 
     def test_complete_matrix(self):
         records = [record(problem, sample) for problem in ("a", "b") for sample in range(2)]
