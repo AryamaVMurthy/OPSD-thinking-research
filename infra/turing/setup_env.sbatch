@@ -35,7 +35,6 @@ source "${ENV_DIR}/bin/activate"
   bitsandbytes==0.48.2 \
   wandb==0.22.3 \
   vllm==0.11.0 \
-  flashinfer-python==0.3.1 \
   xformers==0.0.32.post1 \
   triton==3.4.0 \
   einops==0.8.1 \
@@ -49,6 +48,7 @@ source "${ENV_DIR}/bin/activate"
   packaging==25.0
 
 "${UV_BIN}" pip install --no-build-isolation flash-attn==2.8.3
+"${UV_BIN}" pip install --no-build-isolation flashinfer-python==0.3.1
 "${UV_BIN}" pip install --no-deps -e "${PROJECT_SOURCE}"
 
 python3 -m opsd_research.cli validate-all
