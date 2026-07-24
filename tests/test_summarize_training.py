@@ -47,8 +47,21 @@ class TrainingSummaryTests(unittest.TestCase):
                 "total tokens: 1024, avg length: 1024.0\n",
                 encoding="utf-8",
             )
+            telemetry = root / "gpu.csv"
+            telemetry.write_text(
+                "2026/01/01 00:00:00.000, 0, NVIDIA A100, 80, 34000, "
+                "40960, 200.5, 55\n"
+                "2026/01/01 00:00:30.000, 0, NVIDIA A100, 100, 35000, "
+                "40960, 250.5, 57\n",
+                encoding="utf-8",
+            )
 
-            result = summarize(root, log, max_completion_length=1024)
+            result = summarize(
+                root,
+                log,
+                max_completion_length=1024,
+                telemetry=telemetry,
+            )
 
             self.assertEqual(result["latest_logged_step"], 4)
             self.assertTrue(result["loss_finite"])
@@ -58,6 +71,10 @@ class TrainingSummaryTests(unittest.TestCase):
             self.assertEqual(result["vllm_rollout_calls"]["at_completion_cap"], 1)
             self.assertTrue(result["checkpoints"][0]["adapter_present"])
             self.assertTrue(result["checkpoints"][0]["trainer_state_present"])
+            gpu = result["gpu_telemetry"][0]
+            self.assertEqual(gpu["mean_utilization_percent"], 90)
+            self.assertEqual(gpu["max_memory_mib"], 35000)
+            self.assertEqual(gpu["max_temperature_c"], 57)
 
 
 if __name__ == "__main__":

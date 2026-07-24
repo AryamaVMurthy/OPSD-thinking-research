@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import csv
 import json
 import re
 from pathlib import Path
@@ -44,11 +45,61 @@ def _parse_training_log(path: Path) -> tuple[list[dict[str, Any]], list[int]]:
     return losses, rollout_tokens
 
 
+def _parse_gpu_telemetry(path: Path) -> list[dict[str, Any]]:
+    by_gpu: dict[int, dict[str, Any]] = {}
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        for row in csv.reader(handle):
+            if len(row) != 8:
+                raise ValueError(f"malformed GPU telemetry row in {path}: {row!r}")
+            gpu = int(row[1].strip())
+            utilization = float(row[3].strip())
+            memory_mib = int(row[4].strip())
+            power_watts = float(row[6].strip())
+            temperature_c = int(row[7].strip())
+            stats = by_gpu.setdefault(
+                gpu,
+                {
+                    "gpu": gpu,
+                    "samples": 0,
+                    "utilization_sum": 0.0,
+                    "max_memory_mib": 0,
+                    "max_power_watts": 0.0,
+                    "max_temperature_c": 0,
+                },
+            )
+            stats["samples"] += 1
+            stats["utilization_sum"] += utilization
+            stats["max_memory_mib"] = max(stats["max_memory_mib"], memory_mib)
+            stats["max_power_watts"] = max(
+                stats["max_power_watts"], power_watts
+            )
+            stats["max_temperature_c"] = max(
+                stats["max_temperature_c"], temperature_c
+            )
+
+    result = []
+    for gpu, stats in sorted(by_gpu.items()):
+        result.append(
+            {
+                "gpu": gpu,
+                "samples": stats["samples"],
+                "mean_utilization_percent": (
+                    stats["utilization_sum"] / stats["samples"]
+                ),
+                "max_memory_mib": stats["max_memory_mib"],
+                "max_power_watts": stats["max_power_watts"],
+                "max_temperature_c": stats["max_temperature_c"],
+            }
+        )
+    return result
+
+
 def summarize(
     training_dir: Path,
     training_log: Path,
     *,
     max_completion_length: int,
+    telemetry: Path | None = None,
 ) -> dict[str, Any]:
     generation_files = sorted(
         (training_dir / "generations").glob("generations_step_*.json"),
@@ -126,6 +177,7 @@ def summarize(
             ),
             "completion_cap": max_completion_length,
         },
+        "gpu_telemetry": _parse_gpu_telemetry(telemetry) if telemetry else None,
     }
     return summary
 
@@ -135,6 +187,7 @@ def main() -> None:
     parser.add_argument("--training-dir", required=True, type=Path)
     parser.add_argument("--training-log", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--telemetry", type=Path)
     parser.add_argument("--max-completion-length", type=int, default=1024)
     args = parser.parse_args()
 
@@ -142,6 +195,7 @@ def main() -> None:
         args.training_dir,
         args.training_log,
         max_completion_length=args.max_completion_length,
+        telemetry=args.telemetry,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
