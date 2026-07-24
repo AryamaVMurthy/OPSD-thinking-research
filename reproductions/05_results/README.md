@@ -8,3 +8,6 @@ LiveCodeBench v6 are evaluated only for untouched and step-200 models.
 
 Accepted untouched results and immutable archive checksums are recorded in
 [`untouched_baselines.md`](untouched_baselines.md).
+
+Implementation findings from the live OPSD run are recorded in
+[`opsd_training_observations.md`](opsd_training_observations.md).
