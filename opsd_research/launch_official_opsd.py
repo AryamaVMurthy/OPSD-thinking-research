@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from .config import ALLOWED_MODELS
+from .trl_compat import configure_structured_dataset_args
 
 
 PINNED_DATASET = "jasonrqh/Math-CoT-20k"
@@ -82,11 +83,30 @@ def _install_dataset_redirect() -> None:
     datasets.load_dataset = pinned_load_dataset
 
 
+def _install_structured_dataset_compat() -> None:
+    """Adapt upstream OPSD's structured collator to current TRL."""
+    import opsd_trainer
+
+    original_init = opsd_trainer.OPSDTrainer.__init__
+
+    def compatible_init(self, *args, **kwargs):
+        training_args = kwargs.get("args")
+        if training_args is None and len(args) >= 2:
+            training_args = args[1]
+        if training_args is None:
+            raise RuntimeError("OPSDTrainer was initialized without training arguments")
+        configure_structured_dataset_args(training_args)
+        return original_init(self, *args, **kwargs)
+
+    opsd_trainer.OPSDTrainer.__init__ = compatible_init
+
+
 def main() -> None:
     _validate_invocation()
     _install_dataset_redirect()
     upstream = Path(__file__).resolve().parents[1] / "third_party" / "opsd"
     sys.path.insert(0, str(upstream))
+    _install_structured_dataset_compat()
     runpy.run_path(str(upstream / "opsd_train.py"), run_name="__main__")
 
 
