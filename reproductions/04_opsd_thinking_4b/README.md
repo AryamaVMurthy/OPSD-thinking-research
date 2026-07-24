@@ -8,8 +8,9 @@ The beta=0 full-vocabulary forward KL is reduced in 4,096-token vocabulary
 chunks to bound temporary memory. This is mathematically the same loss, not
 the upstream top-k approximation.
 
-Before the 200-step run, submit `smoke.sbatch`. It performs one complete
-optimizer step with the final eight-GPU microbatch/accumulation layout, saves
-a checkpoint, and emits the same training-health summary. The main run is
-submitted only if this job completes without CUDA errors and its adapter,
-trainer state, rollout dump, and telemetry are present.
+Before the 200-step run, submit `smoke.sbatch`. It performs five complete
+optimizer steps with the final eight-GPU microbatch/accumulation layout. Five
+steps are required to exercise the upstream rollout-dump path as well as
+checkpoint saving. The main run is submitted only if this job completes
+without CUDA errors and its adapter, trainer state, rollout dump, health
+summary, and telemetry are present.

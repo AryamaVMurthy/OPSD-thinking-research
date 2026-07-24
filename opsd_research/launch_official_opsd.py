@@ -42,10 +42,10 @@ def _validate_invocation() -> None:
         )
     if max_steps != "200":
         smoke_steps = os.environ.get("OPSD_SMOKE_MAX_STEPS")
-        if max_steps != "1" or smoke_steps != max_steps:
+        if max_steps != "5" or smoke_steps != max_steps:
             raise SystemExit(
                 "--max_steps must be exactly 200, except for the explicit "
-                "OPSD_SMOKE_MAX_STEPS=1 memory smoke"
+                "OPSD_SMOKE_MAX_STEPS=5 memory smoke"
             )
     for flag in ("--student_thinking", "--teacher_thinking", "--fixed_teacher", "--use_peft"):
         if not _flag(flag):

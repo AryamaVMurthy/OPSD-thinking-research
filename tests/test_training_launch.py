@@ -39,13 +39,13 @@ class TrainingLaunchTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "student_model_revision must match"):
                 _validate_invocation()
 
-    def test_one_step_smoke_requires_explicit_environment_gate(self):
-        with patch.object(sys, "argv", invocation(max_steps="1")):
+    def test_five_step_smoke_requires_explicit_environment_gate(self):
+        with patch.object(sys, "argv", invocation(max_steps="5")):
             with patch.dict("os.environ", {}, clear=False):
                 with self.assertRaisesRegex(SystemExit, "memory smoke"):
                     _validate_invocation()
             with patch.dict(
-                "os.environ", {"OPSD_SMOKE_MAX_STEPS": "1"}, clear=False
+                "os.environ", {"OPSD_SMOKE_MAX_STEPS": "5"}, clear=False
             ):
                 _validate_invocation()
 

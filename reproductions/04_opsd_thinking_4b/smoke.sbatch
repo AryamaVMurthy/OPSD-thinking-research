@@ -19,14 +19,14 @@ CONFIG="reproductions/04_opsd_thinking_4b/configs/train.yaml"
 python3 -m opsd_research.cli validate-config "${CONFIG}"
 export OPSD_DATASET_REVISION=1435fb21d4fecc8ad4966a26f22a874cf2b527f1
 export OPSD_EXACT_JSD_VOCAB_CHUNK_SIZE=4096
-export OPSD_SMOKE_MAX_STEPS=1
+export OPSD_SMOKE_MAX_STEPS=5
 
 run_name="qwen3-4b-opsd-thinking-smoke-${SLURM_JOB_ID}"
 output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"
 cp "${CONFIG}" "${output_dir}/protocol.yaml"
 cp "${CONFIG}" "${output_dir}/config.yaml"
-printf 'run_type=memory_smoke\nmax_steps=1\nsave_steps=1\n' \
+printf 'run_type=memory_smoke\nmax_steps=5\nsave_steps=5\n' \
   > "${output_dir}/runtime-overrides.txt"
 record_run_manifest "${output_dir}"
 (
@@ -54,9 +54,9 @@ accelerate launch \
   --output_dir "${TRAIN_ROOT}" \
   --run_config "${run_name}" \
   --num_train_epochs 30 \
-  --max_steps 1 \
+  --max_steps 5 \
   --max_completion_length 1024 \
-  --save_steps 1 \
+  --save_steps 5 \
   --logging_steps 1 \
   --attn_implementation flash_attention_2 \
   --torch_dtype bfloat16 \
