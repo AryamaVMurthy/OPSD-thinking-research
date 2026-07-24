@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+#SBATCH --job-name=opsd-4b-think
+#SBATCH --account=priyesh.shukla
+#SBATCH --partition=u22
+#SBATCH --qos=high
+#SBATCH --nodelist=node10
+#SBATCH --gres=gpu:8
+#SBATCH --cpus-per-task=64
+#SBATCH --mem=768G
+#SBATCH --time=48:00:00
+#SBATCH --output=logs/%x-%j.out
+
+set -euo pipefail
+module load u22/cuda/12.4
+source "${HOME}/OPSD-thinking-research/infra/turing/common.sh"
+cd "${PROJECT_SOURCE}"
+
+CONFIG="reproductions/04_opsd_thinking_4b/configs/train.yaml"
+python3 -m opsd_research.cli validate-config "${CONFIG}"
+export OPSD_DATASET_REVISION=1435fb21d4fecc8ad4966a26f22a874cf2b527f1
+
+run_name="qwen3-4b-opsd-thinking"
+output_dir="${TRAIN_ROOT}/${run_name}"
+mkdir -p "${output_dir}"
+cp "${CONFIG}" "${output_dir}/protocol.yaml"
+
+resume_args=()
+latest="$(find "${output_dir}" -maxdepth 1 -type d -name 'checkpoint-*' -printf '%f\n' 2>/dev/null | sort -V | tail -n 1)"
+if [[ -n "${latest}" ]]; then
+  resume_args=(--resume_from_checkpoint "${output_dir}/${latest}")
+fi
+
+start_gpu_telemetry "${run_name}"
+trap stop_gpu_telemetry EXIT
+
+accelerate launch \
+  --config_file third_party/opsd/accelerate.yaml \
+  --num_processes 8 \
+  --gradient_accumulation_steps 1 \
+  --main_process_port 12949 \
+  -m opsd_research.launch_official_opsd \
+  --model_name_or_path Qwen/Qwen3-4B \
+  --model_revision 1cfa9a7208912126459214e8b04321603b3df60c \
+  --learning_rate 5e-6 \
+  --max_grad_norm 0.1 \
+  --per_device_train_batch_size 4 \
+  --gradient_checkpointing \
+  --gradient_accumulation_steps 1 \
+  --output_dir "${TRAIN_ROOT}" \
+  --run_config "${run_name}" \
+  --num_train_epochs 30 \
+  --max_steps 200 \
+  --max_completion_length 1024 \
+  --save_steps 50 \
+  --logging_steps 2 \
+  --attn_implementation flash_attention_2 \
+  --torch_dtype bfloat16 \
+  --max_length 20000 \
+  --beta 0 \
+  --use_vllm \
+  --vllm_mode colocate \
+  --vllm_gpu_memory_utilization 0.6 \
+  --vllm_tensor_parallel_size 1 \
+  --use_peft \
+  --lora_r 64 \
+  --lora_alpha 128 \
+  --lora_target_modules q_proj k_proj v_proj o_proj gate_proj up_proj down_proj \
+  --temperature 1.1 \
+  --top_p 0.95 \
+  --top_k 20 \
+  --lmbda 1 \
+  --fixed_teacher \
+  --student_thinking \
+  --teacher_thinking \
+  --jsd_token_clip 0.05 \
+  --seed 42 \
+  --data_seed 42 \
+  --report_to wandb \
+  --wandb_project OPSD-thinking-reproduction \
+  "${resume_args[@]}"

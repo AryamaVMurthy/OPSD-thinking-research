@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+
+artifacts/
+outputs/
+logs/*.out
+logs/*.err
+logs/*.csv
+*.local.yaml

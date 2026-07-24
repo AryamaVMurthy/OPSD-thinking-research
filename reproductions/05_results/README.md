@@ -1,0 +1,7 @@
+# Result assembly
+
+Raw generations, execution metadata, checkpoints, and telemetry stay on
+node-local scratch while jobs run. Summaries, rollout-review packets, final
+LoRA adapters, and immutable run manifests are copied back here after
+validation. AIME 2025 and HMMT 2025 form checkpoint curves; AIME 2026 and
+LiveCodeBench v6 are evaluated only for untouched and step-200 models.

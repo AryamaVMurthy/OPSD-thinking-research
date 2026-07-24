@@ -1,0 +1,9 @@
+[submodule "third_party/opsd"]
+	path = third_party/opsd
+	url = https://github.com/siyan-zhao/OPSD.git
+[submodule "third_party/matharena"]
+	path = third_party/matharena
+	url = https://github.com/eth-sri/matharena.git
+[submodule "third_party/livecodebench"]
+	path = third_party/livecodebench
+	url = https://github.com/LiveCodeBench/LiveCodeBench.git

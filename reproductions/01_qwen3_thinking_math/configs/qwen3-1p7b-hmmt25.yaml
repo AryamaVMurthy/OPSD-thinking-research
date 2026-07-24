@@ -1,0 +1,17 @@
+kind: math_eval
+model: Qwen/Qwen3-1.7B
+model_revision: 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
+dataset: hmmt25
+dataset_revision: 6fdc4277120810ff75aa22d2d5489b91f7a262a1
+enable_thinking: true
+samples_per_problem: 12
+temperature: 1.0
+top_p: 0.95
+top_k: -1
+min_p: 0.0
+presence_penalty: 0.0
+max_new_tokens: 38912
+max_model_len: 40960
+base_seed: 42
+gpu_memory_utilization: 0.90
+enforce_eager: true
