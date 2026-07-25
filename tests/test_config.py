@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class ConfigTests(unittest.TestCase):
     def test_every_committed_config_is_valid(self):
         configs = discover_configs(ROOT)
-        self.assertEqual(len(configs), 10)
+        self.assertEqual(len(configs), 12)
         for path in configs:
             with self.subTest(path=path):
                 load_config(path)
@@ -62,6 +62,16 @@ class ConfigTests(unittest.TestCase):
         changed = copy.deepcopy(data)
         del changed["tail_logits_only"]
         with self.assertRaisesRegex(ConfigError, "tail_logits_only"):
+            validate_config(changed)
+
+    def test_graf_candidate_allows_longer_rollouts_but_not_protocol_drift(self):
+        data = load_config(
+            ROOT / "reproductions/06_graf_opsd/configs/c0-long-rollout.yaml"
+        ).data
+        validate_config(data)
+        changed = copy.deepcopy(data)
+        changed["max_completion_length"] = 1536
+        with self.assertRaisesRegex(ConfigError, "max_completion_length"):
             validate_config(changed)
 
 

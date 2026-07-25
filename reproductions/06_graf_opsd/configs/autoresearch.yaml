@@ -1,0 +1,23 @@
+kind: graf_autoresearch
+model: Qwen/Qwen3-4B
+model_revision: 1cfa9a7208912126459214e8b04321603b3df60c
+enable_thinking: true
+training_dataset: jasonrqh/Math-CoT-20k
+training_dataset_revision: 1435fb21d4fecc8ad4966a26f22a874cf2b527f1
+development_benchmark: aime24
+locked_benchmarks: [aime25, aime26]
+official_samples_per_problem: 12
+promotion_min_avg_at_12_delta: 0.03
+promotion_requires_positive_ci_lower: true
+max_candidates: 24
+graph_cache_problem_limit: 512
+max_forks_per_problem: 2
+actions_per_fork: 3
+forced_continuations_per_action: 2
+allowed_mutations:
+  - max_completion_length
+  - fork_threshold
+  - graph_budget
+  - viability_temperature
+  - branch_loss_weight
+  - entropy_floor_weight

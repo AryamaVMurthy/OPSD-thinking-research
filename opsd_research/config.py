@@ -13,6 +13,11 @@ ALLOWED_MODELS = {
 }
 
 MATH_DATASETS = {
+    "aime24": {
+        "path": "MathArena/aime_2024_combined",
+        "split": "train",
+        "expected_count": 30,
+    },
     "aime25": {
         "path": "MathArena/aime_2025",
         "split": "train",
@@ -182,6 +187,92 @@ def _validate_train(data: dict[str, Any], source: str) -> None:
         )
 
 
+def _validate_graf_train(data: dict[str, Any], source: str) -> None:
+    """Validate an experimental GRAF candidate without weakening OPSD checks."""
+    if data.get("kind") != "graf_train":
+        raise ConfigError(f"{source}: unsupported GRAF training kind")
+    if data.get("model") != "Qwen/Qwen3-4B":
+        raise ConfigError(f"{source}: GRAF autoresearch is Qwen3-4B only")
+    if not isinstance(data.get("variant"), str) or not data["variant"]:
+        raise ConfigError(f"{source}: GRAF candidate requires a nonempty variant")
+    for key in ("student_thinking", "teacher_thinking", "fixed_teacher"):
+        if data.get(key) is not True:
+            raise ConfigError(f"{source}: {key} must be true")
+    expected = {
+        "dataset": "jasonrqh/Math-CoT-20k",
+        "effective_batch_size": 32,
+        "learning_rate": 5e-6,
+        "lora_r": 64,
+        "lora_alpha": 128,
+        "rollouts_per_prompt": 1,
+        "temperature": 1.1,
+        "top_p": 0.95,
+        "top_k": 20,
+        "lmbda": 1.0,
+        "beta": 0.0,
+        "jsd_token_clip": 0.05,
+        "seed": 42,
+        "tail_logits_only": True,
+    }
+    for key, value in expected.items():
+        if data.get(key) != value:
+            raise ConfigError(f"{source}: GRAF protocol requires {key}={value!r}")
+    if data.get("max_completion_length") not in {1024, 2048, 4096}:
+        raise ConfigError(
+            f"{source}: max_completion_length must be 1024, 2048, or 4096"
+        )
+    if data.get("max_steps") not in {5, 50, 200}:
+        raise ConfigError(f"{source}: max_steps must be 5, 50, or 200")
+    if data.get("save_steps") != data.get("max_steps"):
+        raise ConfigError(f"{source}: pilot candidates save only at their final step")
+    computed_batch = (
+        int(data.get("per_device_train_batch_size", 0))
+        * int(data.get("gradient_accumulation_steps", 0))
+        * int(data.get("num_gpus", 0))
+    )
+    if computed_batch != 32:
+        raise ConfigError(f"{source}: GRAF batch factors must produce 32")
+    if set(data.get("lora_target_modules", [])) != {
+        "q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"
+    }:
+        raise ConfigError(f"{source}: GRAF LoRA target modules are incomplete")
+    if data.get("graph_mode") not in {"disabled", "fork_mask", "viability_routed"}:
+        raise ConfigError(f"{source}: unsupported graph_mode")
+    for key in ("branch_loss_weight", "entropy_floor_weight"):
+        value = data.get(key)
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+            raise ConfigError(f"{source}: {key} must be a nonnegative number")
+
+
+def _validate_graf_autoresearch(data: dict[str, Any], source: str) -> None:
+    if data.get("kind") != "graf_autoresearch":
+        raise ConfigError(f"{source}: unsupported autoresearch kind")
+    if data.get("model") != "Qwen/Qwen3-4B":
+        raise ConfigError(f"{source}: autoresearch is Qwen3-4B only")
+    if data.get("training_dataset") != "jasonrqh/Math-CoT-20k":
+        raise ConfigError(f"{source}: autoresearch training dataset is pinned")
+    if data.get("development_benchmark") != "aime24":
+        raise ConfigError(f"{source}: AIME24 is the fixed development benchmark")
+    if data.get("locked_benchmarks") != ["aime25", "aime26"]:
+        raise ConfigError(f"{source}: locked benchmarks must be AIME25 then AIME26")
+    if data.get("official_samples_per_problem") != 12:
+        raise ConfigError(f"{source}: official evaluations require 12 samples/problem")
+    if not isinstance(data.get("promotion_min_avg_at_12_delta"), (int, float)):
+        raise ConfigError(f"{source}: promotion threshold must be numeric")
+    if data["promotion_min_avg_at_12_delta"] < 0.03:
+        raise ConfigError(f"{source}: promotion threshold must be at least 0.03")
+    if data.get("promotion_requires_positive_ci_lower") is not True:
+        raise ConfigError(f"{source}: promotion requires a positive confidence bound")
+    if not isinstance(data.get("max_candidates"), int) or not 1 <= data["max_candidates"] <= 24:
+        raise ConfigError(f"{source}: max_candidates must be in [1, 24]")
+    expected_mutations = {
+        "max_completion_length", "fork_threshold", "graph_budget",
+        "viability_temperature", "branch_loss_weight", "entropy_floor_weight",
+    }
+    if not set(data.get("allowed_mutations", [])).issubset(expected_mutations):
+        raise ConfigError(f"{source}: autoresearch includes a forbidden mutation")
+
+
 def validate_config(data: dict[str, Any], source: str = "<config>") -> None:
     _validate_model(data, source)
     _require_thinking(data, source)
@@ -190,6 +281,10 @@ def validate_config(data: dict[str, Any], source: str = "<config>") -> None:
         _validate_eval(data, source)
     elif kind == "opsd_train":
         _validate_train(data, source)
+    elif kind == "graf_train":
+        _validate_graf_train(data, source)
+    elif kind == "graf_autoresearch":
+        _validate_graf_autoresearch(data, source)
     else:
         raise ConfigError(f"{source}: unsupported kind {kind!r}")
 
