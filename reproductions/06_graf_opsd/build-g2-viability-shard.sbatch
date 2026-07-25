@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # A small, independently auditable G2 viability target build: 64 accepted
-# graphs, eight one-GPU shards, and one frozen continuation per action.
+# graphs, eight one-GPU shards, and two frozen continuations per action.
 # Submit with: sbatch --array=0-7 --export=ALL,CACHE_BUILD_JOB_ID=<id> ...
 #SBATCH --job-name=graf-g2-viability
 #SBATCH --account=priyesh.shukla
@@ -10,7 +10,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=96G
-#SBATCH --time=08:00:00
+#SBATCH --time=12:00:00
 #SBATCH --output=logs/%x-%A_%a.out
 
 set -euo pipefail
@@ -35,7 +35,7 @@ python3 -m opsd_research.build_graf_viability \
   --graph-manifest "${graph_manifest}" \
   --output "${output}" \
   --start-index "${start_index}" --limit 8 \
-  --samples-per-action 1 --temperature 1.0 \
+  --samples-per-action 2 --temperature 1.0 \
   --model Qwen/Qwen3-4B \
   --model-revision 1cfa9a7208912126459214e8b04321603b3df60c \
   --tensor-parallel-size 1 --seed 42

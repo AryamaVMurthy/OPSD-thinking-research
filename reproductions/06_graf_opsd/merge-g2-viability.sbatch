@@ -29,7 +29,7 @@ python3 -m opsd_research.merge_graf_viability \
   "${shards[@]}" \
   --output "${target_root}/viability.jsonl" \
   --manifest "${target_root}/manifest.json" \
-  --samples-per-action 1 --temperature 1.0 \
+  --samples-per-action 2 --temperature 1.0 \
   --model Qwen/Qwen3-4B \
   --model-revision 1cfa9a7208912126459214e8b04321603b3df60c \
   --seed 42
