@@ -40,3 +40,6 @@ PY
 manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
 g1_pilot="$(GRAF_GRAPH_CACHE_MANIFEST="${manifest}" sbatch --parsable reproductions/06_graf_opsd/g1-pilot.sbatch)"
 echo "g1_pilot_job=${g1_pilot}"
+sbatch --parsable --dependency="afterok:${g1_pilot}" \
+  --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G1_PILOT_JOB_ID=${g1_pilot}" \
+  reproductions/06_graf_opsd/after-g1-pilot.sbatch
