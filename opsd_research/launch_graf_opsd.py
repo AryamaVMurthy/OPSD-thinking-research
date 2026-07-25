@@ -11,7 +11,6 @@ from __future__ import annotations
 import os
 import runpy
 import sys
-from pathlib import Path
 
 from .config import load_config
 
@@ -51,8 +50,13 @@ def _validate_invocation() -> dict[str, object]:
     # C0 uses the same reliable upstream objective with a longer rollout.
     if config["graph_mode"] != "disabled":
         manifest = os.environ.get("GRAF_GRAPH_CACHE_MANIFEST")
-        if not manifest or not Path(manifest).is_file():
+        if not manifest:
             raise SystemExit("graph-routed candidates require GRAF_GRAPH_CACHE_MANIFEST")
+        from .graf_cache import validate_graph_cache_manifest
+        try:
+            validate_graph_cache_manifest(manifest)
+        except ValueError as error:
+            raise SystemExit(f"invalid GRAF graph cache: {error}") from error
     return config
 
 
