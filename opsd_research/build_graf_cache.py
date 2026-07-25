@@ -13,7 +13,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .graf_graph import graph_builder_prompt, parse_answer_masked_graph
+from .graf_graph import (
+    graph_builder_prompt,
+    graph_sanitizer_prompt,
+    parse_answer_masked_graph,
+)
 from .records import append_jsonl
 
 
@@ -93,6 +97,21 @@ def _builder_chat_prompt(tokenizer: Any, problem: str, reference_solution: str) 
     return prompt
 
 
+def _sanitizer_chat_prompt(tokenizer: Any, problem: str, candidate_graph: dict[str, Any]) -> str:
+    """Render a reference-free non-thinking JSON rewrite turn."""
+    prompt = tokenizer.apply_chat_template(
+        [{"role": "user", "content": graph_sanitizer_prompt(problem, candidate_graph)}],
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False,
+    )
+    if "</think>" not in prompt:
+        raise RuntimeError("sanitizer chat template did not disable thinking")
+    if len(tokenizer.encode(prompt, add_special_tokens=False)) > MAX_MODEL_LEN - MAX_COMPLETION_TOKENS:
+        raise ValueError("sanitizer chat prompt exceeds its context window")
+    return prompt
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build an immutable GRAF graph cache")
     parser.add_argument("--output", required=True, type=Path)
@@ -160,6 +179,7 @@ def main() -> None:
             ),
         ) if prompts else []
         next_pending: list[int] = []
+        sanitizer_inputs: list[tuple[int, dict[str, Any]]] = []
         for index, output in zip(viable_indices, outputs, strict=True):
             row = rows[index]
             question = str(row["question"])
@@ -190,6 +210,69 @@ def main() -> None:
             except (ValueError, json.JSONDecodeError) as error:
                 last_errors[index] = str(error)
                 next_pending.append(index)
+                if str(error) == "graph copies a five-word reference fragment":
+                    try:
+                        candidate_graph = _json_object(output.outputs[0].text)
+                        # This validates structure and hard answer leakage, but
+                        # deliberately skips only the copied-phrase rule before
+                        # the reference-free rewrite below.
+                        parse_answer_masked_graph(
+                            candidate_graph,
+                            problem=question,
+                            reference_solution=response,
+                            check_reference_fragments=False,
+                        )
+                        sanitizer_inputs.append((index, candidate_graph))
+                    except (ValueError, json.JSONDecodeError):
+                        pass
+        sanitizer_prompts: list[str] = []
+        sanitizer_indices: list[int] = []
+        for index, candidate_graph in sanitizer_inputs:
+            row = rows[index]
+            try:
+                sanitizer_prompts.append(_sanitizer_chat_prompt(
+                    tokenizer, str(row["question"]), candidate_graph
+                ))
+                sanitizer_indices.append(index)
+            except ValueError as error:
+                last_errors[index] = str(error)
+        sanitized_outputs = llm.generate(
+            sanitizer_prompts,
+            SamplingParams(
+                temperature=0.2,
+                top_p=0.95,
+                max_tokens=MAX_COMPLETION_TOKENS,
+                seed=args.seed + 10_000 + attempt,
+            ),
+        ) if sanitizer_prompts else []
+        for index, output in zip(sanitizer_indices, sanitized_outputs, strict=True):
+            row = rows[index]
+            question = str(row["question"])
+            response = str(row["response"])
+            try:
+                graph = parse_answer_masked_graph(
+                    _json_object(output.outputs[0].text),
+                    problem=question,
+                    reference_solution=response,
+                )
+                records[index] = {
+                    "schema_version": 1,
+                    "example_index": index,
+                    "problem_sha256": hashlib.sha256(question.encode("utf-8")).hexdigest(),
+                    "builder_model": args.model,
+                    "builder_model_revision": args.model_revision,
+                    "training_dataset_revision": TRAINING_DATASET_REVISION,
+                    "builder_seed": args.seed + 10_000 + attempt,
+                    "builder_attempt": attempt + 1,
+                    "sanitized_reference_free": True,
+                    "accepted": True,
+                    "graph": json.loads(graph.canonical_json()),
+                    "graph_sha256": graph.sha256,
+                }
+                accepted += 1
+            except (ValueError, json.JSONDecodeError) as error:
+                last_errors[index] = str(error)
+        next_pending = [index for index in next_pending if records[index] is None]
         pending = next_pending
     rejected_indices = [index for index, record in enumerate(records) if record is None]
     rejected = len(rejected_indices)

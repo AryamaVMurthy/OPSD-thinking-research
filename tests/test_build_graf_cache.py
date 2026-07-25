@@ -4,6 +4,7 @@ from opsd_research.build_graf_cache import (
     MAX_COMPLETION_TOKENS,
     MAX_MODEL_LEN,
     _builder_chat_prompt,
+    _sanitizer_chat_prompt,
     _bounded_builder_prompt,
     _json_object,
 )
@@ -47,3 +48,11 @@ def test_builder_uses_qwen_non_thinking_chat_template_for_json() -> None:
     prompt = _builder_chat_prompt(_CharacterTokenizer(), "Find x.", "A short reference.")
     assert "</think>" in prompt
     assert "Output only the JSON object" in prompt
+
+
+def test_sanitizer_never_receives_reference_solution() -> None:
+    prompt = _sanitizer_chat_prompt(
+        _CharacterTokenizer(), "Find x.", {"forks": []}
+    )
+    assert "Candidate graph" in prompt
+    assert "reference solution" not in prompt.lower()

@@ -25,6 +25,22 @@ class GrafGraphTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "answer"):
             parse_answer_masked_graph(leaked, problem="Solve x.", reference_solution="First factor carefully. Therefore \\boxed{7}.")
 
+    def test_copy_only_graph_can_be_structurally_checked_before_sanitizing(self):
+        copied = self.payload()
+        copied["forks"][0]["actions"][0]["description"] = (
+            "Use the same exact symbolic transformation from the reference."
+        )
+        reference = "Use the same exact symbolic transformation from the reference before calculating."
+        with self.assertRaisesRegex(ValueError, "copies"):
+            parse_answer_masked_graph(copied, problem="Solve x.", reference_solution=reference)
+        graph = parse_answer_masked_graph(
+            copied,
+            problem="Solve x.",
+            reference_solution=reference,
+            check_reference_fragments=False,
+        )
+        self.assertEqual(len(graph.forks), 1)
+
     def test_viability_target_removes_invalid_actions(self):
         graph = parse_answer_masked_graph(self.payload(), problem="Solve x.", reference_solution="Therefore \\boxed{7}.")
         target = branch_target(graph.forks[0].actions, {"factor": 0.8, "discriminant": 0.7}, temperature=0.2)

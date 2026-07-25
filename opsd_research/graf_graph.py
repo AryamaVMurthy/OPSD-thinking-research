@@ -79,6 +79,27 @@ that could apply to a related problem.
 Output only the JSON object—no prose, Markdown, or explanation."""
 
 
+def graph_sanitizer_prompt(problem: str, candidate_graph: dict[str, Any]) -> str:
+    """Request a reference-free rewrite of a structurally valid graph.
+
+    This is only used after the first candidate has passed answer-leak checks
+    but failed an exact reference-fragment check.  The rewriter never receives
+    the reference solution, and its result is still fully revalidated.
+    """
+    return f"""Rewrite this reasoning graph for the math problem below.
+
+Problem:
+{problem}
+
+Candidate graph:
+{json.dumps(candidate_graph, sort_keys=True)}
+
+Return the same JSON schema with only `forks`. Preserve high-level choices,
+but write every state, action, check, and recovery instruction independently.
+Do not include a final answer, a boxed expression, a numerical intermediate,
+or any explanation outside the JSON object."""
+
+
 def _normalise(text: str) -> str:
     return " ".join(text.lower().split())
 
@@ -100,7 +121,8 @@ def _all_text(payload: dict[str, Any]) -> list[str]:
 
 
 def parse_answer_masked_graph(
-    payload: dict[str, Any], *, problem: str, reference_solution: str, max_forks: int = 2
+    payload: dict[str, Any], *, problem: str, reference_solution: str, max_forks: int = 2,
+    check_reference_fragments: bool = True,
 ) -> ReasoningGraph:
     """Validate a builder payload and reject rather than redact leakage.
 
@@ -119,7 +141,9 @@ def parse_answer_masked_graph(
             raise ValueError("graph contains an answer-format leak")
         if answer and re.search(rf"(?<![A-Za-z0-9]){re.escape(answer)}(?![A-Za-z0-9])", field):
             raise ValueError("graph contains the reference answer")
-        if any(fragment and fragment in normalized for fragment in fragments):
+        if check_reference_fragments and any(
+            fragment and fragment in normalized for fragment in fragments
+        ):
             raise ValueError("graph copies a five-word reference fragment")
     forks: list[GraphFork] = []
     seen_forks: set[str] = set()
