@@ -35,6 +35,7 @@ rollouts and is the leading mechanistic hypothesis for this degradation.
 | 50 | HMMT Feb 2025 | 0.4361 | 0.5333 | 0.6667 | -0.0056 | [-0.0639, 0.0472] |
 | 100 | AIME 2025 | 0.5639 | 0.6333 | 0.7667 | -0.1000 | [-0.1472, -0.0556] |
 | 100 | HMMT Feb 2025 | 0.3694 | 0.4333 | 0.6667 | -0.0722 | [-0.1389, -0.0083] |
+| 150 | AIME 2025 | 0.4417 | 0.6000 | 0.7000 | -0.2222 | [-0.3000, -0.1500] |
 
 Step 50 is not statistically separated from the untouched Avg@12 baseline,
 but Pass@12 falls from 0.9000 to 0.8000. Of 360 paired samples, 32 degrade,
@@ -86,6 +87,16 @@ solved symmetric algebra. Improvements include exact coordinate and counting
 arguments, but one capped geometry rollout still resolves a contradiction by
 rounding to an unsupported final answer.
 
+Step 150 on AIME 2025 is a large regression: Avg@12 falls to 0.4417 from
+0.6639 (paired delta -0.2222, 95% CI [-0.3000, -0.1500]), Maj@12 falls to
+0.6000, and Pass@12 to 0.7000. Of 360 paired samples, 86 degrade and only 6
+improve. The run completed in 1h19m31s; mean output length is 20,291.2 tokens
+and 26/360 samples (7.22%) reach the 38,912-token limit. Manual review finds
+lost symbolic solutions, major combinatorial undercounts, invalid sign
+repairs, and a substantially heavier long-tail failure rate. A small number of
+exact geometry and perimeter solutions improve, but they do not offset the
+clear degradation.
+
 ## Verified archives
 
 ```text
@@ -100,6 +111,7 @@ f5509904c72a8b4a5d0ec62cbfd6d3faa060d644d62c703530c73d82d63bc0ac  opsd-qwen3-4b-
 d47fef7cd1ce64321b6cd76c9327ceb86409eceeeab7670fbff9bfab15a805ae  opsd-qwen3-4b-step50-hmmt25.tar.gz
 d314eb8c9cbfbed65ceeebc241f62e607be05ee4ef95e3cec84e26da1a0f740e  opsd-qwen3-4b-step100-aime25.tar.gz
 f584e03f617159c5b3d5127afa10a190a08579b68e52c27186bfd2c5a6469872  opsd-qwen3-4b-step100-hmmt25.tar.gz
+a4d86e6f6fae4a917e81f30b33eaf81f5c1b98ea5dfd8fe566e243f4ccb2fe53  opsd-qwen3-4b-step150-aime25.tar.gz
 ```
 
 ## Preserved recoveries

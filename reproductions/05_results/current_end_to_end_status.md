@@ -30,7 +30,7 @@ the Qwen3-4B math series; LiveCodeBench and all 1.7B retries are excluded.
 | step-50 HMMT 2025 | accepted, reviewed, archived | job 16081; archive `d47fef7c…` |
 | step-100 AIME 2025 | accepted, reviewed, archived | job 16082; archive `d314eb8c…` |
 | step-100 HMMT 2025 | accepted, reviewed, archived | job 16163; archive `f584e03f…` |
-| step-150 AIME/HMMT | AIME running; HMMT queued | jobs 16164 / 16165 |
+| step-150 AIME/HMMT | AIME accepted; HMMT running | jobs 16164 / 16165 |
 | step-200 AIME/HMMT/AIME 2026 | queued | jobs 16166 / 16167 / 16168 |
 
 The first step-100 HMMT attempt, job 16083, was intentionally cancelled during
