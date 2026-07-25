@@ -60,10 +60,11 @@ print("1" if delta >= 0.03 and lower > 0 and upper > 0 else "0")
 PY
 )"
 if [[ "${promote}" == "1" ]]; then
-  adapter="${TRAIN_ROOT}/graf-g2-viability-50-${G2_PILOT_JOB_ID}"
-  locked="$(sbatch --parsable --export="ALL,METHOD=g2-viability-routed,ADAPTER=${adapter}" \
-    reproductions/06_graf_opsd/submit-locked-evals.sbatch)"
-  echo "g2_promoted_locked_submit_job=${locked}"
+  graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
+  viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
+  full="$(sbatch --parsable --export="ALL,CANDIDATE_ID=g2-viability-routed-2048,CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/g2-viability-routed.yaml,METHOD=g2-viability-routed,COMPLETION_LENGTH=2048,GRAF_GRAPH_CACHE_MANIFEST=${graph_manifest},GRAF_VIABILITY_MANIFEST=${viability_manifest}" reproductions/06_graf_opsd/promoted-full-train.sbatch)"
+  echo "g2_full_confirmation_job=${full}"
+  sbatch --parsable --dependency="afterok:${full}" --export="ALL,FULL_JOB_ID=${full},CANDIDATE_ID=g2-viability-routed-2048,METHOD=g2-viability-routed" reproductions/06_graf_opsd/after-promoted-full-train.sbatch
 else
   # G3 differs from G2 in exactly one pre-registered field: the one-sided
   # branch entropy floor. Reuse G2's immutable graph/viability inputs.

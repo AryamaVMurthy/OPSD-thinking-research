@@ -40,9 +40,9 @@ print("1" if delta >= 0.03 and lower > 0 and upper > 0 else "0")
 PY
 )"
 if [[ "${promote}" == "1" ]]; then
-  adapter="${TRAIN_ROOT}/graf-c1-long-4096-50-${C1_PILOT_JOB_ID}"
-  locked="$(sbatch --parsable --export="ALL,METHOD=opsd-long-4096,ADAPTER=${adapter}" reproductions/06_graf_opsd/submit-locked-evals.sbatch)"
-  echo "c1_promoted_locked_submit_job=${locked}"
+  full="$(sbatch --parsable --export="ALL,CANDIDATE_ID=c1-long-rollout-4096,CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/c1-long-rollout-4096.yaml,METHOD=opsd-long-4096,COMPLETION_LENGTH=4096,VLLM_GPU_UTILIZATION=0.55" reproductions/06_graf_opsd/promoted-full-train.sbatch)"
+  echo "c1_full_confirmation_job=${full}"
+  sbatch --parsable --dependency="afterok:${full}" --export="ALL,FULL_JOB_ID=${full},CANDIDATE_ID=c1-long-rollout-4096,METHOD=opsd-long-4096" reproductions/06_graf_opsd/after-promoted-full-train.sbatch
 else
   echo "c1 did not clear the development gate; inspect the immutable ledger before proposing G4 recovery routing"
 fi

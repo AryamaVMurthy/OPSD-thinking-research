@@ -47,9 +47,11 @@ print("1" if delta >= 0.03 and lower > 0 and upper > 0 else "0")
 PY
 )"
 if [[ "${promote}" == "1" ]]; then
-  adapter="${TRAIN_ROOT}/graf-g3-viability-entropy-50-${G3_PILOT_JOB_ID}"
-  locked="$(sbatch --parsable --export="ALL,METHOD=g3-viability-entropy,ADAPTER=${adapter}" reproductions/06_graf_opsd/submit-locked-evals.sbatch)"
-  echo "g3_promoted_locked_submit_job=${locked}"
+  graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
+  viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
+  full="$(sbatch --parsable --export="ALL,CANDIDATE_ID=g3-viability-entropy-2048,CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/g3-viability-entropy.yaml,METHOD=g3-viability-entropy,COMPLETION_LENGTH=2048,GRAF_GRAPH_CACHE_MANIFEST=${graph_manifest},GRAF_VIABILITY_MANIFEST=${viability_manifest}" reproductions/06_graf_opsd/promoted-full-train.sbatch)"
+  echo "g3_full_confirmation_job=${full}"
+  sbatch --parsable --dependency="afterok:${full}" --export="ALL,FULL_JOB_ID=${full},CANDIDATE_ID=g3-viability-entropy-2048,METHOD=g3-viability-entropy" reproductions/06_graf_opsd/after-promoted-full-train.sbatch
 else
   # C1 is the independent 4,096-token OPSD control. It directly tests whether
   # the observed rollout truncation, rather than graph routing, explains the

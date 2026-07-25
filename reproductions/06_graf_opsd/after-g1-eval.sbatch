@@ -64,10 +64,10 @@ print("1" if delta >= 0.03 and lower > 0 and upper > 0 else "0")
 PY
 )"
 if [[ "${promote}" == "1" ]]; then
-  adapter="${TRAIN_ROOT}/graf-g1-answer-masked-50-${G1_PILOT_JOB_ID}"
-  locked="$(sbatch --parsable --export="ALL,METHOD=g1-answer-masked-scaffold,ADAPTER=${adapter}" \
-    reproductions/06_graf_opsd/submit-locked-evals.sbatch)"
-  echo "g1_promoted_locked_submit_job=${locked}"
+  graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
+  full="$(sbatch --parsable --export="ALL,CANDIDATE_ID=g1-scaffold-2048,CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/g1-answer-masked-scaffold.yaml,METHOD=g1-answer-masked-scaffold,COMPLETION_LENGTH=2048,GRAF_GRAPH_CACHE_MANIFEST=${graph_manifest}" reproductions/06_graf_opsd/promoted-full-train.sbatch)"
+  echo "g1_full_confirmation_job=${full}"
+  sbatch --parsable --dependency="afterok:${full}" --export="ALL,FULL_JOB_ID=${full},CANDIDATE_ID=g1-scaffold-2048,METHOD=g1-answer-masked-scaffold" reproductions/06_graf_opsd/after-promoted-full-train.sbatch
   exit 0
 fi
 
