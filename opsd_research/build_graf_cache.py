@@ -20,6 +20,8 @@ from .records import append_jsonl
 DEFAULT_MODEL = "Qwen/Qwen3-4B"
 DEFAULT_MODEL_REVISION = "1cfa9a7208912126459214e8b04321603b3df60c"
 TRAINING_DATASET_REVISION = "1435fb21d4fecc8ad4966a26f22a874cf2b527f1"
+MAX_MODEL_LEN = 40960
+MAX_COMPLETION_TOKENS = 1024
 
 
 def _json_object(text: str) -> dict[str, Any]:
@@ -35,6 +37,35 @@ def _json_object(text: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("builder JSON must be an object")
     return payload
+
+
+def _bounded_builder_prompt(tokenizer: Any, problem: str, reference_solution: str) -> str:
+    """Keep a cache-builder request inside its declared context window.
+
+    The builder is offline and may inspect the reference, whereas the saved
+    graph is still answer-masked by ``parse_answer_masked_graph``. Preserve as
+    much of an unusually long reference as fits, and label any truncation
+    rather than letting one example abort the whole immutable cache build.
+    """
+    max_prompt_tokens = MAX_MODEL_LEN - MAX_COMPLETION_TOKENS
+    prompt = graph_builder_prompt(problem, reference_solution)
+    prompt_tokens = tokenizer.encode(prompt, add_special_tokens=False)
+    if len(prompt_tokens) <= max_prompt_tokens:
+        return prompt
+
+    reference_tokens = tokenizer.encode(reference_solution, add_special_tokens=False)
+    overhead = len(prompt_tokens) - len(reference_tokens)
+    keep = max(0, max_prompt_tokens - overhead - 32)
+    while True:
+        truncated_reference = tokenizer.decode(
+            reference_tokens[:keep], skip_special_tokens=True
+        ) + "\n[Reference truncated for the builder context window.]"
+        prompt = graph_builder_prompt(problem, truncated_reference)
+        if len(tokenizer.encode(prompt, add_special_tokens=False)) <= max_prompt_tokens:
+            return prompt
+        if keep == 0:
+            raise ValueError("problem and graph-builder instructions exceed the context window")
+        keep = max(0, int(keep * 0.9))
 
 
 def _parse_args() -> argparse.Namespace:
@@ -69,15 +100,24 @@ def main() -> None:
         revision=args.model_revision,
         dtype="bfloat16",
         tensor_parallel_size=args.tensor_parallel_size,
-        max_model_len=8192,
+        max_model_len=MAX_MODEL_LEN,
         gpu_memory_utilization=0.90,
         enforce_eager=True,
         trust_remote_code=True,
     )
-    prompts = [graph_builder_prompt(str(row["question"]), str(row["response"])) for row in rows]
+    tokenizer = llm.get_tokenizer()
+    prompts = [
+        _bounded_builder_prompt(tokenizer, str(row["question"]), str(row["response"]))
+        for row in rows
+    ]
     outputs = llm.generate(
         prompts,
-        SamplingParams(temperature=0.2, top_p=0.95, max_tokens=1024, seed=args.seed),
+        SamplingParams(
+            temperature=0.2,
+            top_p=0.95,
+            max_tokens=MAX_COMPLETION_TOKENS,
+            seed=args.seed,
+        ),
     )
     accepted = 0
     rejected = 0
