@@ -51,5 +51,17 @@ if [[ "${promote}" == "1" ]]; then
   locked="$(sbatch --parsable --export="ALL,METHOD=g3-viability-entropy,ADAPTER=${adapter}" reproductions/06_graf_opsd/submit-locked-evals.sbatch)"
   echo "g3_promoted_locked_submit_job=${locked}"
 else
-  echo "g3 did not clear the development gate; inspect its immutable ledger before proposing G4"
+  # C1 is the independent 4,096-token OPSD control. It directly tests whether
+  # the observed rollout truncation, rather than graph routing, explains the
+  # lack of movement in G1--G3.
+  python3 -m opsd_research.graf_autoresearch register \
+    --policy reproductions/06_graf_opsd/configs/autoresearch.yaml \
+    --config reproductions/06_graf_opsd/configs/c1-long-rollout-4096.yaml \
+    --ledger artifacts/graf_opsd/candidate-ledger.jsonl \
+    --candidate-id c1-long-rollout-4096 --parent-id c0-long-2048 --stage C1 \
+    --hypothesis "Increase only the on-policy completion cap to reduce systematic early-thought truncation before adding further graph mechanisms." \
+    --changed-field max_completion_length
+  c1_smoke="$(sbatch --parsable reproductions/06_graf_opsd/c1-smoke.sbatch)"
+  echo "c1_smoke_job=${c1_smoke}"
+  sbatch --parsable --dependency="afterok:${c1_smoke}" --export="ALL,C1_SMOKE_JOB_ID=${c1_smoke}" reproductions/06_graf_opsd/after-c1-smoke.sbatch
 fi

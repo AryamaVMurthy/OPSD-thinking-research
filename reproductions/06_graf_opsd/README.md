@@ -15,3 +15,7 @@ G3 is pre-registered as the single-field continuation after an unpromoted G2:
 it changes the one-sided branch entropy floor from 0.1 to 1.0 while retaining
 the exact same frozen graph, forced-continuation targets, model, corpus, and
 evaluation protocol.
+
+If G3 does not promote, C1 is the independent, no-graph 4,096-token OPSD
+control. Its five-step smoke is mandatory because the longer on-policy rollout
+changes the memory envelope; it is only compared after that feasibility gate.
