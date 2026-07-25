@@ -1,6 +1,9 @@
-import pytest
+import unittest
 
-torch = pytest.importorskip("torch", reason="routing objective requires PyTorch")
+try:
+    import torch
+except ImportError as error:
+    raise unittest.SkipTest("routing objective requires PyTorch") from error
 
 from opsd_research.graf_branch_objective import build_routed_action_batch
 from opsd_research.graf_routing import ActionTarget, ForkTarget

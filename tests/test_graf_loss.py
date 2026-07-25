@@ -1,8 +1,9 @@
 import unittest
 
-import pytest
-
-torch = pytest.importorskip("torch", reason="loss unit test requires PyTorch")
+try:
+    import torch
+except ImportError as error:
+    raise unittest.SkipTest("loss unit test requires PyTorch") from error
 
 from opsd_research.graf_loss import branch_routed_loss
 

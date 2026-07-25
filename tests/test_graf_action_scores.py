@@ -1,6 +1,9 @@
-import pytest
+import unittest
 
-torch = pytest.importorskip("torch", reason="action score unit test requires PyTorch")
+try:
+    import torch
+except ImportError as error:
+    raise unittest.SkipTest("action score unit test requires PyTorch") from error
 
 from opsd_research.graf_action_scores import action_scores_from_tail_logits
 
