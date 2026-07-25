@@ -72,7 +72,8 @@ invalid, dead_end, recoverable, redundant.
 
 Never include the final answer, any boxed expression, a unique numerical
 intermediate from the reference, or a copied reference-solution phrase. Action
-descriptions must describe a general mathematical operation, not its result."""
+descriptions must describe a general mathematical operation, not its result.
+Output only the JSON object—no prose, Markdown, or explanation."""
 
 
 def _normalise(text: str) -> str:

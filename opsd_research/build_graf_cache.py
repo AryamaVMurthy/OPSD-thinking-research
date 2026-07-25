@@ -22,6 +22,7 @@ DEFAULT_MODEL_REVISION = "1cfa9a7208912126459214e8b04321603b3df60c"
 TRAINING_DATASET_REVISION = "1435fb21d4fecc8ad4966a26f22a874cf2b527f1"
 MAX_MODEL_LEN = 40960
 MAX_COMPLETION_TOKENS = 1024
+CHAT_TEMPLATE_RESERVE_TOKENS = 256
 
 
 def _json_object(text: str) -> dict[str, Any]:
@@ -47,7 +48,9 @@ def _bounded_builder_prompt(tokenizer: Any, problem: str, reference_solution: st
     much of an unusually long reference as fits, and label any truncation
     rather than letting one example abort the whole immutable cache build.
     """
-    max_prompt_tokens = MAX_MODEL_LEN - MAX_COMPLETION_TOKENS
+    max_prompt_tokens = (
+        MAX_MODEL_LEN - MAX_COMPLETION_TOKENS - CHAT_TEMPLATE_RESERVE_TOKENS
+    )
     prompt = graph_builder_prompt(problem, reference_solution)
     prompt_tokens = tokenizer.encode(prompt, add_special_tokens=False)
     if len(prompt_tokens) <= max_prompt_tokens:
@@ -66,6 +69,28 @@ def _bounded_builder_prompt(tokenizer: Any, problem: str, reference_solution: st
         if keep == 0:
             raise ValueError("problem and graph-builder instructions exceed the context window")
         keep = max(0, int(keep * 0.9))
+
+
+def _builder_chat_prompt(tokenizer: Any, problem: str, reference_solution: str) -> str:
+    """Render a non-thinking JSON compiler turn for the offline graph builder.
+
+    Thinking remains enabled for student rollouts and benchmark evaluation. The
+    builder instead uses Qwen's documented disabled-thinking template because
+    its sole product is a compact JSON object; this prevents a long hidden
+    chain-of-thought from consuming the fixed 1,024-token JSON budget or being
+    accidentally retained in an answer-masked artifact.
+    """
+    prompt = tokenizer.apply_chat_template(
+        [{"role": "user", "content": _bounded_builder_prompt(tokenizer, problem, reference_solution)}],
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False,
+    )
+    if "</think>" not in prompt:
+        raise RuntimeError("builder chat template did not disable thinking")
+    if len(tokenizer.encode(prompt, add_special_tokens=False)) > MAX_MODEL_LEN - MAX_COMPLETION_TOKENS:
+        raise ValueError("builder chat prompt exceeds its context window")
+    return prompt
 
 
 def _parse_args() -> argparse.Namespace:
@@ -107,7 +132,7 @@ def main() -> None:
     )
     tokenizer = llm.get_tokenizer()
     prompts = [
-        _bounded_builder_prompt(tokenizer, str(row["question"]), str(row["response"]))
+        _builder_chat_prompt(tokenizer, str(row["question"]), str(row["response"]))
         for row in rows
     ]
     outputs = llm.generate(

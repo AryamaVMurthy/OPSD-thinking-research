@@ -3,6 +3,7 @@ import pytest
 from opsd_research.build_graf_cache import (
     MAX_COMPLETION_TOKENS,
     MAX_MODEL_LEN,
+    _builder_chat_prompt,
     _bounded_builder_prompt,
     _json_object,
 )
@@ -16,6 +17,12 @@ class _CharacterTokenizer:
     def decode(self, token_ids, *, skip_special_tokens=True):
         del skip_special_tokens
         return "".join(token_ids)
+
+    def apply_chat_template(self, messages, *, tokenize, add_generation_prompt, enable_thinking):
+        assert not tokenize
+        assert add_generation_prompt
+        assert not enable_thinking
+        return "<assistant><think>\n\n</think>\n\n" + messages[0]["content"]
 
 
 def test_extracts_plain_or_fenced_json_object() -> None:
@@ -34,3 +41,9 @@ def test_builder_prompt_bounds_an_unusually_long_reference() -> None:
     )
     assert len(prompt) <= MAX_MODEL_LEN - MAX_COMPLETION_TOKENS
     assert "Reference truncated" in prompt
+
+
+def test_builder_uses_qwen_non_thinking_chat_template_for_json() -> None:
+    prompt = _builder_chat_prompt(_CharacterTokenizer(), "Find x.", "A short reference.")
+    assert "</think>" in prompt
+    assert "Output only the JSON object" in prompt
