@@ -8,6 +8,12 @@ deferred. Jobs 16078, 16079, 16089, and 16090 were cancelled, with the partial
 AIME 2025 evaluation, started immediately on all eight A100s. The active
 priority is now the complete nine-run 4B math series.
 
+Scope update at 2026-07-25 12:53 IST: the active deliverable was narrowed to
+the Qwen3-4B OPSD math evaluation only. The two queued 1.7B retries, jobs
+16097 and 16098, were cancelled. Jobs 16080–16088 are now the entire active
+queue: AIME 2025 and HMMT 2025 at checkpoints 50/100/150/200, followed by
+AIME 2026 at checkpoint 200.
+
 This report separates accepted results from work that is still running or
 queued. A result is accepted only after Slurm success, exact generation-matrix
 validation, checksum verification, official scoring, comparison with the
