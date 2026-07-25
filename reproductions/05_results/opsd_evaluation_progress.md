@@ -38,6 +38,7 @@ rollouts and is the leading mechanistic hypothesis for this degradation.
 | 150 | AIME 2025 | 0.4417 | 0.6000 | 0.7000 | -0.2222 | [-0.3000, -0.1500] |
 | 150 | HMMT Feb 2025 | 0.2917 | 0.4000 | 0.5667 | -0.1500 | [-0.2278, -0.0778] |
 | 200 | AIME 2025 | 0.4139 | 0.5333 | 0.7333 | -0.2500 | [-0.3333, -0.1694] |
+| 200 | HMMT Feb 2025 | 0.2944 | 0.3333 | 0.5000 | -0.1472 | [-0.2250, -0.0750] |
 
 Step 50 is not statistically separated from the untouched Avg@12 baseline,
 but Pass@12 falls from 0.9000 to 0.8000. Of 360 paired samples, 32 degrade,
@@ -117,6 +118,16 @@ repeated pair-versus-coordinate counting errors, incomplete branch accounting,
 and capped radical-guess loops. Occasional correct combinatorial fixes do not
 offset the endpoint degradation.
 
+Step 200 on HMMT February 2025 remains a large, statistically significant
+regression: Avg@12 falls to 0.2944 from 0.4417 (paired delta -0.1472, 95% CI
+[-0.2250, -0.0750]); Maj@12 falls to 0.3333 and Pass@12 to 0.5000. Of 360
+paired samples, 64 degrade and 11 improve. The run completed in 1h27m48s;
+mean output length is 21,716.2 tokens and 35/360 samples (9.72%) reach the
+38,912-token cap. Manual review finds abandoned combinatorial counts replaced
+by unsupported answers, invalid symmetric algebra, and floor-sum endpoint
+misalignment. The few improvements are valid but too sparse to offset the
+regression.
+
 ## Verified archives
 
 ```text
@@ -134,6 +145,7 @@ f584e03f617159c5b3d5127afa10a190a08579b68e52c27186bfd2c5a6469872  opsd-qwen3-4b-
 a4d86e6f6fae4a917e81f30b33eaf81f5c1b98ea5dfd8fe566e243f4ccb2fe53  opsd-qwen3-4b-step150-aime25.tar.gz
 b32e36e8498fdb4f46c15daaad361b04ddbdfe85a2a62125c40515ebc520adcc  opsd-qwen3-4b-step150-hmmt25.tar.gz
 98966b01736034a241ec6f18e1fa87938e13ae0c2a7f916555136c275202e290  opsd-qwen3-4b-step200-aime25.tar.gz
+930d2df8df12b3ee2fe6ca3f49ae888efb1f4023e40184859a111091d71bc728  opsd-qwen3-4b-step200-hmmt25.tar.gz
 ```
 
 ## Preserved recoveries
