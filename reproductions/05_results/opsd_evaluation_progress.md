@@ -37,6 +37,7 @@ rollouts and is the leading mechanistic hypothesis for this degradation.
 | 100 | HMMT Feb 2025 | 0.3694 | 0.4333 | 0.6667 | -0.0722 | [-0.1389, -0.0083] |
 | 150 | AIME 2025 | 0.4417 | 0.6000 | 0.7000 | -0.2222 | [-0.3000, -0.1500] |
 | 150 | HMMT Feb 2025 | 0.2917 | 0.4000 | 0.5667 | -0.1500 | [-0.2278, -0.0778] |
+| 200 | AIME 2025 | 0.4139 | 0.5333 | 0.7333 | -0.2500 | [-0.3333, -0.1694] |
 
 Step 50 is not statistically separated from the untouched Avg@12 baseline,
 but Pass@12 falls from 0.9000 to 0.8000. Of 360 paired samples, 32 degrade,
@@ -107,6 +108,15 @@ unsupported integer conclusions, a missing rotation factor, broken geometry
 constraints, and long capped loops. Exact coordinate and modular improvements
 remain, but they are too sparse to counter the broad regression.
 
+Step 200 on AIME 2025 is the strongest AIME regression: Avg@12 falls to
+0.4139 from 0.6639 (paired delta -0.2500, 95% CI [-0.3333, -0.1694]), Maj@12
+to 0.5333, and Pass@12 to 0.7333. Of 360 paired samples, 104 degrade and 14
+improve. The run completed in 1h22m45s; mean output length is 20,918.7 tokens
+and 28/360 samples (7.78%) reach the 38,912-token cap. Manual review finds
+repeated pair-versus-coordinate counting errors, incomplete branch accounting,
+and capped radical-guess loops. Occasional correct combinatorial fixes do not
+offset the endpoint degradation.
+
 ## Verified archives
 
 ```text
@@ -123,6 +133,7 @@ d314eb8c9cbfbed65ceeebc241f62e607be05ee4ef95e3cec84e26da1a0f740e  opsd-qwen3-4b-
 f584e03f617159c5b3d5127afa10a190a08579b68e52c27186bfd2c5a6469872  opsd-qwen3-4b-step100-hmmt25.tar.gz
 a4d86e6f6fae4a917e81f30b33eaf81f5c1b98ea5dfd8fe566e243f4ccb2fe53  opsd-qwen3-4b-step150-aime25.tar.gz
 b32e36e8498fdb4f46c15daaad361b04ddbdfe85a2a62125c40515ebc520adcc  opsd-qwen3-4b-step150-hmmt25.tar.gz
+98966b01736034a241ec6f18e1fa87938e13ae0c2a7f916555136c275202e290  opsd-qwen3-4b-step200-aime25.tar.gz
 ```
 
 ## Preserved recoveries
