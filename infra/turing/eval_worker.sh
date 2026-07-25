@@ -7,8 +7,16 @@ set -euo pipefail
 : "${OUTPUT_DIR:?}"
 : "${METHOD:?}"
 : "${CHECKPOINT:?}"
+: "${SLURM_JOB_ID:?}"
 : "${SLURM_PROCID:?}"
 : "${SLURM_NTASKS:?}"
+
+source "${PROJECT_SOURCE}/infra/turing/vllm_port.sh"
+export VLLM_PORT="$(
+  vllm_port_for_task "${SLURM_JOB_ID}" "${SLURM_PROCID}"
+)"
+printf '{"event":"vllm_port_assignment","job_id":"%s","shard_id":%s,"port":%s}\n' \
+  "${SLURM_JOB_ID}" "${SLURM_PROCID}" "${VLLM_PORT}"
 
 source "${ENV_DIR}/bin/activate"
 cd "${PROJECT_SOURCE}"
