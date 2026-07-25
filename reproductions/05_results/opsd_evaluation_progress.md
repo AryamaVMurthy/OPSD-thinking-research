@@ -18,8 +18,9 @@ model, with identical problem/sample seeds and prompt hashes verified first.
 | 150 | AIME 2025 | 0.1944 | 0.2667 | 0.4333 | -0.1667 | [-0.2583, -0.0889] |
 | 150 | HMMT Feb 2025 | 0.1167 | 0.2000 | 0.2333 | -0.1111 | [-0.1889, -0.0389] |
 | 200 | AIME 2025 | 0.1611 | 0.1667 | 0.3333 | -0.2000 | [-0.2889, -0.1222] |
+| 200 | HMMT Feb 2025 | 0.0833 | 0.1667 | 0.2667 | -0.1444 | [-0.2250, -0.0750] |
 
-These five results all trail the untouched model on Avg@12.
+These six results all trail the untouched model on Avg@12.
 Manual review attributes the gap to genuine reasoning mistakes, unsupported
 assumptions, repetitive long-tail failures, and missing `</think>` closures.
 The official 1,024-token training rollout cap truncates almost all thinking
@@ -33,6 +34,7 @@ e767efdf11ba08a0af60693c585936d5b2ed87ae02ccbdb54a9d5ed1d061a2e5  opsd-qwen3-1p7
 71ba056f5432469488a1459a0d33dff92e9e529e77fb9eb74e6464999892cc37  opsd-qwen3-1p7b-step150-aime25.tar.gz
 86f2b84723773730ce556cfe9fbe655250d1f8104f7325c192284f721f6e197f  opsd-qwen3-1p7b-step150-hmmt25.tar.gz
 35228e00a6f75ab65468a4f78e14090091edd6022d3aebb02602bf9943b959e3  opsd-qwen3-1p7b-step200-aime25.tar.gz
+53773439aa101efebf4db4be66b5887a47db1ff07ee6faa006052ccadc05c093  opsd-qwen3-1p7b-step200-hmmt25.tar.gz
 ```
 
 ## Preserved recoveries
