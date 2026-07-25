@@ -2,6 +2,12 @@
 
 Snapshot: 2026-07-25 12:40 IST
 
+Queue update at 2026-07-25 12:48 IST: LiveCodeBench was explicitly
+deferred. Jobs 16078, 16079, 16089, and 16090 were cancelled, with the partial
+1.7B generations retained on scratch. Job 16080, the Qwen3-4B OPSD step-50
+AIME 2025 evaluation, started immediately on all eight A100s. The active
+priority is now the complete nine-run 4B math series.
+
 This report separates accepted results from work that is still running or
 queued. A result is accepted only after Slurm success, exact generation-matrix
 validation, checksum verification, official scoring, comparison with the
@@ -36,6 +42,12 @@ The current reproduction phase covers:
 - untouched inference followed by OPSD-Standard training and checkpoint
   evaluation at steps 50, 100, 150, and 200;
 - AIME 2026 and LiveCodeBench only at step 200, as held-out/final diagnostics.
+
+Because OPSD is trained only on Math-CoT-20k, LiveCodeBench is an
+out-of-domain transfer/regression diagnostic. It is not evidence of
+code-domain training or a targeted claim that this adapter improves coding.
+Targeted coding OPSD would require a separate leakage-controlled code-training
+corpus and a separately trained adapter.
 
 BFCL, SearchQA, GRPO, Purified OPSD, J-space, and String Seed of Thought are
 not part of the running phase. They remain possible later experiments and
@@ -430,4 +442,3 @@ The most informative next research design is a 2×2 ablation:
 That design separates truncation from objective/data-quality effects. GRPO
 should then be added as a training-control baseline before attributing gains
 to a new J-space or String Seed of Thought method.
-

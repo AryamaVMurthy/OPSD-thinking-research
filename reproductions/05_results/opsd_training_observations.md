@@ -164,7 +164,7 @@ directory is 2,908,479,986 bytes. All four minimal local checkpoint copies
 verify against their own SHA-256 manifests. Their adapter SHA-256 values are:
 
 - step 50:
-  `4a65128c88617eb2a8bc0dfa71aa6480a84fd073fa09e260fdb416010804ed9f`;
+  `4a65128c401bbf05e4692f75a0564520efb2c417fb927d355f86a485111b8312`;
 - step 100:
   `1c867302d5574e5b707b22325c66a917ce721f897d52d5e1caafe4c8ed4307e7`;
 - step 150:
