@@ -26,6 +26,14 @@ class GrafContractTests(unittest.TestCase):
 
     def test_candidate_requires_one_allowlisted_mutation(self):
         validate_candidate(self.candidate(), {"max_completion_length"})
+        validate_candidate(
+            self.candidate(
+                candidate_id="g1-scaffold",
+                changed_fields=("graph_mode",),
+                config={"graph_mode": "scaffold_graph"},
+            ),
+            {"graph_mode"},
+        )
         with self.assertRaisesRegex(ValueError, "exactly one"):
             validate_candidate(
                 self.candidate(changed_fields=("max_completion_length", "graph_budget")),
