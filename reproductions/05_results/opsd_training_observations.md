@@ -139,3 +139,13 @@ figure, or had not yet resolved the main optimization. Therefore the gate
 proves execution and checkpoint correctness, but it reinforces the 1.7B
 finding that the official 1,024-token training budget mostly distills
 incomplete reasoning prefixes when thinking is enabled.
+
+The full 4B run provides a complementary data-quality example at step 130.
+One rank-0 rollout naturally stopped after 437 tokens and closed its thinking
+block, but the source record contains an already-English math problem followed
+by a Chinese request to translate it to English, another English “final
+version,” and the collator's conflicting request for a reasoned boxed answer.
+The model coherently follows the translation instruction and repeats the
+English sentence without solving the math problem. Thus, short or closed
+thinking is not by itself evidence of a useful privileged trajectory; the
+source task and final-answer semantics must also be validated.
