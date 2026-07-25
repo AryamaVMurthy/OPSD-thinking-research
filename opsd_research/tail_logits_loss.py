@@ -129,3 +129,55 @@ def compute_loss_with_tail_logits(
         minimal_output.loss = loss
         return loss, minimal_output
     return loss
+
+
+def compute_loss_with_graf_routing(
+    self,
+    model,
+    inputs,
+    return_outputs: bool = False,
+    num_items_in_batch=None,
+):
+    """Add GRAF's frozen branch-target objective to exact OPSD distillation.
+
+    The normal tail-only OPSD path runs first and releases its logits.  The
+    routing term then performs a compact, action-only policy forward.  This
+    ordering keeps the 4B 8x40GB recipe within the same memory envelope.
+    """
+    result = compute_loss_with_tail_logits(
+        self,
+        model,
+        inputs,
+        return_outputs=return_outputs,
+        num_items_in_batch=num_items_in_batch,
+    )
+    if return_outputs:
+        base_loss, outputs = result
+    else:
+        base_loss = result
+        outputs = None
+    from .graf_branch_objective import graf_branch_loss
+
+    branch_loss, metrics = graf_branch_loss(
+        model=model,
+        inputs=inputs,
+        tokenizer=self.processing_class,
+        routing_targets=self._graf_routing_targets,
+        branch_loss_weight=self._graf_branch_loss_weight,
+        entropy_floor_fraction=self._graf_entropy_floor_fraction,
+    )
+    total = base_loss + branch_loss
+    self._graf_last_branch_metrics = metrics
+    if self.accelerator.is_main_process:
+        print(
+            '{"event":"graf_branch_loss",'
+            f'"active_forks":{metrics["active_forks"]},'
+            f'"branch_kl":{metrics["branch_kl"]:.8f},'
+            f'"entropy_floor":{metrics["entropy_floor"]:.8f},'
+            f'"weighted_loss":{float(branch_loss.detach()):.8f}' + "}",
+            flush=True,
+        )
+    if return_outputs:
+        outputs.loss = total
+        return total, outputs
+    return total

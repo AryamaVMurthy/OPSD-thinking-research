@@ -247,6 +247,13 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         value = data.get(key)
         if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
             raise ConfigError(f"{source}: {key} must be a nonnegative number")
+    if data.get("graph_mode") == "viability_routed":
+        if float(data["branch_loss_weight"]) <= 0:
+            raise ConfigError(f"{source}: viability_routed requires branch_loss_weight > 0")
+        if float(data["entropy_floor_weight"]) > 1:
+            raise ConfigError(f"{source}: entropy_floor_weight is an entropy fraction in [0, 1]")
+    elif float(data["branch_loss_weight"]) != 0 or float(data["entropy_floor_weight"]) != 0:
+        raise ConfigError(f"{source}: branch settings require graph_mode=viability_routed")
 
 
 def _validate_graf_autoresearch(data: dict[str, Any], source: str) -> None:

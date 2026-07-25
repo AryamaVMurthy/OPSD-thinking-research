@@ -75,6 +75,10 @@ def install_graph_scaffold_dataset_redirect(manifest_path: str | Path) -> int:
             return {
                 "problem": example["question"],
                 "solution": scaffolds[int(example["_graf_source_index"])],
+                # The index is immutable cache identity, not model-visible text.
+                # It lets the loss join each minibatch item to its independently
+                # verified forced-continuation targets.
+                "graf_source_index": int(example["_graf_source_index"]),
             }
 
         return datasets.DatasetDict({

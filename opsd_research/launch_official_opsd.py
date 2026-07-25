@@ -176,6 +176,51 @@ def _install_tail_logits_loss() -> None:
     )
 
 
+def _install_graf_routed_loss(
+    *, routing_targets, branch_loss_weight: float, entropy_floor_fraction: float
+) -> None:
+    """Install the GRAF branch objective after its cache join is verified."""
+    if branch_loss_weight <= 0:
+        raise SystemExit("GRAF viability-routed mode requires branch_loss_weight > 0")
+    if not 0.0 <= entropy_floor_fraction <= 1.0:
+        raise SystemExit("GRAF entropy_floor_fraction must be in [0, 1]")
+    import opsd_trainer
+
+    from .tail_logits_loss import compute_loss_with_graf_routing
+
+    opsd_trainer.OPSDTrainer._graf_routing_targets = routing_targets
+    opsd_trainer.OPSDTrainer._graf_branch_loss_weight = float(branch_loss_weight)
+    opsd_trainer.OPSDTrainer._graf_entropy_floor_fraction = float(entropy_floor_fraction)
+    opsd_trainer.OPSDTrainer.compute_loss = compute_loss_with_graf_routing
+    print(
+        '{"event":"graf_routed_branch_loss_enabled",'
+        f'"examples":{len(routing_targets)},'
+        f'"branch_loss_weight":{branch_loss_weight},'
+        f'"entropy_floor_fraction":{entropy_floor_fraction}' + "}",
+        flush=True,
+    )
+
+
+def _install_graf_source_index_collator() -> None:
+    """Pass immutable cache indices through the upstream structured collator."""
+    from data_collator import SelfDistillationDataCollator
+    import torch
+
+    original_call = SelfDistillationDataCollator.__call__
+
+    def graf_call(self, features):
+        result = original_call(self, features)
+        if not all("graf_source_index" in feature for feature in features):
+            raise RuntimeError("GRAF viability routing received a row without graph identity")
+        result["graf_source_index"] = torch.tensor(
+            [int(feature["graf_source_index"]) for feature in features], dtype=torch.long
+        )
+        return result
+
+    SelfDistillationDataCollator.__call__ = graf_call
+    print('{"event":"graf_source_index_collator_enabled"}', flush=True)
+
+
 def _install_final_generation_flush() -> None:
     import opsd_trainer
 

@@ -68,6 +68,7 @@ def main() -> None:
     from . import launch_official_opsd as official
 
     os.environ.setdefault("OPSD_DATASET_REVISION", str(config["dataset_revision"]))
+    routed_targets = None
     if config["graph_mode"] == "scaffold_graph":
         from .graf_scaffold_dataset import install_graph_scaffold_dataset_redirect
 
@@ -79,6 +80,27 @@ def main() -> None:
             f'"accepted_graph_records":{records}}}',
             flush=True,
         )
+    elif config["graph_mode"] == "viability_routed":
+        from .graf_routing import load_routing_targets
+        from .graf_scaffold_dataset import install_graph_scaffold_dataset_redirect
+
+        raw_viability_manifest = os.environ.get("GRAF_VIABILITY_MANIFEST")
+        if not raw_viability_manifest:
+            raise SystemExit("viability-routed candidates require GRAF_VIABILITY_MANIFEST")
+        records = install_graph_scaffold_dataset_redirect(
+            os.environ["GRAF_GRAPH_CACHE_MANIFEST"]
+        )
+        routed_targets = load_routing_targets(
+            os.environ["GRAF_GRAPH_CACHE_MANIFEST"], raw_viability_manifest
+        )
+        if not routed_targets:
+            raise SystemExit("viability-routed candidates require at least one joined target")
+        print(
+            '{"event":"graf_viability_routing_enabled",'
+            f'"accepted_graph_records":{records},'
+            f'"routed_examples":{len(routed_targets)}' + "}",
+            flush=True,
+        )
     else:
         official._install_dataset_redirect()
     upstream = Path(__file__).resolve().parents[1] / "third_party" / "opsd"
@@ -86,6 +108,13 @@ def main() -> None:
     official._install_structured_dataset_compat()
     official._install_exact_jsd_chunking()
     official._install_tail_logits_loss()
+    if routed_targets is not None:
+        official._install_graf_source_index_collator()
+        official._install_graf_routed_loss(
+            routing_targets=routed_targets,
+            branch_loss_weight=float(config["branch_loss_weight"]),
+            entropy_floor_fraction=float(config["entropy_floor_weight"]),
+        )
     official._install_final_generation_flush()
     runpy.run_path(str(upstream / "opsd_train.py"), run_name="__main__")
 
