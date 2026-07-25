@@ -33,6 +33,7 @@ rollouts and is the leading mechanistic hypothesis for this degradation.
 |---:|---|---:|---:|---:|---:|---:|
 | 50 | AIME 2025 | 0.6472 | 0.7667 | 0.8000 | -0.0167 | [-0.0639, 0.0250] |
 | 50 | HMMT Feb 2025 | 0.4361 | 0.5333 | 0.6667 | -0.0056 | [-0.0639, 0.0472] |
+| 100 | AIME 2025 | 0.5639 | 0.6333 | 0.7667 | -0.1000 | [-0.1472, -0.0556] |
 
 Step 50 is not statistically separated from the untouched Avg@12 baseline,
 but Pass@12 falls from 0.9000 to 0.8000. Of 360 paired samples, 32 degrade,
@@ -61,6 +62,17 @@ regressions caused by a missing factor for distinct rotations, a modular-sign
 error, and a broken coordinate constraint. A capped geometry response shows
 unproductive repetitive derivation rather than a scoring issue.
 
+Step 100 on AIME 2025 is a statistically significant regression: Avg@12 falls
+to 0.5639 from 0.6639 (paired delta -0.1000, 95% CI [-0.1472, -0.0556]);
+Maj@12 falls to 0.6333 and Pass@12 to 0.7667. Of 360 paired samples, 55
+degrade, 19 improve, 184 remain correct, and 102 remain wrong. The run
+completed in 1h12m15s; mean output length is 18,767.8 tokens and 10/360
+samples (2.78%) reach the 38,912-token cap. Manual review finds invalid
+pair-level inclusion-exclusion, an unsupported chord-intersection probability,
+and lost cross-row constraints; gains include a correct complement count and
+an exact quartic factorization. One treatment sample hits the cap while cycling
+through numerical radical guesses and emits no answer.
+
 ## Verified archives
 
 ```text
@@ -73,6 +85,7 @@ e767efdf11ba08a0af60693c585936d5b2ed87ae02ccbdb54a9d5ed1d061a2e5  opsd-qwen3-1p7
 0d7427c752c0c0eb5fa3273b6d3554b195e4cb723b091374a0783bf19111ccf7  opsd-qwen3-1p7b-step200-aime26.tar.gz
 f5509904c72a8b4a5d0ec62cbfd6d3faa060d644d62c703530c73d82d63bc0ac  opsd-qwen3-4b-step50-aime25.tar.gz
 d47fef7cd1ce64321b6cd76c9327ceb86409eceeeab7670fbff9bfab15a805ae  opsd-qwen3-4b-step50-hmmt25.tar.gz
+d314eb8c9cbfbed65ceeebc241f62e607be05ee4ef95e3cec84e26da1a0f740e  opsd-qwen3-4b-step100-aime25.tar.gz
 ```
 
 ## Preserved recoveries

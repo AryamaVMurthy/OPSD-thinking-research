@@ -12,6 +12,9 @@ def test_accept_math_eval_has_guarded_acceptance_pipeline() -> None:
     assert '"${exit_code}" != "0:0"' in contents
     assert "transfer-manifest-${job_id}.sha256" in contents
     assert 'sha256sum -c "${manifest_name}"' in contents
+    assert 'remote_manifest="$(' in contents
+    assert "remote_login_result" in contents
+    assert 'ssh ${node_name}' not in contents
     assert "-m opsd_research.rescore_matharena" in contents
     assert "-m opsd_research.compare_math" in contents
     assert "-m opsd_research.review_rollouts" in contents

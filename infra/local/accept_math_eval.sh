@@ -79,14 +79,9 @@ if [[ ! "${node_name}" =~ ^[A-Za-z0-9._-]+$ ]]; then
 fi
 
 remote_project="opsd-thinking-research"
-remote_compute_root="/scratch/${node_name}/aryama.murthy/${remote_project}"
 remote_login_root="/scratch/${node_name}/${node_name}/aryama.murthy/${remote_project}"
-remote_result="${remote_compute_root}/results/${run_name}"
 remote_login_result="${remote_login_root}/results/${run_name}"
 manifest_name="transfer-manifest-${job_id}.sha256"
-
-cluster_ssh \
-  "ssh ${node_name} \"test -d '${remote_result}' && cd '${remote_result}' && find . -maxdepth 1 -type f ! -name 'transfer-manifest-*.sha256' -printf '%P\\\\0' | sort -z | xargs -0 sha256sum > '${manifest_name}' && sha256sum -c '${manifest_name}'\""
 
 local_result="artifacts/results/${run_name}"
 local_baseline="artifacts/results/${baseline_run_name}"
@@ -98,6 +93,22 @@ mkdir -p \
   artifacts/telemetry \
   artifacts/comparisons \
   artifacts/reviews
+
+# Seal the login-visible scratch mirror rather than SSHing directly to the
+# completed allocation node. Turing's pam_slurm_adopt policy correctly denies
+# a direct node login once the job has exited, and the login mirror is
+# read-only. Capture its file hashes over the authenticated connection, then
+# persist that transfer manifest locally and validate the downloaded files
+# against it below.
+remote_manifest="$(
+  cluster_ssh \
+    "test -d '${remote_login_result}' && cd '${remote_login_result}' && find . -maxdepth 1 -type f ! -name 'transfer-manifest-*.sha256' -printf '%P\\0' | sort -z | xargs -0 sha256sum"
+)"
+if [[ -z "${remote_manifest}" ]]; then
+  echo "refusing empty remote transfer manifest for ${remote_login_result}" >&2
+  exit 1
+fi
+printf '%s\n' "${remote_manifest}" > "${local_result}/${manifest_name}"
 
 retry_transfer rsync -a --partial --info=stats2 -e "${rsync_shell}" \
   "${turing_target}:${remote_login_result}/" "${local_result}/"
