@@ -36,6 +36,7 @@ rollouts and is the leading mechanistic hypothesis for this degradation.
 | 100 | AIME 2025 | 0.5639 | 0.6333 | 0.7667 | -0.1000 | [-0.1472, -0.0556] |
 | 100 | HMMT Feb 2025 | 0.3694 | 0.4333 | 0.6667 | -0.0722 | [-0.1389, -0.0083] |
 | 150 | AIME 2025 | 0.4417 | 0.6000 | 0.7000 | -0.2222 | [-0.3000, -0.1500] |
+| 150 | HMMT Feb 2025 | 0.2917 | 0.4000 | 0.5667 | -0.1500 | [-0.2278, -0.0778] |
 
 Step 50 is not statistically separated from the untouched Avg@12 baseline,
 but Pass@12 falls from 0.9000 to 0.8000. Of 360 paired samples, 32 degrade,
@@ -97,6 +98,15 @@ repairs, and a substantially heavier long-tail failure rate. A small number of
 exact geometry and perimeter solutions improve, but they do not offset the
 clear degradation.
 
+Step 150 on HMMT February 2025 is also a large regression: Avg@12 falls to
+0.2917 from 0.4417 (paired delta -0.1500, 95% CI [-0.2278, -0.0778]), Maj@12
+to 0.4000, and Pass@12 to 0.5667. Of 360 paired samples, 68 degrade and 14
+improve. The run completed in 1h29m40s; mean output length is 20,855.9 tokens
+and 23/360 samples (6.39%) reach the 38,912-token cap. Manual review finds
+unsupported integer conclusions, a missing rotation factor, broken geometry
+constraints, and long capped loops. Exact coordinate and modular improvements
+remain, but they are too sparse to counter the broad regression.
+
 ## Verified archives
 
 ```text
@@ -112,6 +122,7 @@ d47fef7cd1ce64321b6cd76c9327ceb86409eceeeab7670fbff9bfab15a805ae  opsd-qwen3-4b-
 d314eb8c9cbfbed65ceeebc241f62e607be05ee4ef95e3cec84e26da1a0f740e  opsd-qwen3-4b-step100-aime25.tar.gz
 f584e03f617159c5b3d5127afa10a190a08579b68e52c27186bfd2c5a6469872  opsd-qwen3-4b-step100-hmmt25.tar.gz
 a4d86e6f6fae4a917e81f30b33eaf81f5c1b98ea5dfd8fe566e243f4ccb2fe53  opsd-qwen3-4b-step150-aime25.tar.gz
+b32e36e8498fdb4f46c15daaad361b04ddbdfe85a2a62125c40515ebc520adcc  opsd-qwen3-4b-step150-hmmt25.tar.gz
 ```
 
 ## Preserved recoveries
