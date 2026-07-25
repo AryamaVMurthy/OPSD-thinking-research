@@ -28,3 +28,6 @@ python3 -m opsd_research.graf_autoresearch register \
   --changed-field graph_mode
 g1_job="$(GRAF_GRAPH_CACHE_MANIFEST="${manifest}" sbatch --parsable reproductions/06_graf_opsd/g1-smoke.sbatch)"
 echo "g1_smoke_job=${g1_job}"
+sbatch --parsable --dependency="afterok:${g1_job}" \
+  --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G1_SMOKE_JOB_ID=${g1_job}" \
+  reproductions/06_graf_opsd/after-g1-smoke.sbatch
