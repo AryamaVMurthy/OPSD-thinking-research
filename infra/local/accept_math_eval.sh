@@ -154,6 +154,15 @@ fi
   --per-class 5 \
   --seed 42
 
+"${python_bin}" -m opsd_research.review_math_changes \
+  --baseline-input "${baseline_inputs[@]}" \
+  --baseline-grades "${local_baseline}/official-grades.jsonl" \
+  --treatment-input "${treatment_inputs[@]}" \
+  --treatment-grades "${local_result}/official-grades.jsonl" \
+  --output "artifacts/reviews/${run_name}-paired.md" \
+  --per-class 3 \
+  --seed 42
+
 "${project_root}/infra/turing/artifact_manifest.sh" \
   "${local_result}" artifact-manifest-local-official.sha256
 
@@ -162,3 +171,4 @@ echo "accepted_run=${run_name}"
 echo "result_dir=${local_result}"
 echo "comparison=artifacts/comparisons/${run_name}-vs-untouched.json"
 echo "review_packet=artifacts/reviews/${run_name}.md"
+echo "paired_review_packet=artifacts/reviews/${run_name}-paired.md"

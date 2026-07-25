@@ -24,6 +24,7 @@ result_dir="artifacts/results/${run_name}"
 log_path="artifacts/logs/opsd-eval-${job_id}.out"
 telemetry_path="artifacts/telemetry/${run_name}-${job_id}.csv"
 review_path="artifacts/reviews/${run_name}.md"
+paired_review_path="artifacts/reviews/${run_name}-paired.md"
 manual_review_path="artifacts/reviews/${run_name}-manual-notes.md"
 manifest_name="artifact-manifest-local-official.sha256"
 
@@ -32,6 +33,7 @@ required_paths=(
   "${log_path}"
   "${telemetry_path}"
   "${review_path}"
+  "${paired_review_path}"
   "${manual_review_path}"
   "${result_dir}/${manifest_name}"
 )
@@ -62,6 +64,7 @@ archive_members=(
   "${log_path}"
   "${telemetry_path}"
   "${review_path}"
+  "${paired_review_path}"
   "${manual_review_path}"
 )
 tar_options=(

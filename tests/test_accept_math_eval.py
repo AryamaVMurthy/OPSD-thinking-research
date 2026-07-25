@@ -15,6 +15,7 @@ def test_accept_math_eval_has_guarded_acceptance_pipeline() -> None:
     assert "-m opsd_research.rescore_matharena" in contents
     assert "-m opsd_research.compare_math" in contents
     assert "-m opsd_research.review_rollouts" in contents
+    assert "-m opsd_research.review_math_changes" in contents
     assert "artifact-manifest-local-official.sha256" in contents
 
     result = subprocess.run(
@@ -34,6 +35,7 @@ def test_archive_eval_requires_review_and_reproducible_builds() -> None:
     assert os.access(script, os.X_OK)
     assert "artifact-manifest-local-official.sha256" in contents
     assert "${run_name}-manual-notes.md" in contents
+    assert "${run_name}-paired.md" in contents
     assert 'sha256sum -c "${manifest_name}"' in contents
     assert "--sort=name" in contents
     assert "--mtime=@0" in contents
