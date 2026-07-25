@@ -33,7 +33,7 @@ if payload["rollout_dump_integrity"] != {
     "latest_generation_step": 5,
 }:
     raise SystemExit("G1 smoke did not save a complete step-5 checkpoint/rollout pair")
-for row in payload["training_log_steps"]:
+for row in payload["loss_history"]:
     if not math.isfinite(float(row["loss"])) or not math.isfinite(float(row["grad_norm"])):
         raise SystemExit("G1 smoke loss or gradient was non-finite")
 PY

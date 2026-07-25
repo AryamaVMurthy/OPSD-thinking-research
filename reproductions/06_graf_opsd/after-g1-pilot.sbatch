@@ -33,7 +33,7 @@ payload = json.load(open(sys.argv[1], encoding="utf-8"))
 integrity = payload["rollout_dump_integrity"]
 if not integrity["covers_latest_checkpoint"] or integrity["latest_checkpoint_step"] != 50:
     raise SystemExit("G1 pilot lacks a complete final checkpoint/rollout dump")
-for row in payload["training_log_steps"]:
+for row in payload["loss_history"]:
     if not math.isfinite(float(row["loss"])) or not math.isfinite(float(row["grad_norm"])):
         raise SystemExit("G1 pilot loss or gradient was non-finite")
 PY
