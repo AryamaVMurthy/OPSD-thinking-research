@@ -64,7 +64,10 @@ print("1" if delta >= 0.03 and lower > 0 and upper > 0 else "0")
 PY
 )"
 if [[ "${promote}" == "1" ]]; then
-  echo "g1 promoted; locked-benchmark evaluation is the next controller action"
+  adapter="${TRAIN_ROOT}/graf-g1-answer-masked-50-${G1_PILOT_JOB_ID}"
+  locked="$(sbatch --parsable --export="ALL,METHOD=g1-answer-masked-scaffold,ADAPTER=${adapter}" \
+    reproductions/06_graf_opsd/submit-locked-evals.sbatch)"
+  echo "g1_promoted_locked_submit_job=${locked}"
   exit 0
 fi
 

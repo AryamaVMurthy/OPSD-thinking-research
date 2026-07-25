@@ -49,3 +49,21 @@ event = {
 event["ledger_event_sha256"] = append_ledger(Path(sys.argv[2]), event)
 print(json.dumps(event, sort_keys=True))
 PY
+
+promote="$(python3 - "${treatment}/paired-vs-base.json" <<'PY'
+import json
+import sys
+comparison = json.load(open(sys.argv[1], encoding="utf-8"))
+delta = comparison["avg_at_12"]["delta"]
+lower, upper = comparison["delta_bootstrap_95ci"]["avg_at_12"]
+print("1" if delta >= 0.03 and lower > 0 and upper > 0 else "0")
+PY
+)"
+if [[ "${promote}" == "1" ]]; then
+  adapter="${TRAIN_ROOT}/graf-g2-viability-50-${G2_PILOT_JOB_ID}"
+  locked="$(sbatch --parsable --export="ALL,METHOD=g2-viability-routed,ADAPTER=${adapter}" \
+    reproductions/06_graf_opsd/submit-locked-evals.sbatch)"
+  echo "g2_promoted_locked_submit_job=${locked}"
+else
+  echo "g2 did not clear the development promotion gate; inspect the immutable ledger before proposing G3"
+fi
