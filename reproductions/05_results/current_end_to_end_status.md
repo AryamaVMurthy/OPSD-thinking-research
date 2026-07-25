@@ -31,13 +31,19 @@ the Qwen3-4B math series; LiveCodeBench and all 1.7B retries are excluded.
 | step-100 AIME 2025 | accepted, reviewed, archived | job 16082; archive `d314eb8c…` |
 | step-100 HMMT 2025 | accepted, reviewed, archived | job 16163; archive `f584e03f…` |
 | step-150 AIME/HMMT | accepted, reviewed, archived | jobs 16164 / 16165 |
-| step-200 AIME/HMMT/AIME 2026 | AIME/HMMT accepted; AIME 2026 running | jobs 16166 / 16167 / 16168 |
+| step-200 AIME/HMMT/AIME 2026 | accepted, reviewed, archived | jobs 16166 / 16167 / 16168 |
 
 Queue update at 2026-07-25 23:59 IST: job 16167 (step-200 HMMT) completed
 in 1h27m48s with exit code `0:0`, passed transfer-manifest verification and
 official rescoring, received paired manual review, and was archived as
 `930d2df8…`. Job 16168 (step-200 AIME 2026) started immediately afterwards;
 it is the sole remaining evaluation in the active 4B-math scope.
+
+Completion update at 2026-07-26 01:31 IST: job 16168 (step-200 AIME 2026)
+completed in 1h17m52s with exit code `0:0`, passed transfer-manifest
+verification and official rescoring, received paired manual review, and was
+archived as `68fcaea5…`. This completes all nine evaluations in the active
+Qwen3-4B math scope.
 
 The first step-100 HMMT attempt, job 16083, was intentionally cancelled during
 a user-requested pause after 33m41s. It has no generation shards and remains
