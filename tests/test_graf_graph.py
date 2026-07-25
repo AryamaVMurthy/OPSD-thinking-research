@@ -1,6 +1,6 @@
 import unittest
 
-from opsd_research.graf_graph import branch_target, parse_answer_masked_graph
+from opsd_research.graf_graph import branch_target, parse_answer_masked_graph, render_graph_scaffold
 
 
 class GrafGraphTests(unittest.TestCase):
@@ -31,3 +31,13 @@ class GrafGraphTests(unittest.TestCase):
         self.assertAlmostEqual(sum(target), 1.0)
         self.assertEqual(target[-1], 0.0)
         self.assertGreater(target[0], target[1])
+
+    def test_scaffold_is_answer_masked_and_contains_actions(self):
+        graph = parse_answer_masked_graph(
+            self.payload(), problem="Solve x.",
+            reference_solution="First factor carefully. Therefore \\boxed{7}.",
+        )
+        scaffold = render_graph_scaffold(graph)
+        self.assertIn("Factor the symbolic expression.", scaffold)
+        self.assertNotIn("7", scaffold)
+        self.assertNotIn("\\boxed", scaffold)

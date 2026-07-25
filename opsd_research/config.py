@@ -239,7 +239,9 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         "q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"
     }:
         raise ConfigError(f"{source}: GRAF LoRA target modules are incomplete")
-    if data.get("graph_mode") not in {"disabled", "fork_mask", "viability_routed"}:
+    if data.get("graph_mode") not in {
+        "disabled", "scaffold_graph", "fork_mask", "viability_routed"
+    }:
         raise ConfigError(f"{source}: unsupported graph_mode")
     for key in ("branch_loss_weight", "entropy_floor_weight"):
         value = data.get(key)
@@ -269,7 +271,7 @@ def _validate_graf_autoresearch(data: dict[str, Any], source: str) -> None:
     if not isinstance(data.get("max_candidates"), int) or not 1 <= data["max_candidates"] <= 24:
         raise ConfigError(f"{source}: max_candidates must be in [1, 24]")
     expected_mutations = {
-        "max_completion_length", "fork_threshold", "graph_budget",
+        "max_completion_length", "graph_mode", "fork_threshold", "graph_budget",
         "viability_temperature", "branch_loss_weight", "entropy_floor_weight",
     }
     if not set(data.get("allowed_mutations", [])).issubset(expected_mutations):

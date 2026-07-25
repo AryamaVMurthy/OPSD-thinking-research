@@ -175,6 +175,22 @@ def branch_target(
     return [weight / normalizer for weight in weights]
 
 
+def render_graph_scaffold(graph: ReasoningGraph) -> str:
+    """Render a non-answer graph as a compact privileged teacher scaffold."""
+    lines = [
+        "Use this answer-masked strategy graph as a scaffold. It contains no final "
+        "answer; independently solve and verify the problem."
+    ]
+    for fork in graph.forks:
+        lines.append(f"State {fork.fork_id}: {fork.state}")
+        for action in fork.actions:
+            lines.append(
+                f"- {action.action_id} [{action.status}]: {action.description} "
+                f"Check: {action.validation_test} Recovery: {action.recovery_action}"
+            )
+    return "\n".join(lines)
+
+
 def write_graph_cache_record(path: Path, graph: ReasoningGraph, metadata: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {"graph": asdict(graph), "graph_sha256": graph.sha256, "metadata": metadata}

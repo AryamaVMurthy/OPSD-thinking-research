@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import runpy
 import sys
+from pathlib import Path
 
 from .config import load_config
 
@@ -67,7 +68,19 @@ def main() -> None:
     from . import launch_official_opsd as official
 
     os.environ.setdefault("OPSD_DATASET_REVISION", str(config["dataset_revision"]))
-    official._install_dataset_redirect()
+    if config["graph_mode"] == "scaffold_graph":
+        from .graf_scaffold_dataset import install_graph_scaffold_dataset_redirect
+
+        records = install_graph_scaffold_dataset_redirect(
+            os.environ["GRAF_GRAPH_CACHE_MANIFEST"]
+        )
+        print(
+            '{"event":"graf_answer_masked_scaffold_enabled",'
+            f'"accepted_graph_records":{records}}}',
+            flush=True,
+        )
+    else:
+        official._install_dataset_redirect()
     upstream = Path(__file__).resolve().parents[1] / "third_party" / "opsd"
     sys.path.insert(0, str(upstream))
     official._install_structured_dataset_compat()
