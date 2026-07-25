@@ -27,6 +27,28 @@ assumptions, repetitive long-tail failures, and missing `</think>` closures.
 The official 1,024-token training rollout cap truncates almost all thinking
 rollouts and is the leading mechanistic hypothesis for this degradation.
 
+## Qwen3-4B completed diagnostics
+
+| Step | Benchmark | Avg@12 | Maj@12 | Pass@12 | Paired Avg delta | Delta 95% CI |
+|---:|---|---:|---:|---:|---:|---:|
+| 50 | AIME 2025 | 0.6472 | 0.7667 | 0.8000 | -0.0167 | [-0.0639, 0.0250] |
+
+Step 50 is not statistically separated from the untouched Avg@12 baseline,
+but Pass@12 falls from 0.9000 to 0.8000. Of 360 paired samples, 32 degrade,
+26 improve, 207 remain correct, and 95 remain wrong. The run completes in
+1h12m12s; mean output length is 17,646.8 tokens and 13/360 samples (3.61%)
+reach the 38,912-token inference limit.
+
+Manual paired review finds substantive changes in both directions. Degraded
+examples include an incorrect coordinate/Jacobian transformation followed by
+an acknowledged unsupported guess, an overconstrained combinatorial count,
+and inclusion of the excluded endpoint `2pi`. Improved examples use a correct
+shoelace construction for a reflected heptagon, recover the correct bounded
+triangle and surface-area factor, and replace approximate rounding with an
+exact coordinate construction that verifies all five distance constraints.
+One both-wrong OPSD response cycles through quartic factorizations until the
+length cap; a stable both-correct response retains a clean coordinate solution.
+
 ## Verified archives
 
 ```text
@@ -37,6 +59,7 @@ e767efdf11ba08a0af60693c585936d5b2ed87ae02ccbdb54a9d5ed1d061a2e5  opsd-qwen3-1p7
 35228e00a6f75ab65468a4f78e14090091edd6022d3aebb02602bf9943b959e3  opsd-qwen3-1p7b-step200-aime25.tar.gz
 53773439aa101efebf4db4be66b5887a47db1ff07ee6faa006052ccadc05c093  opsd-qwen3-1p7b-step200-hmmt25.tar.gz
 0d7427c752c0c0eb5fa3273b6d3554b195e4cb723b091374a0783bf19111ccf7  opsd-qwen3-1p7b-step200-aime26.tar.gz
+f5509904c72a8b4a5d0ec62cbfd6d3faa060d644d62c703530c73d82d63bc0ac  opsd-qwen3-4b-step50-aime25.tar.gz
 ```
 
 ## Preserved recoveries
