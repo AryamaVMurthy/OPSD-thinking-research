@@ -65,5 +65,23 @@ if [[ "${promote}" == "1" ]]; then
     reproductions/06_graf_opsd/submit-locked-evals.sbatch)"
   echo "g2_promoted_locked_submit_job=${locked}"
 else
-  echo "g2 did not clear the development promotion gate; inspect the immutable ledger before proposing G3"
+  # G3 differs from G2 in exactly one pre-registered field: the one-sided
+  # branch entropy floor. Reuse G2's immutable graph/viability inputs.
+  python3 -m opsd_research.graf_autoresearch register \
+    --policy reproductions/06_graf_opsd/configs/autoresearch.yaml \
+    --config reproductions/06_graf_opsd/configs/g3-viability-entropy.yaml \
+    --ledger artifacts/graf_opsd/candidate-ledger.jsonl \
+    --candidate-id g3-viability-entropy-2048 \
+    --parent-id g2-viability-routed-2048 --stage G3 \
+    --hypothesis "Match the full viable-branch entropy floor without rewarding uncertainty beyond the frozen branch target." \
+    --changed-field entropy_floor_weight
+  graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
+  viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
+  g3_smoke="$(sbatch --parsable \
+    --export="ALL,GRAF_GRAPH_CACHE_MANIFEST=${graph_manifest},GRAF_VIABILITY_MANIFEST=${viability_manifest}" \
+    reproductions/06_graf_opsd/g3-smoke.sbatch)"
+  echo "g3_smoke_job=${g3_smoke}"
+  sbatch --parsable --dependency="afterok:${g3_smoke}" \
+    --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G2_VIABILITY_ARRAY_JOB_ID=${G2_VIABILITY_ARRAY_JOB_ID},G3_SMOKE_JOB_ID=${g3_smoke}" \
+    reproductions/06_graf_opsd/after-g3-smoke.sbatch
 fi

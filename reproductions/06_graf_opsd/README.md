@@ -10,3 +10,8 @@ The active ladder and promotion gates are defined in
 Artifacts are isolated under `artifacts/graf_opsd/` and use immutable candidate
 IDs. A candidate cannot be submitted without a ledger entry, graph-cache
 manifest (when applicable), and a validated configuration.
+
+G3 is pre-registered as the single-field continuation after an unpromoted G2:
+it changes the one-sided branch entropy floor from 0.1 to 1.0 while retaining
+the exact same frozen graph, forced-continuation targets, model, corpus, and
+evaluation protocol.
