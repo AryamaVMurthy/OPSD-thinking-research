@@ -29,7 +29,8 @@ def test_turing_math_jobs_use_isolated_official_scorer_and_final_manifest() -> N
     assert "SCORE_ENV_DIR=" in common
     assert '"${UV_BIN}" python install 3.12' in setup
     assert '"${SCORE_ENV_DIR}/bin/python"' in setup
-    assert '"${SCORE_ENV_DIR}/bin/python" -m opsd_research.rescore_matharena' in evaluation
+    assert 'score_python="${SCORE_ENV_DIR}/bin/python"' in evaluation
+    assert '"${score_python}" -m opsd_research.rescore_matharena' in evaluation
     assert 'official-grades.jsonl' in evaluation
     assert 'summarize_math' not in evaluation
     assert 'artifact_manifest.sh' in evaluation

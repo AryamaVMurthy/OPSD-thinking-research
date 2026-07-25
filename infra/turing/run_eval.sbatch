@@ -58,7 +58,12 @@ srun \
   "${PROJECT_SOURCE}/infra/turing/eval_worker.sh"
 
 if [[ "${EVAL_MODULE}" == "math_eval" ]]; then
-  "${SCORE_ENV_DIR}/bin/python" -m opsd_research.rescore_matharena \
+  score_python="${SCORE_ENV_DIR}/bin/python"
+  if [[ ! -x "${score_python}" ]]; then
+    score_python="${ENV_DIR}/bin/python"
+    echo "{\"event\":\"score_env_fallback\",\"python\":\"${score_python}\"}" >&2
+  fi
+  "${score_python}" -m opsd_research.rescore_matharena \
     --config "${PROJECT_SOURCE}/${CONFIG}" \
     --input "${OUTPUT_DIR}"/generations.shard*.jsonl \
     --grades-output "${OUTPUT_DIR}/official-grades.jsonl" \
