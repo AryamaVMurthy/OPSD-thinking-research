@@ -23,6 +23,8 @@ fi
 run_dir="${SCRATCH_ROOT}/graf_cache/g1-${SLURM_JOB_ID}"
 mkdir -p "${run_dir}"
 git rev-parse HEAD > "${run_dir}/source-commit.txt"
+start_gpu_telemetry "graf-graph-cache"
+trap stop_gpu_telemetry EXIT
 
 python3 -m opsd_research.build_graf_cache \
   --output "${run_dir}/graphs.jsonl" \
