@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class ConfigTests(unittest.TestCase):
     def test_every_committed_config_is_valid(self):
         configs = discover_configs(ROOT)
-        self.assertEqual(len(configs), 14)
+        self.assertEqual(len(configs), 15)
         for path in configs:
             with self.subTest(path=path):
                 load_config(path)
@@ -72,6 +72,15 @@ class ConfigTests(unittest.TestCase):
         changed = copy.deepcopy(data)
         changed["max_completion_length"] = 1536
         with self.assertRaisesRegex(ConfigError, "max_completion_length"):
+            validate_config(changed)
+
+    def test_viability_routed_candidate_requires_a_real_branch_loss(self):
+        data = load_config(
+            ROOT / "reproductions/06_graf_opsd/configs/g2-viability-routed.yaml"
+        ).data
+        changed = copy.deepcopy(data)
+        changed["branch_loss_weight"] = 0.0
+        with self.assertRaisesRegex(ConfigError, "branch_loss_weight"):
             validate_config(changed)
 
 

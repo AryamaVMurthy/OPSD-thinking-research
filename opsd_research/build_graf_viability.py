@@ -35,7 +35,11 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build forced-continuation viability targets")
     parser.add_argument("--graph-manifest", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--manifest", required=True, type=Path)
+    parser.add_argument("--manifest", type=Path)
+    parser.add_argument(
+        "--start-index", type=int, default=0,
+        help="Offset within accepted cache rows; used only by independently generated shards.",
+    )
     parser.add_argument("--limit", required=True, type=int)
     parser.add_argument("--samples-per-action", required=True, type=int)
     parser.add_argument("--temperature", type=float, default=1.0)
@@ -48,18 +52,23 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = _parse_args()
-    if args.limit < 1 or args.samples_per_action < 1 or args.temperature <= 0:
+    if (
+        args.limit < 1
+        or args.start_index < 0
+        or args.samples_per_action < 1
+        or args.temperature <= 0
+    ):
         raise SystemExit("limit, samples-per-action, and temperature must be positive")
     if args.model != DEFAULT_MODEL or args.model_revision != DEFAULT_MODEL_REVISION:
         raise SystemExit("GRAF viability building is pinned to Qwen3-4B@1cfa9a7")
-    if args.output.exists() or args.manifest.exists():
+    if args.output.exists() or (args.manifest is not None and args.manifest.exists()):
         raise SystemExit("refusing to alter an existing viability cache or manifest")
     graph_manifest = validate_graph_cache_manifest(args.graph_manifest)
     graph_cache_path = Path(str(graph_manifest["cache"]))
     if not graph_cache_path.is_absolute():
         graph_cache_path = args.graph_manifest.parent / graph_cache_path
     accepted = [record for record in read_jsonl(graph_cache_path) if record.get("accepted")]
-    accepted = accepted[: args.limit]
+    accepted = accepted[args.start_index : args.start_index + args.limit]
     if not accepted:
         raise SystemExit("graph cache contains no accepted records")
 
@@ -144,8 +153,9 @@ def main() -> None:
         "training_dataset_revision": TRAINING_DATASET_REVISION,
         "seed": args.seed,
     }
-    args.manifest.parent.mkdir(parents=True, exist_ok=True)
-    args.manifest.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if args.manifest is not None:
+        args.manifest.parent.mkdir(parents=True, exist_ok=True)
+        args.manifest.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(manifest, sort_keys=True), flush=True)
 
 
