@@ -6,15 +6,22 @@ exit code `0:0`; generation matrices were checked for exact
 problem. LiveCodeBench v6 uses 10 samples per problem and the official
 execution checker.
 
+Math values below use the parser and equivalence checker from the pinned
+official MathArena commit
+`a11194deff8c67a232974a383795e8a2776b4c6f`. The immutable generation
+records retain their original `correct` field, while an SHA-256-linked
+`official-grades.jsonl` sidecar and `summary.official.json` provide the
+authoritative scores. This preserves the full audit trail.
+
 ## Math
 
 | Model | Benchmark | Avg@12 | Maj@12 | Pass@12 | Format | Length cutoff |
 |---|---:|---:|---:|---:|---:|---:|
 | Qwen3-1.7B | AIME 2025 | 0.3611 | 0.4333 | 0.6667 | 0.9917 | 0.0167 |
-| Qwen3-1.7B | HMMT Feb 2025 | 0.2083 | 0.2333 | 0.4000 | 1.0000 | 0.0028 |
+| Qwen3-1.7B | HMMT Feb 2025 | 0.2278 | 0.2333 | 0.5333 | 1.0000 | 0.0028 |
 | Qwen3-1.7B | AIME 2026 | 0.3833 | 0.5000 | 0.6333 | 0.9917 | 0.0111 |
-| Qwen3-4B | AIME 2025 | 0.6611 | 0.8000 | 0.8667 | 0.9583 | 0.0500 |
-| Qwen3-4B | HMMT Feb 2025 | 0.3556 | 0.4000 | 0.5333 | 0.9861 | 0.0222 |
+| Qwen3-4B | AIME 2025 | 0.6639 | 0.8000 | 0.9000 | 0.9583 | 0.0500 |
+| Qwen3-4B | HMMT Feb 2025 | 0.4417 | 0.5333 | 0.6667 | 0.9861 | 0.0222 |
 | Qwen3-4B | AIME 2026 | 0.6278 | 0.7333 | 0.8000 | 0.9500 | 0.0528 |
 
 Generation jobs: 16017–16022.

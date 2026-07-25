@@ -58,10 +58,13 @@ srun \
   "${PROJECT_SOURCE}/infra/turing/eval_worker.sh"
 
 if [[ "${EVAL_MODULE}" == "math_eval" ]]; then
-  python3 -m opsd_research.summarize_math \
+  "${SCORE_ENV_DIR}/bin/python" -m opsd_research.rescore_matharena \
     --config "${PROJECT_SOURCE}/${CONFIG}" \
     --input "${OUTPUT_DIR}"/generations.shard*.jsonl \
-    --output "${OUTPUT_DIR}/summary.json"
+    --grades-output "${OUTPUT_DIR}/official-grades.jsonl" \
+    --summary-output "${OUTPUT_DIR}/summary.json"
 fi
 
+"${PROJECT_SOURCE}/infra/turing/artifact_manifest.sh" \
+  "${OUTPUT_DIR}" "artifact-manifest-${SLURM_JOB_ID}.sha256"
 du -sh "${OUTPUT_DIR}" "${HF_HOME}" "${TRAIN_ROOT}"

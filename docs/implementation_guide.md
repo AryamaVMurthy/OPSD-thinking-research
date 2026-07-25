@@ -27,9 +27,12 @@ with less than 200 GiB free. No unrelated home or scratch data is deleted.
 
 1. Sync the source tree and create `logs/`.
 2. Submit `infra/turing/setup_env.sbatch`. It installs the official OPSD
-   dependency versions, caches both models and all four datasets, validates
-   row counts, checks CUDA/FlashAttention/vLLM, and asserts that the Qwen
-   thinking-mode template switch changes the rendered prompt correctly.
+   dependency versions in the Python 3.10 GPU environment and creates a
+   small, isolated Python 3.12 scoring environment with MathArena's exact
+   parser dependencies. It caches both models and all four datasets,
+   validates row counts, checks CUDA/FlashAttention/vLLM, and asserts that
+   the Qwen thinking-mode template switch changes the rendered prompt
+   correctly.
 3. Run untouched 1.7B math configs, then untouched 1.7B LCB.
 4. Run untouched 4B math configs, then untouched 4B LCB.
 5. Score each LCB generation job separately with the official execution
@@ -48,6 +51,16 @@ without duplicates. Every trained method and checkpoint reuses the exact
 accepted untouched seed for the same model, benchmark, problem, and sample
 index, giving paired random streams across the comparison. LoRA checkpoints
 are loaded directly by vLLM.
+
+After each math generation finishes, the isolated scoring environment invokes
+the parser and equivalence checker from pinned MathArena commit
+`a11194deff8c67a232974a383795e8a2776b4c6f`. It writes a compact
+`official-grades.jsonl` sidecar linked to every raw response by SHA-256 and
+an authoritative `summary.json`. The raw shard records are never rewritten.
+The job then creates an `artifact-manifest-<job-id>.sha256` covering the
+generation shards, summaries, config, runtime metadata, and adapter identity.
+LCB scoring creates the same final artifact manifest after the official
+execution checker finishes.
 
 Before queuing the full matrix, run one AIME problem through the saved LoRA
 adapter. The gate loads the adapter through vLLM, produces all 12 configured
@@ -108,7 +121,10 @@ A run is accepted only if:
 - every record says thinking was enabled and the aggregate reports the
   non-empty-thinking rate;
 - cutoff, extraction/formatting, and output-length diagnostics are reported;
+- math correctness comes from the pinned official MathArena parser and every
+  sidecar response hash matches its immutable raw generation;
 - LCB uses the official execution checker;
+- the final artifact manifest verifies every retained generation and summary;
 - sample correct and incorrect rollouts have been manually read;
 - the immutable config, package freeze, upstream SHAs, and adapter are
   retained.

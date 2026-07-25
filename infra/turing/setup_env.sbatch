@@ -19,8 +19,12 @@ export UV_CACHE_DIR="${SCRATCH_ROOT}/uv-cache"
 export UV_PYTHON_INSTALL_DIR="${SCRATCH_ROOT}/uv-python"
 
 "${UV_BIN}" python install 3.10
+"${UV_BIN}" python install 3.12
 if [[ ! -x "${ENV_DIR}/bin/python3" ]]; then
   "${UV_BIN}" venv --python 3.10 "${ENV_DIR}"
+fi
+if [[ ! -x "${SCORE_ENV_DIR}/bin/python3" ]]; then
+  "${UV_BIN}" venv --python 3.12 "${SCORE_ENV_DIR}"
 fi
 source "${ENV_DIR}/bin/activate"
 
@@ -50,9 +54,17 @@ source "${ENV_DIR}/bin/activate"
 "${UV_BIN}" pip install --no-build-isolation flash-attn==2.8.3
 "${UV_BIN}" pip install --no-build-isolation flashinfer-python==0.3.1
 "${UV_BIN}" pip install --no-deps -e "${PROJECT_SOURCE}"
+"${UV_BIN}" pip install \
+  --python "${SCORE_ENV_DIR}/bin/python" \
+  -e "${PROJECT_SOURCE}"
 
 python3 -m opsd_research.cli validate-all
 python3 -m opsd_research.prepare_assets
 python3 -m opsd_research.smoke
+"${SCORE_ENV_DIR}/bin/python" -c \
+  "from opsd_research.matharena_grading import grade_response; assert grade_response(r'\\boxed{26!}', r'2^{25} \\cdot 26!', strict_parsing=False)['correct'] is False"
 "${UV_BIN}" pip freeze > "${SCRATCH_ROOT}/environment-freeze.txt"
+"${UV_BIN}" pip freeze \
+  --python "${SCORE_ENV_DIR}/bin/python" \
+  > "${SCRATCH_ROOT}/score-environment-freeze.txt"
 df -h "${SCRATCH_ROOT}"

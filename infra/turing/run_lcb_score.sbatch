@@ -21,3 +21,6 @@ python3 -m opsd_research.score_lcb \
   --graded-output "${OUTPUT_DIR}/graded.jsonl" \
   --output "${OUTPUT_DIR}/summary.json" \
   --processes 32
+
+"${PROJECT_SOURCE}/infra/turing/artifact_manifest.sh" \
+  "${OUTPUT_DIR}" "artifact-manifest-${SLURM_JOB_ID}.sha256"
