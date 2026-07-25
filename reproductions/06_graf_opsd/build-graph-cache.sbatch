@@ -15,9 +15,10 @@ module load u22/cuda/12.4
 source "${HOME}/OPSD-thinking-research/infra/turing/common.sh"
 cd "${PROJECT_SOURCE}"
 
-GRAPH_LIMIT="${GRAPH_LIMIT:-32}"
-if (( GRAPH_LIMIT < 1 )); then
-  echo "GRAPH_LIMIT must be positive" >&2
+GRAPH_LIMIT="${GRAPH_LIMIT:-512}"
+GRAPH_ATTEMPTS="${GRAPH_ATTEMPTS:-3}"
+if (( GRAPH_LIMIT < 1 || GRAPH_ATTEMPTS < 1 )); then
+  echo "GRAPH_LIMIT and GRAPH_ATTEMPTS must be positive" >&2
   exit 2
 fi
 run_dir="${SCRATCH_ROOT}/graf_cache/g1-${SLURM_JOB_ID}"
@@ -30,6 +31,7 @@ python3 -m opsd_research.build_graf_cache \
   --output "${run_dir}/graphs.jsonl" \
   --manifest "${run_dir}/manifest.json" \
   --limit "${GRAPH_LIMIT}" \
+  --attempts "${GRAPH_ATTEMPTS}" \
   --tensor-parallel-size 1 \
   --seed 42
 

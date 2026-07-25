@@ -98,6 +98,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--limit", required=True, type=int)
+    parser.add_argument("--attempts", type=int, default=3)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--model-revision", default=DEFAULT_MODEL_REVISION)
     parser.add_argument("--tensor-parallel-size", type=int, default=1)
@@ -107,8 +108,8 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = _parse_args()
-    if args.limit < 1:
-        raise SystemExit("--limit must be positive")
+    if args.limit < 1 or args.attempts < 1:
+        raise SystemExit("--limit and --attempts must be positive")
     if args.model != DEFAULT_MODEL or args.model_revision != DEFAULT_MODEL_REVISION:
         raise SystemExit("GRAF cache building is pinned to Qwen3-4B@1cfa9a7")
     if args.output.exists():
@@ -131,26 +132,71 @@ def main() -> None:
         trust_remote_code=True,
     )
     tokenizer = llm.get_tokenizer()
-    prompts = [
-        _builder_chat_prompt(tokenizer, str(row["question"]), str(row["response"]))
-        for row in rows
-    ]
-    outputs = llm.generate(
-        prompts,
-        SamplingParams(
-            temperature=0.2,
-            top_p=0.95,
-            max_tokens=MAX_COMPLETION_TOKENS,
-            seed=args.seed,
-        ),
-    )
+    records: list[dict[str, Any] | None] = [None] * len(rows)
+    pending: list[int] = list(range(len(rows)))
     accepted = 0
-    rejected = 0
-    for index, (row, output) in enumerate(zip(rows, outputs, strict=True)):
+    last_errors: dict[int, str] = {}
+    for attempt in range(args.attempts):
+        if not pending:
+            break
+        prompts: list[str] = []
+        viable_indices: list[int] = []
+        for index in pending:
+            row = rows[index]
+            try:
+                prompts.append(_builder_chat_prompt(
+                    tokenizer, str(row["question"]), str(row["response"])
+                ))
+                viable_indices.append(index)
+            except ValueError as error:
+                last_errors[index] = str(error)
+        outputs = llm.generate(
+            prompts,
+            SamplingParams(
+                temperature=0.35,
+                top_p=0.95,
+                max_tokens=MAX_COMPLETION_TOKENS,
+                seed=args.seed + attempt,
+            ),
+        ) if prompts else []
+        next_pending: list[int] = []
+        for index, output in zip(viable_indices, outputs, strict=True):
+            row = rows[index]
+            question = str(row["question"])
+            response = str(row["response"])
+            record: dict[str, Any] = {
+                "schema_version": 1,
+                "example_index": index,
+                "problem_sha256": hashlib.sha256(question.encode("utf-8")).hexdigest(),
+                "builder_model": args.model,
+                "builder_model_revision": args.model_revision,
+                "training_dataset_revision": TRAINING_DATASET_REVISION,
+                "builder_seed": args.seed + attempt,
+                "builder_attempt": attempt + 1,
+            }
+            try:
+                graph = parse_answer_masked_graph(
+                    _json_object(output.outputs[0].text),
+                    problem=question,
+                    reference_solution=response,
+                )
+                record.update({
+                    "accepted": True,
+                    "graph": json.loads(graph.canonical_json()),
+                    "graph_sha256": graph.sha256,
+                })
+                records[index] = record
+                accepted += 1
+            except (ValueError, json.JSONDecodeError) as error:
+                last_errors[index] = str(error)
+                next_pending.append(index)
+        pending = next_pending
+    rejected_indices = [index for index, record in enumerate(records) if record is None]
+    rejected = len(rejected_indices)
+    for index in rejected_indices:
+        row = rows[index]
         question = str(row["question"])
-        response = str(row["response"])
-        raw = output.outputs[0].text
-        record: dict[str, Any] = {
+        records[index] = {
             "schema_version": 1,
             "example_index": index,
             "problem_sha256": hashlib.sha256(question.encode("utf-8")).hexdigest(),
@@ -158,16 +204,13 @@ def main() -> None:
             "builder_model_revision": args.model_revision,
             "training_dataset_revision": TRAINING_DATASET_REVISION,
             "builder_seed": args.seed,
+            "builder_attempts": args.attempts,
+            "accepted": False,
+            "reject_reason": last_errors.get(index, "prompt could not be rendered"),
         }
-        try:
-            graph = parse_answer_masked_graph(
-                _json_object(raw), problem=question, reference_solution=response
-            )
-            record.update({"accepted": True, "graph": json.loads(graph.canonical_json()), "graph_sha256": graph.sha256})
-            accepted += 1
-        except (ValueError, json.JSONDecodeError) as error:
-            record.update({"accepted": False, "reject_reason": str(error)})
-            rejected += 1
+    for record in records:
+        if record is None:
+            raise RuntimeError("cache builder lost an example record")
         append_jsonl(args.output, record)
     digest = hashlib.sha256(args.output.read_bytes()).hexdigest()
     manifest = {
@@ -181,6 +224,7 @@ def main() -> None:
         "builder_model_revision": args.model_revision,
         "training_dataset_revision": TRAINING_DATASET_REVISION,
         "builder_seed": args.seed,
+        "builder_attempts": args.attempts,
     }
     args.manifest.parent.mkdir(parents=True, exist_ok=True)
     args.manifest.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")

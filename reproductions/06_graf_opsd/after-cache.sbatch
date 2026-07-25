@@ -17,6 +17,19 @@ cd "${PROJECT_SOURCE}"
 : "${CACHE_BUILD_JOB_ID:?missing graph-cache build job ID}"
 manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
 test -f "${manifest}"
+min_accepted="${MIN_GRAPH_ACCEPTED:-64}"
+python3 - "${manifest}" "${min_accepted}" <<'PY'
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+minimum = int(sys.argv[2])
+accepted = int(manifest["accepted_examples"])
+if accepted < minimum:
+    raise SystemExit(
+        f"refusing G1 training: only {accepted} validated graphs; need at least {minimum}"
+    )
+PY
 python3 -m opsd_research.graf_autoresearch register \
   --policy reproductions/06_graf_opsd/configs/autoresearch.yaml \
   --config reproductions/06_graf_opsd/configs/g1-answer-masked-scaffold.yaml \
