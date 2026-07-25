@@ -14,9 +14,12 @@ ALLOWED_MODELS = {
 
 MATH_DATASETS = {
     "aime24": {
-        "path": "MathArena/aime_2024_combined",
         "split": "train",
         "expected_count": 30,
+        "components": (
+            ("I", "MathArena/aime_2024_I"),
+            ("II", "MathArena/aime_2024_II"),
+        ),
     },
     "aime25": {
         "path": "MathArena/aime_2025",

@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class ConfigTests(unittest.TestCase):
     def test_every_committed_config_is_valid(self):
         configs = discover_configs(ROOT)
-        self.assertEqual(len(configs), 12)
+        self.assertEqual(len(configs), 13)
         for path in configs:
             with self.subTest(path=path):
                 load_config(path)

@@ -2,7 +2,18 @@ import hashlib
 import json
 from pathlib import Path
 
-from opsd_research.rescore_matharena import rescore_run
+from opsd_research.rescore_matharena import _competition_protocol, rescore_run
+
+
+def test_aime24_combines_official_i_and_ii_protocols() -> None:
+    strict, config_paths, config_hash = _competition_protocol("aime24")
+
+    assert strict is False
+    assert config_paths == (
+        "configs/competitions/aime/aime_2024_I.yaml+"
+        "configs/competitions/aime/aime_2024_II.yaml"
+    )
+    assert len(config_hash) == 64
 
 
 def test_rescore_run_writes_verified_sidecars_without_touching_raw_data(

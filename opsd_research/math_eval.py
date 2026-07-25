@@ -38,23 +38,43 @@ def _load_rows(config: dict[str, Any], limit: int | None) -> list[dict[str, str]
 
     alias = config["dataset"]
     spec = MATH_DATASETS[alias]
-    dataset = load_dataset(
-        spec["path"],
-        split=spec["split"],
-        revision=config["dataset_revision"],
-        trust_remote_code=True,
-    )
-    if len(dataset) != spec["expected_count"]:
+    component_specs = spec.get("components")
+    if component_specs:
+        revisions = str(config["dataset_revision"]).split("+")
+        if len(revisions) != len(component_specs):
+            raise RuntimeError(
+                f"{alias}: composite dataset_revision must contain "
+                f"{len(component_specs)} '+'-separated immutable revisions"
+            )
+        datasets = [
+            (label, load_dataset(path, split=spec["split"], revision=revision,
+                                 trust_remote_code=True))
+            for (label, path), revision in zip(component_specs, revisions, strict=True)
+        ]
+        dataset_items = [
+            (label, raw) for label, dataset in datasets for raw in dataset
+        ]
+    else:
+        dataset = load_dataset(
+            spec["path"],
+            split=spec["split"],
+            revision=config["dataset_revision"],
+            trust_remote_code=True,
+        )
+        dataset_items = [(None, raw) for raw in dataset]
+    if len(dataset_items) != spec["expected_count"]:
         raise RuntimeError(
-            f"{alias}: expected {spec['expected_count']} rows, found {len(dataset)}"
+            f"{alias}: expected {spec['expected_count']} rows, found {len(dataset_items)}"
         )
     rows: list[dict[str, str]] = []
-    for index, raw in enumerate(dataset):
+    for index, (component, raw) in enumerate(dataset_items):
         problem = str(_field(raw, ("problem", "question", "prompt")))
         answer = str(_field(raw, ("answer", "solution", "ground_truth")))
         problem_id = str(
             raw.get("problem_idx", raw.get("id", raw.get("question_id", index)))
         )
+        if component is not None:
+            problem_id = f"{component}:{problem_id}"
         rows.append(
             {"problem_id": problem_id, "problem": problem, "answer": answer}
         )

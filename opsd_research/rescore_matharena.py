@@ -19,6 +19,10 @@ from .records import read_jsonl, validate_consistent_fields
 
 
 COMPETITION_CONFIGS = {
+    "aime24": (
+        "configs/competitions/aime/aime_2024_I.yaml",
+        "configs/competitions/aime/aime_2024_II.yaml",
+    ),
     "aime25": "configs/competitions/aime/aime_2025.yaml",
     "aime26": "configs/competitions/aime/aime_2026.yaml",
     "hmmt25": "configs/competitions/hmmt/hmmt_feb_2025.yaml",
@@ -58,13 +62,24 @@ def _competition_protocol(dataset: str) -> tuple[bool, str, str]:
         relative_path = COMPETITION_CONFIGS[dataset]
     except KeyError as exc:
         raise ValueError(f"no official MathArena config mapped for {dataset!r}") from exc
-    path = _matharena_root() / relative_path
-    payload = path.read_bytes()
-    config = yaml.safe_load(payload)
-    if not isinstance(config, dict):
-        raise ValueError(f"{path}: expected YAML mapping")
-    strict_parsing = bool(config.get("strict_parsing", False))
-    return strict_parsing, relative_path, hashlib.sha256(payload).hexdigest()
+    relative_paths = (relative_path,) if isinstance(relative_path, str) else relative_path
+    payloads = []
+    strict_values = []
+    for item in relative_paths:
+        path = _matharena_root() / item
+        payload = path.read_bytes()
+        protocol = yaml.safe_load(payload)
+        if not isinstance(protocol, dict):
+            raise ValueError(f"{path}: expected YAML mapping")
+        payloads.append(payload)
+        strict_values.append(bool(protocol.get("strict_parsing", False)))
+    if len(set(strict_values)) != 1:
+        raise ValueError(f"{dataset}: component protocols disagree on strict parsing")
+    return (
+        strict_values[0],
+        "+".join(relative_paths),
+        hashlib.sha256(b"\0".join(payloads)).hexdigest(),
+    )
 
 
 def _scorer_environment() -> dict[str, str]:
