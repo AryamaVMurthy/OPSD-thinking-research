@@ -149,3 +149,43 @@ The model coherently follows the translation instruction and repeats the
 English sentence without solving the math problem. Thus, short or closed
 thinking is not by itself evidence of a useful privileged trajectory; the
 source task and final-answer semantics must also be validated.
+
+## Completed Qwen3-4B execution
+
+Job 16057 completed all 200 optimizer steps from source commit
+`5e4af436c1b38dc72a8346863af5926f125d07af` with Slurm state `COMPLETED`,
+exit `0:0`, and wall time 2h32m12s. The losses and gradients remained finite;
+the step-200 loss was -0.0174 and its gradient norm was 0.0286546.
+
+Full resumable checkpoints 50, 100, 150, and 200 remain on node10 scratch.
+Each contains eight optimizer shards, one model-state shard, eight RNG states,
+the scheduler, tokenizer, trainer state, and LoRA adapter. The checkpoint-200
+directory is 2,908,479,986 bytes. All four minimal local checkpoint copies
+verify against their own SHA-256 manifests. Their adapter SHA-256 values are:
+
+- step 50:
+  `4a65128c88617eb2a8bc0dfa71aa6480a84fd073fa09e260fdb416010804ed9f`;
+- step 100:
+  `1c867302d5574e5b707b22325c66a917ce721f897d52d5e1caafe4c8ed4307e7`;
+- step 150:
+  `559fb93f367dd279e9dba48f7a02035beb5c61a127ecbba697c80cb65b976a9c`;
+- step 200:
+  `68cbcedfe4331707ed8974dfaf52e10613cc4ad0a6245ab68c655cf979983c62`.
+
+The final-buffer repair emitted a structured
+`final_generation_buffer_flush` event and preserved
+`generations_step_200.json`. Across all 40 five-step dumps, all 800 saved
+rank-0 rollouts are non-empty and begin thinking; one closes `</think>` and
+none emits a boxed answer. Of 6,338 logged vLLM calls, 6,335 reach exactly
+1,024 tokens; the other lengths are 791, 933, and 437, giving a mean of
+1,023.856 tokens. The 437-token natural completion is the malformed
+translation example documented above.
+
+Mean GPU utilization including initialization is 90.5–91.4% across the eight
+A100s. Peak memory is 38,887 MiB of 40,960 MiB, and the maximum observed
+temperature is 67°C. The run manifest, complete training summary, final log,
+telemetry, every rollout dump, and all manual review packets are preserved
+with the four minimal adapters in a 788 MiB archive. Its SHA-256 is
+`78b1d9b8129cf16edb12478ee2f45522a4f4de1c497bba592b11f496e493c348`.
+The gzip stream, all 12 archived checkpoint checksums, 40 generation members,
+global step 200, and the 800-rollout summary were independently verified.
