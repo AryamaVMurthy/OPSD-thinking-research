@@ -30,6 +30,14 @@ The rescorer calls MathArena's own `extract_answer`, `parse_answer`, and
 
 The original JSONL and legacy `summary.json` are deliberately not overwritten.
 
+The six untouched-baseline sidecars and official summaries are bundled
+separately so the immutable raw-generation archives retain their original
+checksums:
+
+```text
+52b4f68dda5a2293986c99a2854cd75b3fc27dca9f4ed13a6767fefbb9634618  matharena-official-rescore-untouched-baselines.tar.gz
+```
+
 ## Baseline impact
 
 | Run | Legacy Avg@12 | Official Avg@12 | Legacy Maj@12 | Official Maj@12 | Grade flips |
