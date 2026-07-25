@@ -27,9 +27,9 @@ hypothesis for this degradation.
 ## Verified archives
 
 ```text
-22a219e097fc4ba451c4271b3fd587839dbf4dc846de69049f79d1291dafa10d  opsd-qwen3-1p7b-step50-aime25.tar.gz
-2706fad7dfe13b13d389ceea7c416b5c2d5c15e8d6b7d8469de5ef05a1351618  opsd-qwen3-1p7b-step100-hmmt25.tar.gz
-914f1f8159e8d84f938cf48f4e2437d67656dc0df032ae81775ed4100c6cf5c3  opsd-qwen3-1p7b-step150-aime25.tar.gz
+07687218dcc02994a44e42acdb8d68cbf23a12a8f8c307f8ac7d88602a6e5836  opsd-qwen3-1p7b-step50-aime25.tar.gz
+e767efdf11ba08a0af60693c585936d5b2ed87ae02ccbdb54a9d5ed1d061a2e5  opsd-qwen3-1p7b-step100-hmmt25.tar.gz
+71ba056f5432469488a1459a0d33dff92e9e529e77fb9eb74e6464999892cc37  opsd-qwen3-1p7b-step150-aime25.tar.gz
 ```
 
 ## Preserved recoveries

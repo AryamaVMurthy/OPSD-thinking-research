@@ -35,7 +35,7 @@ separately so the immutable raw-generation archives retain their original
 checksums:
 
 ```text
-52b4f68dda5a2293986c99a2854cd75b3fc27dca9f4ed13a6767fefbb9634618  matharena-official-rescore-untouched-baselines.tar.gz
+5d0d08dad0e7f4ac6672a142451457ccfdd229590903e59ad0305a06c5cef0a5  matharena-official-rescore-untouched-baselines.tar.gz
 ```
 
 ## Baseline impact
