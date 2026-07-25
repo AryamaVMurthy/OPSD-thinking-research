@@ -19,15 +19,21 @@ fi
 
 project_source="${HOME}/OPSD-thinking-research"
 cd "${project_source}"
+source infra/turing/job_dependency.sh
 if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "refusing to submit post-training evaluations from a dirty tree" >&2
   exit 1
 fi
 
 adapter_root="/scratch/node10/${USER}/opsd-thinking-research/training/qwen3-4b-opsd-thinking"
-dependency="afterok:${train_job_id}"
+afterok_jobs=("${train_job_id}")
 if [[ -n "${smoke_job_id}" ]]; then
-  dependency+=":${smoke_job_id}"
+  afterok_jobs+=("${smoke_job_id}")
+fi
+afterok_ids="$(resolve_afterok_ids "${afterok_jobs[@]}")"
+dependency_args=()
+if [[ -n "${afterok_ids}" ]]; then
+  dependency_args=(--dependency="afterok:${afterok_ids}")
 fi
 source_commit="$(git rev-parse HEAD)"
 submission_id="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -45,7 +51,7 @@ submit_eval() {
   local job_id
   job_id="$(
     sbatch --parsable \
-      --dependency="${dependency}" \
+      "${dependency_args[@]}" \
       --export=ALL,CONFIG="${config}",EVAL_MODULE="${module}",RUN_NAME="${run_name}",ADAPTER="${adapter}",METHOD=opsd-standard-thinking,CHECKPOINT="${checkpoint}" \
       infra/turing/run_eval.sbatch
   )"

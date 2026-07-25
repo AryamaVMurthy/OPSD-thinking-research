@@ -17,6 +17,7 @@ done
 
 project_source="${HOME}/OPSD-thinking-research"
 cd "${project_source}"
+source infra/turing/job_dependency.sh
 if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "refusing to submit post-training pipeline from a dirty tree" >&2
   exit 1
@@ -32,8 +33,14 @@ submit_smoke() {
   local config="$2"
   local run_name="$3"
   local adapter="$4"
+  local afterok_ids
+  local dependency_args=()
+  afterok_ids="$(resolve_afterok_ids "${training_job}")"
+  if [[ -n "${afterok_ids}" ]]; then
+    dependency_args=(--dependency="afterok:${afterok_ids}")
+  fi
   sbatch --parsable \
-    --dependency="afterok:${training_job}" \
+    "${dependency_args[@]}" \
     --export=ALL,CONFIG="${config}",RUN_NAME="${run_name}",ADAPTER="${adapter}",CHECKPOINT=200 \
     infra/turing/smoke_adapter_inference.sbatch
 }
