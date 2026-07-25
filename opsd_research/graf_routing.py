@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from .graf_actions import ASSISTANT_ACTION_PREFIX_PROTOCOL
 from .graf_cache import validate_graph_cache_manifest
 
 
@@ -46,6 +47,8 @@ def load_routing_targets(
         raise ValueError(f"invalid viability manifest: {error}") from error
     if viability_manifest.get("schema_version") != 1:
         raise ValueError("unsupported viability manifest schema")
+    if viability_manifest.get("forced_prefix_protocol") != ASSISTANT_ACTION_PREFIX_PROTOCOL:
+        raise ValueError("viability cache uses an incompatible action-prefix protocol")
     if viability_manifest.get("graph_cache_sha256") != graph_manifest["cache_sha256"]:
         raise ValueError("viability cache was built from a different graph cache")
     viability_path = _resolve_manifest_path(
@@ -65,6 +68,8 @@ def load_routing_targets(
     }
     targets: dict[int, tuple[ForkTarget, ...]] = {}
     for record in _read_jsonl(viability_path):
+        if record.get("forced_prefix_protocol") != ASSISTANT_ACTION_PREFIX_PROTOCOL:
+            raise ValueError("viability record uses an incompatible action-prefix protocol")
         index = int(record["example_index"])
         graph = graphs.get(index)
         if graph is None or record.get("graph_sha256") != graph.get("graph_sha256"):

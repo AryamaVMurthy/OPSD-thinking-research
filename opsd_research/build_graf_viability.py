@@ -9,6 +9,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from .graf_actions import ASSISTANT_ACTION_PREFIX_PROTOCOL, action_continuation
 from .generation_common import extract_last_boxed, grade_math
 from .graf_cache import validate_graph_cache_manifest
 from .graf_graph import GraphAction, branch_target
@@ -21,14 +22,16 @@ DEFAULT_MODEL_REVISION = "1cfa9a7208912126459214e8b04321603b3df60c"
 TRAINING_DATASET_REVISION = "1435fb21d4fecc8ad4966a26f22a874cf2b527f1"
 
 
-def forced_action_messages(problem: str, action: str) -> list[dict[str, str]]:
-    """Give the student an ordinary problem context, then force one proposed move."""
-    messages = math_messages(problem)
-    messages[0]["content"] += (
-        "\n\nBegin your solution by carrying out this proposed mathematical action: "
-        f"{action}\nContinue independently from there; check the result yourself."
-    )
-    return messages
+def forced_action_prompt(tokenizer: Any, problem: str, action: str) -> str:
+    """Force the *same assistant continuation* scored by GRAF's branch loss.
+
+    The ordinary student message remains untouched.  The graph action is
+    appended after Qwen's thinking-enabled assistant prefix, so empirical
+    viability answers the relevant question: can the student finish after it
+    has emitted this exact action, rather than after the user merely suggested
+    it?
+    """
+    return render_thinking_prompt(tokenizer, math_messages(problem)) + action_continuation(action)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -94,8 +97,8 @@ def main() -> None:
                         int(record["example_index"]), str(fork["fork_id"]),
                         str(action["action_id"]), str(row["response"]), str(action["description"]),
                     ))
-                    prompts.append(render_thinking_prompt(
-                        tokenizer, forced_action_messages(str(row["question"]), str(action["description"]))
+                    prompts.append(forced_action_prompt(
+                        tokenizer, str(row["question"]), str(action["description"])
                     ))
     llm = LLM(
         model=args.model, revision=args.model_revision, dtype="bfloat16",
@@ -137,6 +140,7 @@ def main() -> None:
             "fork_targets": fork_targets,
             "samples_per_action": args.samples_per_action,
             "temperature": args.temperature,
+            "forced_prefix_protocol": ASSISTANT_ACTION_PREFIX_PROTOCOL,
             "model": args.model,
             "model_revision": args.model_revision,
         })
@@ -148,6 +152,7 @@ def main() -> None:
         "examples": len(accepted),
         "samples_per_action": args.samples_per_action,
         "temperature": args.temperature,
+        "forced_prefix_protocol": ASSISTANT_ACTION_PREFIX_PROTOCOL,
         "model": args.model,
         "model_revision": args.model_revision,
         "training_dataset_revision": TRAINING_DATASET_REVISION,

@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 
 from .graf_cache import validate_graph_cache_manifest
+from .graf_actions import ASSISTANT_ACTION_PREFIX_PROTOCOL
 from .records import append_jsonl, read_jsonl
 
 
@@ -52,6 +53,8 @@ def main() -> None:
                 raise SystemExit("viability shard samples-per-action mismatch")
             if float(record.get("temperature", -1)) != args.temperature:
                 raise SystemExit("viability shard temperature mismatch")
+            if record.get("forced_prefix_protocol") != ASSISTANT_ACTION_PREFIX_PROTOCOL:
+                raise SystemExit("viability shard action-prefix protocol mismatch")
             if record.get("model") != args.model or record.get("model_revision") != args.model_revision:
                 raise SystemExit("viability shard model pin mismatch")
             records[index] = record
@@ -67,6 +70,7 @@ def main() -> None:
         "examples": len(records),
         "samples_per_action": args.samples_per_action,
         "temperature": args.temperature,
+        "forced_prefix_protocol": ASSISTANT_ACTION_PREFIX_PROTOCOL,
         "model": args.model,
         "model_revision": args.model_revision,
         "seed": args.seed,

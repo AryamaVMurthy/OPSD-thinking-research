@@ -13,19 +13,10 @@ from dataclasses import dataclass
 
 import torch
 
+from .graf_actions import action_continuation
 from .graf_action_scores import action_scores_from_tail_logits
 from .graf_loss import branch_routed_loss
 from .graf_routing import ForkTarget
-
-
-ACTION_PREFIX = "\n\nBegin your solution by carrying out this proposed mathematical action: "
-ACTION_SUFFIX = "\n"
-
-
-def action_continuation(description: str) -> str:
-    """Exact text whose probability is aligned with viability rollouts."""
-    return f"{ACTION_PREFIX}{description}{ACTION_SUFFIX}"
-
 
 @dataclass(frozen=True)
 class RoutedActionBatch:

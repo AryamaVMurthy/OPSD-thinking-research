@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 from opsd_research.graf_routing import load_routing_targets
+from opsd_research.graf_actions import ASSISTANT_ACTION_PREFIX_PROTOCOL
 
 
 def test_joins_matching_immutable_graph_and_viability_caches(tmp_path: Path) -> None:
@@ -24,6 +25,7 @@ def test_joins_matching_immutable_graph_and_viability_caches(tmp_path: Path) -> 
     viability_cache = tmp_path / "viability.jsonl"
     viability_cache.write_text(json.dumps({
         "example_index": 3, "graph_sha256": "graph-hash",
+        "forced_prefix_protocol": ASSISTANT_ACTION_PREFIX_PROTOCOL,
         "fork_targets": [{"fork_id": "f", "action_ids": ["a", "b"], "target": [0.75, 0.25]}],
     }) + "\n", encoding="utf-8")
     viability_manifest = tmp_path / "viability-manifest.json"
@@ -31,7 +33,7 @@ def test_joins_matching_immutable_graph_and_viability_caches(tmp_path: Path) -> 
         "schema_version": 1, "graph_cache_sha256": graph_digest,
         "viability_cache": "viability.jsonl",
         "viability_cache_sha256": hashlib.sha256(viability_cache.read_bytes()).hexdigest(),
-        "examples": 1,
+        "examples": 1, "forced_prefix_protocol": ASSISTANT_ACTION_PREFIX_PROTOCOL,
     }), encoding="utf-8")
 
     targets = load_routing_targets(graph_manifest, viability_manifest)

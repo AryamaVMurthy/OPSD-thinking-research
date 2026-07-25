@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from opsd_research import merge_graf_viability
+from opsd_research.graf_actions import ASSISTANT_ACTION_PREFIX_PROTOCOL
 
 
 def test_merges_verified_nonoverlapping_shards(tmp_path: Path, monkeypatch) -> None:
@@ -25,6 +26,7 @@ def test_merges_verified_nonoverlapping_shards(tmp_path: Path, monkeypatch) -> N
         shard.write_text(json.dumps({
             "example_index": index, "graph_sha256": digest, "samples_per_action": 1,
             "temperature": 1.0, "model": "Qwen/Qwen3-4B", "model_revision": "pin",
+            "forced_prefix_protocol": ASSISTANT_ACTION_PREFIX_PROTOCOL,
             "fork_targets": [{"fork_id": "f", "action_ids": ["x"], "target": [1.0]}],
         }) + "\n", encoding="utf-8")
         shards.append(shard)
@@ -38,4 +40,5 @@ def test_merges_verified_nonoverlapping_shards(tmp_path: Path, monkeypatch) -> N
     merge_graf_viability.main()
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     assert payload["examples"] == 2
+    assert payload["forced_prefix_protocol"] == ASSISTANT_ACTION_PREFIX_PROTOCOL
     assert [json.loads(line)["example_index"] for line in output.read_text().splitlines()] == [1, 2]
