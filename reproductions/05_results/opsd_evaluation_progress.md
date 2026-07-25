@@ -34,6 +34,7 @@ rollouts and is the leading mechanistic hypothesis for this degradation.
 | 50 | AIME 2025 | 0.6472 | 0.7667 | 0.8000 | -0.0167 | [-0.0639, 0.0250] |
 | 50 | HMMT Feb 2025 | 0.4361 | 0.5333 | 0.6667 | -0.0056 | [-0.0639, 0.0472] |
 | 100 | AIME 2025 | 0.5639 | 0.6333 | 0.7667 | -0.1000 | [-0.1472, -0.0556] |
+| 100 | HMMT Feb 2025 | 0.3694 | 0.4333 | 0.6667 | -0.0722 | [-0.1389, -0.0083] |
 
 Step 50 is not statistically separated from the untouched Avg@12 baseline,
 but Pass@12 falls from 0.9000 to 0.8000. Of 360 paired samples, 32 degrade,
@@ -73,6 +74,18 @@ and lost cross-row constraints; gains include a correct complement count and
 an exact quartic factorization. One treatment sample hits the cap while cycling
 through numerical radical guesses and emits no answer.
 
+Step 100 on HMMT February 2025 is likewise a statistically significant
+regression: Avg@12 falls to 0.3694 from 0.4417 (paired delta -0.0722, 95% CI
+[-0.1389, -0.0083]); Maj@12 falls to 0.4333 while Pass@12 remains 0.6667. Of
+360 paired samples, 49 degrade, 23 improve, 110 remain correct, and 178 remain
+wrong. The run completed in 1h14m37s; mean output length is 19,415.0 tokens
+and 10/360 samples (2.78%) reach the 38,912-token cap. Manual review finds an
+unjustified substitution of a nearby rational for an irrational constant,
+confusion of either-axis with both-axis separation, and asserted rather than
+solved symmetric algebra. Improvements include exact coordinate and counting
+arguments, but one capped geometry rollout still resolves a contradiction by
+rounding to an unsupported final answer.
+
 ## Verified archives
 
 ```text
@@ -86,6 +99,7 @@ e767efdf11ba08a0af60693c585936d5b2ed87ae02ccbdb54a9d5ed1d061a2e5  opsd-qwen3-1p7
 f5509904c72a8b4a5d0ec62cbfd6d3faa060d644d62c703530c73d82d63bc0ac  opsd-qwen3-4b-step50-aime25.tar.gz
 d47fef7cd1ce64321b6cd76c9327ceb86409eceeeab7670fbff9bfab15a805ae  opsd-qwen3-4b-step50-hmmt25.tar.gz
 d314eb8c9cbfbed65ceeebc241f62e607be05ee4ef95e3cec84e26da1a0f740e  opsd-qwen3-4b-step100-aime25.tar.gz
+f584e03f617159c5b3d5127afa10a190a08579b68e52c27186bfd2c5a6469872  opsd-qwen3-4b-step100-hmmt25.tar.gz
 ```
 
 ## Preserved recoveries
