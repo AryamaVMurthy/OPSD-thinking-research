@@ -19,6 +19,32 @@ queued. A result is accepted only after Slurm success, exact generation-matrix
 validation, checksum verification, official scoring, comparison with the
 matching untouched run, manual rollout review, and immutable archiving.
 
+## Current authoritative 4B math status (2026-07-25 17:05 IST)
+
+The earlier queue snapshot below is historical. The active scope is exclusively
+the Qwen3-4B math series; LiveCodeBench and all 1.7B retries are excluded.
+
+| Run | Current state | Evidence / job |
+|---|---|---|
+| step-50 AIME 2025 | accepted, reviewed, archived | job 16080; archive `f5509904…` |
+| step-50 HMMT 2025 | accepted, reviewed, archived | job 16081; archive `d47fef7c…` |
+| step-100 AIME 2025 | accepted, reviewed, archived | job 16082; archive `d314eb8c…` |
+| step-100 HMMT 2025 | running | retry job 16163 on node10 |
+| step-150 AIME/HMMT | queued | jobs 16164 / 16165 |
+| step-200 AIME/HMMT/AIME 2026 | queued | jobs 16166 / 16167 / 16168 |
+
+The first step-100 HMMT attempt, job 16083, was intentionally cancelled during
+a user-requested pause after 33m41s. It has no generation shards and remains
+only as preserved setup metadata on read-only scratch. The restarted job 16163
+uses the same frozen source, adapter, official configuration, and 12-sample
+protocol. Turing serializes these evaluations because each occupies all eight
+A100 GPUs; `AssocGrpCpuLimit` on later jobs is expected.
+
+Acceptance now seals a hash manifest through the read-only login-visible
+scratch mirror, transfers the exact files, and verifies them locally. This is
+required because Turing's `pam_slurm_adopt` rejects direct node SSH after a
+completed allocation is released.
+
 ## Executive status
 
 | Phase | Status | Completed |
