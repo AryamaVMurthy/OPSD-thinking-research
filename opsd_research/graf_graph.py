@@ -79,23 +79,24 @@ that could apply to a related problem.
 Output only the JSON object—no prose, Markdown, or explanation."""
 
 
-def graph_sanitizer_prompt(problem: str, candidate_graph: dict[str, Any]) -> str:
-    """Request a reference-free rewrite of a structurally valid graph.
+def graph_sanitizer_prompt(problem: str) -> str:
+    """Request a clean graph without exposing either solution or candidate text.
 
     This is only used after the first candidate has passed answer-leak checks
-    but failed an exact reference-fragment check.  The rewriter never receives
-    the reference solution, and its result is still fully revalidated.
+    but failed an exact reference-fragment check. The fallback gets only the
+    problem, so it cannot echo a phrase from the rejected candidate or from the
+    reference solution. Its result is still fully revalidated.
     """
-    return f"""Rewrite this reasoning graph for the math problem below.
+    return f"""Construct an answer-masked reasoning graph for the math problem below.
 
 Problem:
 {problem}
 
-Candidate graph:
-{json.dumps(candidate_graph, sort_keys=True)}
-
-Return the same JSON schema with only `forks`. Preserve high-level choices,
-but write every state, action, check, and recovery instruction independently.
+Construct a fresh answer-masked reasoning graph using only this problem.
+Return JSON with only `forks`; each fork has `fork_id`, `state`, and 2-3
+actions, and each action has `action_id`, `description`, `status`,
+`validation_test`, and `recovery_action`. Status must be one of: viable,
+conditionally_viable, risky, invalid, dead_end, recoverable, redundant.
 Do not include a final answer, a boxed expression, a numerical intermediate,
 or any explanation outside the JSON object."""
 

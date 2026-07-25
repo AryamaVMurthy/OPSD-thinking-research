@@ -97,10 +97,10 @@ def _builder_chat_prompt(tokenizer: Any, problem: str, reference_solution: str) 
     return prompt
 
 
-def _sanitizer_chat_prompt(tokenizer: Any, problem: str, candidate_graph: dict[str, Any]) -> str:
+def _sanitizer_chat_prompt(tokenizer: Any, problem: str) -> str:
     """Render a reference-free non-thinking JSON rewrite turn."""
     prompt = tokenizer.apply_chat_template(
-        [{"role": "user", "content": graph_sanitizer_prompt(problem, candidate_graph)}],
+        [{"role": "user", "content": graph_sanitizer_prompt(problem)}],
         tokenize=False,
         add_generation_prompt=True,
         enable_thinking=False,
@@ -227,12 +227,12 @@ def main() -> None:
                         pass
         sanitizer_prompts: list[str] = []
         sanitizer_indices: list[int] = []
-        for index, candidate_graph in sanitizer_inputs:
+        for index, _candidate_graph in sanitizer_inputs:
             row = rows[index]
             try:
-                sanitizer_prompts.append(_sanitizer_chat_prompt(
-                    tokenizer, str(row["question"]), candidate_graph
-                ))
+                sanitizer_prompts.append(
+                    _sanitizer_chat_prompt(tokenizer, str(row["question"]))
+                )
                 sanitizer_indices.append(index)
             except ValueError as error:
                 last_errors[index] = str(error)

@@ -51,8 +51,7 @@ def test_builder_uses_qwen_non_thinking_chat_template_for_json() -> None:
 
 
 def test_sanitizer_never_receives_reference_solution() -> None:
-    prompt = _sanitizer_chat_prompt(
-        _CharacterTokenizer(), "Find x.", {"forks": []}
-    )
-    assert "Candidate graph" in prompt
+    prompt = _sanitizer_chat_prompt(_CharacterTokenizer(), "Find x.")
+    assert "Construct a fresh" in prompt
+    assert "Candidate graph" not in prompt
     assert "reference solution" not in prompt.lower()
