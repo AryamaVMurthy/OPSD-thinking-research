@@ -32,6 +32,7 @@ rollouts and is the leading mechanistic hypothesis for this degradation.
 | Step | Benchmark | Avg@12 | Maj@12 | Pass@12 | Paired Avg delta | Delta 95% CI |
 |---:|---|---:|---:|---:|---:|---:|
 | 50 | AIME 2025 | 0.6472 | 0.7667 | 0.8000 | -0.0167 | [-0.0639, 0.0250] |
+| 50 | HMMT Feb 2025 | 0.4361 | 0.5333 | 0.6667 | -0.0056 | [-0.0639, 0.0472] |
 
 Step 50 is not statistically separated from the untouched Avg@12 baseline,
 but Pass@12 falls from 0.9000 to 0.8000. Of 360 paired samples, 32 degrade,
@@ -49,6 +50,17 @@ exact coordinate construction that verifies all five distance constraints.
 One both-wrong OPSD response cycles through quartic factorizations until the
 length cap; a stable both-correct response retains a clean coordinate solution.
 
+On HMMT February 2025, step 50 is also statistically indistinguishable from
+the untouched Avg@12 baseline (0.4361 versus 0.4417) and retains identical
+majority and pass rates. Of 360 paired samples, 33 degrade, 31 improve, 126
+remain correct, and 170 remain wrong. The run completes in 1h11m35s; mean
+output length is 18,447.7 tokens and 4/360 samples (1.11%) reach the
+38,912-token inference limit. Manual review identifies real improvements from
+complete coordinate and inclusion-exclusion arguments, alongside real
+regressions caused by a missing factor for distinct rotations, a modular-sign
+error, and a broken coordinate constraint. A capped geometry response shows
+unproductive repetitive derivation rather than a scoring issue.
+
 ## Verified archives
 
 ```text
@@ -60,6 +72,7 @@ e767efdf11ba08a0af60693c585936d5b2ed87ae02ccbdb54a9d5ed1d061a2e5  opsd-qwen3-1p7
 53773439aa101efebf4db4be66b5887a47db1ff07ee6faa006052ccadc05c093  opsd-qwen3-1p7b-step200-hmmt25.tar.gz
 0d7427c752c0c0eb5fa3273b6d3554b195e4cb723b091374a0783bf19111ccf7  opsd-qwen3-1p7b-step200-aime26.tar.gz
 f5509904c72a8b4a5d0ec62cbfd6d3faa060d644d62c703530c73d82d63bc0ac  opsd-qwen3-4b-step50-aime25.tar.gz
+d47fef7cd1ce64321b6cd76c9327ceb86409eceeeab7670fbff9bfab15a805ae  opsd-qwen3-4b-step50-hmmt25.tar.gz
 ```
 
 ## Preserved recoveries
