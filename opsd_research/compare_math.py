@@ -164,6 +164,9 @@ def compare_paired_math(
     return {
         "schema_version": 1,
         "comparison_protocol": "paired-problem-cluster-bootstrap-v1",
+        "evaluation_protocol": (
+            "official" if samples_per_problem == 12 else "development"
+        ),
         "pairing_verified": True,
         "model": first_baseline["model"],
         "benchmark": first_baseline["benchmark"],

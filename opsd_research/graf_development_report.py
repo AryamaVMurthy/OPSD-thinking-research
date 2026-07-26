@@ -27,14 +27,24 @@ def render(comparison: dict[str, Any], *, candidate_id: str) -> str:
         raise ValueError("malformed paired comparison")
     delta = float(metric["delta"])
     decision = "promote to full confirmation" if delta > 0 else "advance to next candidate"
+    evaluation_protocol = comparison.get(
+        "evaluation_protocol",
+        "official" if comparison["samples_per_problem"] == 12 else "development",
+    )
+    result_heading = (
+        "Official paired result"
+        if evaluation_protocol == "official"
+        else "Paired development result"
+    )
     return "\n".join([
         "# GRAF development result", "",
         f"- Candidate: `{candidate_id}`",
         f"- Benchmark: `{comparison['benchmark']}`",
         f"- Model: `{comparison['model']}`",
         f"- Protocol: `{comparison['comparison_protocol']}`",
+        f"- Evaluation tier: `{evaluation_protocol}`",
         f"- Paired problems / samples per problem: `{comparison['num_problems']}` / `{comparison['samples_per_problem']}`", "",
-        "## Official paired result", "",
+        f"## {result_heading}", "",
         "| Metric | Baseline | Candidate | Delta | Paired bootstrap 95% CI |",
         "|---|---:|---:|---:|---:|",
         f"| {key} | {100 * float(metric['baseline']):.2f}% | {100 * float(metric['treatment']):.2f}% | {100 * delta:+.2f} pp | [{100 * float(interval[0]):+.2f}, {100 * float(interval[1]):+.2f}] pp |", "",

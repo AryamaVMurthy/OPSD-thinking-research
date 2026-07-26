@@ -17,3 +17,22 @@ class GrafDevelopmentReportTests(unittest.TestCase):
         self.assertIn("+5.00 pp", report)
         self.assertIn("promote to full confirmation", report)
         self.assertIn("interpretation only", report)
+
+    def test_labels_short_screen_as_development_not_official(self):
+        comparison = {
+            "model": "Qwen/Qwen3-4B", "benchmark": "aime24",
+            "comparison_protocol": "paired-problem-cluster-bootstrap-v1",
+            "evaluation_protocol": "development",
+            "num_problems": 30, "samples_per_problem": 4,
+            "avg_at_4": {"baseline": .5, "treatment": .55, "delta": .05},
+            "delta_bootstrap_95ci": {"avg_at_4": [-.01, .11]},
+            "paired_sample_changes": {
+                "improved": 4, "degraded": 2,
+                "both_correct": 40, "both_wrong": 74,
+            },
+        }
+
+        report = render(comparison, candidate_id="ch0")
+
+        self.assertIn("Paired development result", report)
+        self.assertNotIn("Official paired result", report)

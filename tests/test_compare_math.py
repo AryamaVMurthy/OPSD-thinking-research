@@ -79,3 +79,4 @@ def test_paired_math_comparison_reports_problem_clustered_deltas() -> None:
         "improved": 3,
     }
     assert comparison["pairing_verified"] is True
+    assert comparison["evaluation_protocol"] == "development"
