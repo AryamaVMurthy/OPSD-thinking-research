@@ -76,7 +76,7 @@ export OPSD_DATASET_REVISION=1435fb21d4fecc8ad4966a26f22a874cf2b527f1
 export OPSD_EXACT_JSD_VOCAB_CHUNK_SIZE=4096
 export OPSD_TAIL_LOGITS_ONLY=1
 vllm_utilization="${CH_VLLM_GPU_MEMORY_UTILIZATION:-0.35}"
-run_name="ch-${CH_CANDIDATE_ID}-${CH_MAX_STEPS}-${SLURM_JOB_ID}"
+run_name="${CH_RUN_NAME:-ch-${CH_CANDIDATE_ID}-${CH_MAX_STEPS}-${SLURM_JOB_ID}}"
 output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"
 cp "${CH_CANDIDATE_CONFIG}" "${output_dir}/config.yaml"
@@ -93,6 +93,7 @@ record_run_manifest \
 
 start_gpu_telemetry "${run_name}"
 trap stop_gpu_telemetry EXIT
+canonical_training_log="${output_dir}/training.log"
 accelerate launch \
   --config_file third_party/opsd/accelerate.yaml \
   --num_processes "${configured_gpus}" \
@@ -137,11 +138,12 @@ accelerate launch \
   --seed 42 \
   --data_seed 42 \
   --report_to wandb \
-  --wandb_project CH-OPSD-autoresearch
+  --wandb_project CH-OPSD-autoresearch \
+  2>&1 | tee -a "${canonical_training_log}"
 
 python3 -m opsd_research.summarize_training \
   --training-dir "${output_dir}" \
-  --training-log "${CH_TRAINING_LOG_ROOT:-${PROJECT_SOURCE}/logs}/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out" \
+  --training-log "${canonical_training_log}" \
   --telemetry "${TELEMETRY_ROOT}/${run_name}-${SLURM_JOB_ID}.csv" \
   --output "${output_dir}/training-summary.json" \
   --max-completion-length "${completion_length}"

@@ -217,6 +217,7 @@ def main() -> None:
             branch_loss_weight=float(config["branch_loss_weight"]),
             entropy_floor_fraction=float(config["entropy_floor_weight"]),
         )
+    official._install_auto_resume()
     official._install_final_generation_flush()
     runpy.run_path(str(upstream / "opsd_train.py"), run_name="__main__")
 

@@ -274,6 +274,30 @@ def _install_final_generation_flush() -> None:
     opsd_trainer.OPSDTrainer.train = train_with_final_flush
 
 
+def _install_auto_resume() -> None:
+    """Resume experimental runs from the highest complete local checkpoint."""
+    import opsd_trainer
+
+    from .training_resume import latest_valid_checkpoint
+
+    original_train = opsd_trainer.OPSDTrainer.train
+
+    def train_with_auto_resume(self, *args, **kwargs):
+        if not args and "resume_from_checkpoint" not in kwargs:
+            checkpoint = latest_valid_checkpoint(self.args.output_dir)
+            if checkpoint is not None:
+                kwargs["resume_from_checkpoint"] = str(checkpoint)
+                if self.accelerator.is_main_process:
+                    print(
+                        '{"event":"training_auto_resume",'
+                        f'"checkpoint":"{checkpoint}"' + "}",
+                        flush=True,
+                    )
+        return original_train(self, *args, **kwargs)
+
+    opsd_trainer.OPSDTrainer.train = train_with_auto_resume
+
+
 def main() -> None:
     _validate_invocation()
     _install_dataset_redirect()
