@@ -58,12 +58,12 @@ srun \
   --gpu-bind=single:1 \
   "${PROJECT_SOURCE}/infra/turing/ch_cache_worker.sh"
 
+shards=()
+for ((shard_id = 0; shard_id < SLURM_NTASKS; shard_id++)); do
+  shards+=("${CH_RUN_DIR}/dossiers.shard${shard_id}.jsonl")
+done
 python3 -m opsd_research.merge_ch_cache \
-  --shards \
-    "${CH_RUN_DIR}/dossiers.shard0.jsonl" \
-    "${CH_RUN_DIR}/dossiers.shard1.jsonl" \
-    "${CH_RUN_DIR}/dossiers.shard2.jsonl" \
-    "${CH_RUN_DIR}/dossiers.shard3.jsonl" \
+  --shards "${shards[@]}" \
   --output "${CH_RUN_DIR}/dossiers.jsonl" \
   --manifest "${CH_RUN_DIR}/manifest.json" \
   --requested-examples "${CH_LIMIT}" \

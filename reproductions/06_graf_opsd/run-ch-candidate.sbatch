@@ -31,6 +31,24 @@ import sys
 print(load_config(sys.argv[1]).data["max_steps"])
 PY
 )"
+configured_save_steps="$(python3 - "${CH_CANDIDATE_CONFIG}" <<'PY'
+from opsd_research.config import load_config
+import sys
+print(load_config(sys.argv[1]).data["save_steps"])
+PY
+)"
+configured_gpus="$(python3 - "${CH_CANDIDATE_CONFIG}" <<'PY'
+from opsd_research.config import load_config
+import sys
+print(load_config(sys.argv[1]).data["num_gpus"])
+PY
+)"
+configured_accumulation="$(python3 - "${CH_CANDIDATE_CONFIG}" <<'PY'
+from opsd_research.config import load_config
+import sys
+print(load_config(sys.argv[1]).data["gradient_accumulation_steps"])
+PY
+)"
 max_sequence_length="$(python3 - "${CH_CANDIDATE_CONFIG}" <<'PY'
 from opsd_research.config import load_config
 import sys
@@ -39,8 +57,16 @@ PY
 )"
 if [[ "${CH_MAX_STEPS}" == 1 || "${CH_MAX_STEPS}" == 5 ]]; then
   export GRAF_SMOKE_MAX_STEPS="${CH_MAX_STEPS}"
+  effective_save_steps="${CH_MAX_STEPS}"
 elif [[ "${CH_MAX_STEPS}" != "${configured_steps}" ]]; then
-  echo "CH_MAX_STEPS must be 5 or the configured ${configured_steps}" >&2
+  echo "CH_MAX_STEPS must be 1, 5, or the configured ${configured_steps}" >&2
+  exit 2
+else
+  effective_save_steps="${configured_save_steps}"
+fi
+if [[ -n "${SLURM_GPUS_ON_NODE:-}" &&
+      "${SLURM_GPUS_ON_NODE}" != "${configured_gpus}" ]]; then
+  echo "allocated ${SLURM_GPUS_ON_NODE} GPUs but config requires ${configured_gpus}" >&2
   exit 2
 fi
 
@@ -56,8 +82,9 @@ mkdir -p "${output_dir}"
 cp "${CH_CANDIDATE_CONFIG}" "${output_dir}/config.yaml"
 cp "${CH_DOSSIER_MANIFEST}" "${output_dir}/ch-dossier-manifest.json"
 export OPSD_TRAINING_PARTITION_MANIFEST="${output_dir}/training-partition.json"
-printf 'candidate=%s\nmax_steps=%s\nnum_gpus=4\ngradient_accumulation_steps=8\neffective_batch_size=32\nvllm_gpu_memory_utilization=%s\n' \
-  "${CH_CANDIDATE_ID}" "${CH_MAX_STEPS}" "${vllm_utilization}" \
+printf 'candidate=%s\nmax_steps=%s\nnum_gpus=%s\ngradient_accumulation_steps=%s\neffective_batch_size=32\nvllm_gpu_memory_utilization=%s\n' \
+  "${CH_CANDIDATE_ID}" "${CH_MAX_STEPS}" "${configured_gpus}" \
+  "${configured_accumulation}" "${vllm_utilization}" \
   > "${output_dir}/runtime-overrides.txt"
 record_run_manifest \
   "${output_dir}" \
@@ -68,8 +95,8 @@ start_gpu_telemetry "${run_name}"
 trap stop_gpu_telemetry EXIT
 accelerate launch \
   --config_file third_party/opsd/accelerate.yaml \
-  --num_processes 4 \
-  --gradient_accumulation_steps 8 \
+  --num_processes "${configured_gpus}" \
+  --gradient_accumulation_steps "${configured_accumulation}" \
   --main_process_port "${CH_PORT}" \
   -m opsd_research.launch_graf_opsd \
   --model_name_or_path Qwen/Qwen3-4B \
@@ -79,13 +106,13 @@ accelerate launch \
   --max_grad_norm 0.1 \
   --per_device_train_batch_size 1 \
   --gradient_checkpointing \
-  --gradient_accumulation_steps 8 \
+  --gradient_accumulation_steps "${configured_accumulation}" \
   --output_dir "${TRAIN_ROOT}" \
   --run_config "${run_name}" \
   --num_train_epochs 30 \
   --max_steps "${CH_MAX_STEPS}" \
   --max_completion_length "${completion_length}" \
-  --save_steps "${CH_MAX_STEPS}" \
+  --save_steps "${effective_save_steps}" \
   --logging_steps 1 \
   --attn_implementation flash_attention_2 \
   --torch_dtype bfloat16 \

@@ -254,8 +254,14 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         )
     if data.get("max_steps") not in {5, 12, 25, 50, 200}:
         raise ConfigError(f"{source}: max_steps must be 5, 12, 25, 50, or 200")
-    if data.get("save_steps") != data.get("max_steps"):
-        raise ConfigError(f"{source}: pilot candidates save only at their final step")
+    save_steps = data.get("save_steps")
+    if save_steps != data.get("max_steps") and not (
+        data.get("max_steps") == 200 and save_steps == 50
+    ):
+        raise ConfigError(
+            f"{source}: pilots save only at the final step; "
+            "200-step confirmations may save every 50 steps"
+        )
     max_sequence_length = data.get("max_sequence_length", 28672)
     if (
         not isinstance(max_sequence_length, int)
