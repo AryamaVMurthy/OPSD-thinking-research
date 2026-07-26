@@ -172,6 +172,7 @@ def compute_loss_with_graf_routing(
         print(
             '{"event":"graf_branch_loss",'
             f'"active_forks":{metrics["active_forks"]},'
+            f'"effective_fork_weight":{metrics.get("effective_fork_weight", metrics["active_forks"]):.8f},'
             f'"branch_kl":{metrics["branch_kl"]:.8f},'
             f'"entropy_floor":{metrics["entropy_floor"]:.8f},'
             f'"weighted_loss":{float(branch_loss.detach()):.8f}' + "}",

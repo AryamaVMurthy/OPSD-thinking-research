@@ -26,7 +26,7 @@ class RoutedActionBatch:
     attention_mask: torch.Tensor
     action_token_ids: torch.Tensor
     action_lengths: torch.Tensor
-    target_groups: tuple[tuple[torch.Tensor, torch.Tensor], ...]
+    target_groups: tuple[tuple[torch.Tensor, torch.Tensor, float], ...]
 
 
 def build_routed_action_batch(
@@ -57,7 +57,7 @@ def build_routed_action_batch(
 
     sequences: list[torch.Tensor] = []
     actions: list[torch.Tensor] = []
-    targets: list[tuple[list[int], list[float]]] = []
+    targets: list[tuple[list[int], list[float], float]] = []
     for batch_index, raw_source in enumerate(source_indices.detach().cpu().tolist()):
         prompt_length = int(student_prompt_lengths[batch_index].item())
         prompt = student_prompts[batch_index, :prompt_length]
@@ -73,7 +73,7 @@ def build_routed_action_batch(
                 actions.append(action_tokens)
                 rows.append(len(sequences) - 1)
                 probs.append(float(action.target_probability))
-            targets.append((rows, probs))
+            targets.append((rows, probs, float(fork.information_weight)))
     if not targets:
         return None
 
@@ -101,8 +101,9 @@ def build_routed_action_batch(
             (
                 torch.tensor(rows, dtype=torch.long, device=student_prompts.device),
                 torch.tensor(probabilities, dtype=torch.float32, device=student_prompts.device),
+                information_weight,
             )
-            for rows, probabilities in targets
+            for rows, probabilities, information_weight in targets
         ),
     )
 
@@ -146,9 +147,10 @@ def graf_branch_loss(
         outputs.logits, batch.action_token_ids, batch.action_lengths
     )
     losses: list[torch.Tensor] = []
+    weights: list[float] = []
     branch_kl = 0.0
     entropy_floor = 0.0
-    for rows, target in batch.target_groups:
+    for rows, target, information_weight in batch.target_groups:
         fork_loss, metrics = branch_routed_loss(
             scores.index_select(0, rows).unsqueeze(0),
             target.unsqueeze(0),
@@ -156,12 +158,15 @@ def graf_branch_loss(
             entropy_floor_fraction=entropy_floor_fraction,
         )
         losses.append(fork_loss)
-        branch_kl += float(metrics["branch_kl"])
-        entropy_floor += float(metrics["entropy_floor"])
-    mean_loss = torch.stack(losses).mean()
+        weights.append(information_weight)
+        branch_kl += float(metrics["branch_kl"]) * information_weight
+        entropy_floor += float(metrics["entropy_floor"]) * information_weight
+    weight_sum = sum(weights)
+    mean_loss = sum((loss * weight for loss, weight in zip(losses, weights, strict=True))) / weight_sum
     active = float(len(losses))
     return branch_loss_weight * mean_loss, {
         "active_forks": active,
-        "branch_kl": branch_kl / active,
-        "entropy_floor": entropy_floor / active,
+        "effective_fork_weight": weight_sum,
+        "branch_kl": branch_kl / weight_sum,
+        "entropy_floor": entropy_floor / weight_sum,
     }

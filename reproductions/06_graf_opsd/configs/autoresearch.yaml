@@ -20,6 +20,7 @@ allowed_mutations:
   - fork_threshold
   - fork_information_threshold
   - fork_information_quantile
+  - information_weighted_routing
   - graph_budget
   - viability_temperature
   - branch_loss_weight

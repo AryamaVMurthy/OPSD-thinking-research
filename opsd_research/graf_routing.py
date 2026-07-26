@@ -23,6 +23,7 @@ class ActionTarget:
 class ForkTarget:
     fork_id: str
     actions: tuple[ActionTarget, ...]
+    information_weight: float = 1.0
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -41,6 +42,7 @@ def load_routing_targets(
     min_target_margin: float = 0.0,
     min_target_information: float = 0.0,
     target_information_quantile: float = 0.0,
+    information_weighting: bool = False,
 ) -> dict[int, tuple[ForkTarget, ...]]:
     """Verify caches and optionally retain outcome-differential branch targets.
 
@@ -144,14 +146,24 @@ def load_routing_targets(
             # This differs from a top-two winner margin: [viable, viable,
             # invalid] should preserve the two viable alternatives while
             # explicitly suppressing the invalid one.
-            if target_information(values) < adaptive_information:
+            information = target_information(values)
+            if information < adaptive_information:
                 continue
+            if information_weighting and information == 0.0:
+                continue
+            # Normalizing by the maximum KL for this action arity gives a
+            # continuous [0, 1] reliability weight without assuming how many
+            # actions are viable or invalid.
+            information_weight = (
+                information / math.log(len(values)) if information_weighting else 1.0
+            )
             forks.append(ForkTarget(
                 fork_id=str(fork["fork_id"]),
                 actions=tuple(
                     ActionTarget(action_id, descriptions[action_id], value)
                     for action_id, value in zip(action_ids, values, strict=True)
                 ),
+                information_weight=information_weight,
             ))
         targets[index] = tuple(forks)
     if len(targets) != int(viability_manifest.get("examples", -1)):

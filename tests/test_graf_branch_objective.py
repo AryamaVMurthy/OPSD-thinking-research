@@ -26,6 +26,7 @@ def test_builds_left_padded_action_continuations_and_groups() -> None:
                     ActionTarget("a0", "factor", 0.75),
                     ActionTarget("a1", "substitute", 0.25),
                 ),
+                information_weight=0.4,
             ),
         )
     }
@@ -42,9 +43,10 @@ def test_builds_left_padded_action_continuations_and_groups() -> None:
     assert batch.input_ids.shape[0] == 2
     assert batch.action_token_ids.shape[0] == 2
     assert len(batch.target_groups) == 1
-    rows, target = batch.target_groups[0]
+    rows, target, information_weight = batch.target_groups[0]
     assert rows.tolist() == [0, 1]
     torch.testing.assert_close(target, torch.tensor([0.75, 0.25]))
+    assert information_weight == 0.4
     # Both full sequences are left-padded to a common terminal action boundary.
     assert torch.all(batch.attention_mask[:, -batch.action_lengths.max() :] == 1)
 

@@ -130,6 +130,15 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "fork_information_quantile"):
             validate_config(changed)
 
+    def test_information_weighting_cannot_be_combined_with_cutoff(self):
+        data = load_config(
+            ROOT / "reproductions/06_graf_opsd/configs/g6-information-routed.yaml"
+        ).data
+        changed = copy.deepcopy(data)
+        changed["information_weighted_routing"] = True
+        with self.assertRaisesRegex(ConfigError, "cannot be combined"):
+            validate_config(changed)
+
 
 if __name__ == "__main__":
     unittest.main()

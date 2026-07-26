@@ -33,5 +33,15 @@ if [[ "${promote}" == 1 ]]; then
  echo "g6_full_confirmation_job=${full}"
  sbatch --parsable --dependency="afterok:${full}" --export="ALL,FULL_JOB_ID=${full},CANDIDATE_ID=g6-information-routed,METHOD=graf-information-routed" reproductions/06_graf_opsd/after-promoted-full-train.sbatch
 else
- echo "g6 did not clear the development gate; retain its paired result for the next evidence-driven mutation."
+ python3 -m opsd_research.graf_autoresearch register \
+   --policy reproductions/06_graf_opsd/configs/autoresearch.yaml \
+   --config reproductions/06_graf_opsd/configs/g7-information-weighted.yaml \
+   --ledger artifacts/graf_opsd/candidate-ledger.jsonl \
+   --candidate-id g7-information-weighted --parent-id g2-viability-routed-2048 --stage G7 \
+   --hypothesis "Weight every non-uniform branch target continuously by normalized information rather than using any action-count or information-cutoff rule." \
+   --changed-field information_weighted_routing
+ graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"; viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
+ g7_smoke="$(GRAF_GRAPH_CACHE_MANIFEST="${graph_manifest}" GRAF_VIABILITY_MANIFEST="${viability_manifest}" GRAF_CANDIDATE_ID=g7-information-weighted GRAF_CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/g7-information-weighted.yaml GRAF_MAX_STEPS=5 GRAF_PORT=12981 sbatch --parsable reproductions/06_graf_opsd/run-routed-candidate.sbatch)"
+ echo "g7_smoke_job=${g7_smoke}"
+ sbatch --parsable --dependency="afterok:${g7_smoke}" --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G2_VIABILITY_ARRAY_JOB_ID=${G2_VIABILITY_ARRAY_JOB_ID},G7_SMOKE_JOB_ID=${g7_smoke}" reproductions/06_graf_opsd/after-g7-smoke.sbatch
 fi

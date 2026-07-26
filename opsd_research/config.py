@@ -276,6 +276,15 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         raise ConfigError(
             f"{source}: choose either fork_information_threshold or fork_information_quantile"
         )
+    information_weighted_routing = data.get("information_weighted_routing", False)
+    if not isinstance(information_weighted_routing, bool):
+        raise ConfigError(f"{source}: information_weighted_routing must be boolean")
+    if information_weighted_routing and (
+        float(fork_information_threshold) or float(fork_information_quantile)
+    ):
+        raise ConfigError(
+            f"{source}: information_weighted_routing cannot be combined with an information cutoff"
+        )
     if data.get("graph_mode") == "viability_routed":
         if float(data["branch_loss_weight"]) <= 0:
             raise ConfigError(f"{source}: viability_routed requires branch_loss_weight > 0")
@@ -287,6 +296,7 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         or float(fork_threshold) != 0
         or float(fork_information_threshold) != 0
         or float(fork_information_quantile) != 0
+        or information_weighted_routing
     ):
         raise ConfigError(f"{source}: branch settings require graph_mode=viability_routed")
 
@@ -313,7 +323,7 @@ def _validate_graf_autoresearch(data: dict[str, Any], source: str) -> None:
     if not isinstance(data.get("max_candidates"), int) or not 1 <= data["max_candidates"] <= 24:
         raise ConfigError(f"{source}: max_candidates must be in [1, 24]")
     expected_mutations = {
-        "max_completion_length", "graph_mode", "fork_threshold", "fork_information_threshold", "fork_information_quantile", "graph_budget",
+        "max_completion_length", "graph_mode", "fork_threshold", "fork_information_threshold", "fork_information_quantile", "information_weighted_routing", "graph_budget",
         "viability_temperature", "branch_loss_weight", "entropy_floor_weight",
     }
     if not set(data.get("allowed_mutations", [])).issubset(expected_mutations):

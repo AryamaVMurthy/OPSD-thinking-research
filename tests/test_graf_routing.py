@@ -91,3 +91,8 @@ def test_information_filter_retains_two_viable_actions_and_suppresses_uniform(tm
         graph_manifest, viability_manifest, target_information_quantile=0.5
     )
     assert [fork.fork_id for fork in quantile_targets[3]] == ["informative"]
+    weighted_targets = load_routing_targets(
+        graph_manifest, viability_manifest, information_weighting=True
+    )
+    assert [fork.fork_id for fork in weighted_targets[3]] == ["informative"]
+    assert 0.0 < weighted_targets[3][0].information_weight < 1.0
