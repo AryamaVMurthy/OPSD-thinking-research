@@ -244,8 +244,8 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         raise ConfigError(
             f"{source}: max_completion_length must be 1024, 2048, or 4096"
         )
-    if data.get("max_steps") not in {5, 50, 200}:
-        raise ConfigError(f"{source}: max_steps must be 5, 50, or 200")
+    if data.get("max_steps") not in {5, 25, 50, 200}:
+        raise ConfigError(f"{source}: max_steps must be 5, 25, 50, or 200")
     if data.get("save_steps") != data.get("max_steps"):
         raise ConfigError(f"{source}: pilot candidates save only at their final step")
     heldout_fraction = data.get("heldout_diagnostic_fraction", 0.0)
@@ -269,7 +269,11 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
     }:
         raise ConfigError(f"{source}: GRAF LoRA target modules are incomplete")
     if data.get("graph_mode") not in {
-        "disabled", "scaffold_graph", "fork_mask", "viability_routed"
+        "disabled",
+        "scaffold_graph",
+        "fork_mask",
+        "viability_routed",
+        "context_dossier",
     }:
         raise ConfigError(f"{source}: unsupported graph_mode")
     for key in ("branch_loss_weight", "entropy_floor_weight"):

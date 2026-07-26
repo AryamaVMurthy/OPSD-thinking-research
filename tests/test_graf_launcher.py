@@ -1,6 +1,9 @@
 import os
+import hashlib
+import json
 from pathlib import Path
 import sys
+import tempfile
 import types
 from unittest import mock
 import unittest
@@ -44,3 +47,40 @@ class GrafLauncherTests(unittest.TestCase):
                 model.kwargs,
                 {"preserve_rng_state": False, "use_reentrant": False},
             )
+
+    def test_context_dossier_requires_its_teacher_only_manifest(self):
+        arguments = [
+            "launch_graf_opsd", "--model_name_or_path", "Qwen/Qwen3-4B",
+            "--model_revision", "1cfa9a7208912126459214e8b04321603b3df60c",
+            "--student_model_revision", "1cfa9a7208912126459214e8b04321603b3df60c",
+            "--max_steps", "25", "--max_completion_length", "2048",
+            "--student_thinking", "--teacher_thinking", "--fixed_teacher", "--use_peft",
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cache = root / "dossiers.jsonl"
+            cache.write_text(json.dumps({
+                "schema_version": 1, "accepted": True, "example_index": 0,
+                "teacher_dossier": "teacher-only", "blind_attempt_count": 3,
+            }) + "\n", encoding="utf-8")
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps({
+                "schema_version": 1, "cache": str(cache),
+                "cache_sha256": hashlib.sha256(cache.read_bytes()).hexdigest(),
+                "requested_examples": 1, "accepted_examples": 1,
+                "rejected_examples": 0, "blind_attempts_per_problem": 3,
+                "student_answer_context": False, "teacher_reference_context": True,
+            }), encoding="utf-8")
+            environment = {
+                "GRAF_CONFIG": str(
+                    ROOT / "reproductions/06_graf_opsd/configs/"
+                    "ch0-contrastive-hindsight-2048.yaml"
+                ),
+                "CH_DOSSIER_MANIFEST": str(manifest),
+            }
+            with mock.patch.object(
+                launch_graf_opsd.sys, "argv", arguments
+            ), mock.patch.dict(os.environ, environment, clear=False):
+                loaded = launch_graf_opsd._validate_invocation()
+
+        self.assertEqual(loaded["graph_mode"], "context_dossier")

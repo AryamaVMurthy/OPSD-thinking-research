@@ -51,9 +51,21 @@ def _validate_invocation() -> dict[str, object]:
     for flag in ("--student_thinking", "--teacher_thinking", "--fixed_teacher", "--use_peft"):
         if flag not in sys.argv:
             raise SystemExit(f"required flag is missing: {flag}")
+    if config["graph_mode"] == "context_dossier":
+        manifest = os.environ.get("CH_DOSSIER_MANIFEST")
+        if not manifest:
+            raise SystemExit(
+                "context-dossier candidates require CH_DOSSIER_MANIFEST"
+            )
+        from .ch_dossier import accepted_teacher_dossiers
+
+        try:
+            accepted_teacher_dossiers(manifest)
+        except ValueError as error:
+            raise SystemExit(f"invalid CH dossier cache: {error}") from error
     # GRAF-Lite routing is enabled only after a graph-cache manifest exists.
     # C0 uses the same reliable upstream objective with a longer rollout.
-    if config["graph_mode"] != "disabled":
+    elif config["graph_mode"] != "disabled":
         manifest = os.environ.get("GRAF_GRAPH_CACHE_MANIFEST")
         if not manifest:
             raise SystemExit("graph-routed candidates require GRAF_GRAPH_CACHE_MANIFEST")
@@ -107,7 +119,23 @@ def main() -> None:
         )
     train_index_set = set(train_indices)
     routed_targets = None
-    if config["graph_mode"] == "scaffold_graph":
+    if config["graph_mode"] == "context_dossier":
+        from .ch_dossier import accepted_teacher_dossiers
+        from .ch_dossier_dataset import install_ch_dossier_dataset_redirect
+
+        available = accepted_teacher_dossiers(os.environ["CH_DOSSIER_MANIFEST"])
+        eligible = sorted(set(available).intersection(train_index_set))
+        records = install_ch_dossier_dataset_redirect(
+            os.environ["CH_DOSSIER_MANIFEST"], source_indices=eligible
+        )
+        print(
+            '{"event":"ch_teacher_only_dossier_enabled",'
+            f'"accepted_dossier_records":{records},'
+            '"student_answer_context":false,'
+            '"teacher_reference_context":true}',
+            flush=True,
+        )
+    elif config["graph_mode"] == "scaffold_graph":
         from .graf_scaffold_dataset import (
             accepted_scaffolds,
             install_graph_scaffold_dataset_redirect,

@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Four independent Qwen3-4B replicas maximize throughput for the 128-row cache.
+#SBATCH --job-name=ch-cache
+#SBATCH --account=priyesh.shukla
+#SBATCH --partition=u22
+#SBATCH --qos=high
+#SBATCH --nodelist=node03
+#SBATCH --gres=gpu:4
+#SBATCH --ntasks=4
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=350G
+#SBATCH --time=03:00:00
+#SBATCH --output=logs/%x-%j.out
+
+set -euo pipefail
+module load u22/cuda/12.4
+source "${HOME}/OPSD-thinking-research/infra/turing/common.sh"
+cd "${PROJECT_SOURCE}"
+
+CH_LIMIT="${CH_LIMIT:-128}"
+CH_BLIND_ATTEMPTS="${CH_BLIND_ATTEMPTS:-3}"
+CH_AUDIT_ATTEMPTS="${CH_AUDIT_ATTEMPTS:-3}"
+if (( CH_LIMIT < 1 || CH_AUDIT_ATTEMPTS < 1 )); then
+  echo "CH_LIMIT and CH_AUDIT_ATTEMPTS must be positive" >&2
+  exit 2
+fi
+if [[ "${CH_BLIND_ATTEMPTS}" != 2 && "${CH_BLIND_ATTEMPTS}" != 3 ]]; then
+  echo "CH_BLIND_ATTEMPTS must be 2 or 3" >&2
+  exit 2
+fi
+
+CH_RUN_DIR="${SCRATCH_ROOT}/ch_cache/ch-${CH_LIMIT}-${SLURM_JOB_ID}"
+export CH_RUN_DIR CH_LIMIT CH_BLIND_ATTEMPTS CH_AUDIT_ATTEMPTS
+mkdir -p "${CH_RUN_DIR}"
+git rev-parse HEAD > "${CH_RUN_DIR}/source-commit.txt"
+{
+  printf 'limit=%s\n' "${CH_LIMIT}"
+  printf 'blind_attempts=%s\n' "${CH_BLIND_ATTEMPTS}"
+  printf 'audit_attempts=%s\n' "${CH_AUDIT_ATTEMPTS}"
+  printf 'num_shards=%s\n' "${SLURM_NTASKS}"
+  printf 'blind_max_tokens=2048\n'
+  printf 'audit_max_tokens=1536\n'
+  printf 'max_model_len=16384\n'
+  printf 'parallelism=four-independent-vllm-replicas\n'
+} > "${CH_RUN_DIR}/runtime-parameters.txt"
+
+start_gpu_telemetry "ch-cache-${CH_LIMIT}"
+trap stop_gpu_telemetry EXIT
+srun \
+  --kill-on-bad-exit=1 \
+  --gpus-per-task=1 \
+  --gpu-bind=single:1 \
+  "${PROJECT_SOURCE}/infra/turing/ch_cache_worker.sh"
+
+python3 -m opsd_research.merge_ch_cache \
+  --shards \
+    "${CH_RUN_DIR}/dossiers.shard0.jsonl" \
+    "${CH_RUN_DIR}/dossiers.shard1.jsonl" \
+    "${CH_RUN_DIR}/dossiers.shard2.jsonl" \
+    "${CH_RUN_DIR}/dossiers.shard3.jsonl" \
+  --output "${CH_RUN_DIR}/dossiers.jsonl" \
+  --manifest "${CH_RUN_DIR}/manifest.json" \
+  --requested-examples "${CH_LIMIT}" \
+  --blind-attempts-per-problem "${CH_BLIND_ATTEMPTS}" \
+  --builder-model Qwen/Qwen3-4B \
+  --builder-model-revision 1cfa9a7208912126459214e8b04321603b3df60c \
+  --training-dataset-revision 1435fb21d4fecc8ad4966a26f22a874cf2b527f1 \
+  --builder-seed 42
+
+sha256sum \
+  "${CH_RUN_DIR}"/dossiers.shard*.jsonl \
+  "${CH_RUN_DIR}/dossiers.jsonl" \
+  "${CH_RUN_DIR}/manifest.json" \
+  "${CH_RUN_DIR}/runtime-parameters.txt" \
+  "${CH_RUN_DIR}/source-commit.txt" \
+  > "${CH_RUN_DIR}/artifact-manifest.sha256"
+printf 'CH_DOSSIER_MANIFEST=%s\n' "${CH_RUN_DIR}/manifest.json"
