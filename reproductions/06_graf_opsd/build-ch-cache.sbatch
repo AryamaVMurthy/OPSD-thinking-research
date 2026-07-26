@@ -38,9 +38,9 @@ git rev-parse HEAD > "${CH_RUN_DIR}/source-commit.txt"
   printf 'blind_attempts=%s\n' "${CH_BLIND_ATTEMPTS}"
   printf 'audit_attempts=%s\n' "${CH_AUDIT_ATTEMPTS}"
   printf 'num_shards=%s\n' "${SLURM_NTASKS}"
-  printf 'blind_max_tokens=1024\n'
-  printf 'audit_max_tokens=768\n'
-  printf 'max_model_len=24576\n'
+  printf 'blind_max_tokens=2048\n'
+  printf 'audit_max_tokens=1536\n'
+  printf 'max_model_len=28672\n'
   printf 'parallelism=four-independent-vllm-replicas\n'
 } > "${CH_RUN_DIR}/runtime-parameters.txt"
 

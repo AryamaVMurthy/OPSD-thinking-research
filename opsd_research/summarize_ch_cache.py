@@ -29,7 +29,9 @@ def summarize_ch_records(records: list[dict[str, Any]]) -> dict[str, Any]:
     correct_by_attempt = [0] * num_attempts
     formatted_by_attempt = [0] * num_attempts
     output_tokens_by_attempt: list[list[int]] = [[] for _ in range(num_attempts)]
+    cutoff_by_attempt = [0] * num_attempts
     audit_tokens: list[int] = []
+    audit_cutoffs = 0
     teacher_dossier_tokens: list[int] = []
     teacher_prompt_tokens: list[int] = []
     any_correct = 0
@@ -42,6 +44,10 @@ def summarize_ch_records(records: list[dict[str, Any]]) -> dict[str, Any]:
         if len(attempts) != num_attempts or len(tokens) != num_attempts:
             raise ValueError("accepted CH record lacks complete attempt diagnostics")
         reference = str(record["reference_answer"])
+        blind_max_tokens = int(record.get("blind_max_tokens", 0))
+        audit_max_tokens = int(record.get("audit_max_tokens", 0))
+        if blind_max_tokens < 1 or audit_max_tokens < 1:
+            raise ValueError("accepted CH record lacks generation token limits")
         predictions = [extract_last_boxed(str(attempt)) for attempt in attempts]
         correctness = [
             bool(grade_math(prediction, reference)) if prediction is not None else False
@@ -53,6 +59,7 @@ def summarize_ch_records(records: list[dict[str, Any]]) -> dict[str, Any]:
             formatted_by_attempt[index] += int(prediction is not None)
             correct_by_attempt[index] += int(correct)
             output_tokens_by_attempt[index].append(int(token_count))
+            cutoff_by_attempt[index] += int(int(token_count) >= blind_max_tokens)
         any_correct += int(any(correctness))
         mixed_correctness += int(any(correctness) and not all(correctness))
         if num_attempts == 3:
@@ -61,6 +68,7 @@ def summarize_ch_records(records: list[dict[str, Any]]) -> dict[str, Any]:
             )
         answer_diversity.append(len({answer for answer in predictions if answer is not None}))
         audit_tokens.append(int(record.get("audit_output_tokens", 0)))
+        audit_cutoffs += int(audit_tokens[-1] >= audit_max_tokens)
         dossier_tokens = int(record.get("teacher_dossier_tokens", 0))
         if dossier_tokens < 1:
             raise ValueError("accepted CH record lacks a teacher-dossier token count")
@@ -97,7 +105,11 @@ def summarize_ch_records(records: list[dict[str, Any]]) -> dict[str, Any]:
         "mean_output_tokens_by_attempt": [
             mean(values) for values in output_tokens_by_attempt
         ],
+        "blind_length_cutoff_rate_by_attempt": [
+            value / count for value in cutoff_by_attempt
+        ],
         "mean_audit_output_tokens": mean(audit_tokens),
+        "audit_length_cutoff_rate": audit_cutoffs / count,
         "mean_teacher_dossier_tokens": mean(teacher_dossier_tokens),
         "max_teacher_dossier_tokens": max(teacher_dossier_tokens),
         "teacher_dossiers_over_12000": sum(

@@ -82,6 +82,8 @@ def test_four_complete_shards_merge_into_a_verified_manifest(tmp_path) -> None:
                     "teacher_dossier": f"dossier-{shard_id}",
                     "teacher_dossier_tokens": 20 + shard_id,
                     "teacher_prompt_tokens": 40 + shard_id,
+                    "blind_max_tokens": 2048,
+                    "audit_max_tokens": 1536,
                     "blind_attempt_count": 3,
                     "num_shards": 4,
                     "shard_id": shard_id,
@@ -123,7 +125,9 @@ def test_cache_summary_measures_third_attempt_unique_recovery() -> None:
             ],
             "reference_answer": "7",
             "blind_attempt_output_tokens": [10, 11, 12],
+            "blind_max_tokens": 15,
             "audit_output_tokens": 20,
+            "audit_max_tokens": 21,
             "teacher_dossier_tokens": 100,
             "teacher_prompt_tokens": 150,
         },
@@ -135,7 +139,9 @@ def test_cache_summary_measures_third_attempt_unique_recovery() -> None:
             ],
             "reference_answer": "5",
             "blind_attempt_output_tokens": [13, 14, 15],
+            "blind_max_tokens": 15,
             "audit_output_tokens": 21,
+            "audit_max_tokens": 21,
             "teacher_dossier_tokens": 200,
             "teacher_prompt_tokens": 250,
         },
@@ -150,3 +156,5 @@ def test_cache_summary_measures_third_attempt_unique_recovery() -> None:
     assert summary["total_generation_tokens"] == 116
     assert summary["max_teacher_dossier_tokens"] == 200
     assert summary["max_teacher_prompt_tokens"] == 250
+    assert summary["blind_length_cutoff_rate_by_attempt"] == [0.0, 0.0, 0.5]
+    assert summary["audit_length_cutoff_rate"] == 0.5

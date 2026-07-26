@@ -20,9 +20,9 @@ from .training_data import DATASET_REVISION, load_math_cot_20k
 
 DEFAULT_MODEL = "Qwen/Qwen3-4B"
 DEFAULT_MODEL_REVISION = "1cfa9a7208912126459214e8b04321603b3df60c"
-MAX_MODEL_LEN = 24576
-BLIND_MAX_TOKENS = 1024
-AUDIT_MAX_TOKENS = 768
+MAX_MODEL_LEN = 28672
+BLIND_MAX_TOKENS = 2048
+AUDIT_MAX_TOKENS = 1536
 
 
 def _teacher_training_prompt(tokenizer: Any, problem: str, dossier: str) -> str:
@@ -279,7 +279,9 @@ def main() -> None:
                         "shard_id": args.shard_id,
                         "num_shards": args.num_shards,
                         "blind_attempt_output_tokens": attempt_tokens[index],
+                        "blind_max_tokens": BLIND_MAX_TOKENS,
                         "audit_output_tokens": len(output_token_ids(generated)),
+                        "audit_max_tokens": AUDIT_MAX_TOKENS,
                         "audit_builder_attempt": audit_attempt + 1,
                     }
                 )
