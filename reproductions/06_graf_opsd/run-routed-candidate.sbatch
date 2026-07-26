@@ -25,7 +25,11 @@ PY
 )"
 if [[ "${GRAF_MAX_STEPS}" == 5 ]]; then export GRAF_SMOKE_MAX_STEPS=5; fi
 export GRAF_CONFIG="${PROJECT_SOURCE}/${GRAF_CANDIDATE_CONFIG}" OPSD_DATASET_REVISION=1435fb21d4fecc8ad4966a26f22a874cf2b527f1 OPSD_EXACT_JSD_VOCAB_CHUNK_SIZE=4096 OPSD_TAIL_LOGITS_ONLY=1
-vllm_utilization="${GRAF_VLLM_GPU_MEMORY_UTILIZATION:-0.45}"
+# Keep candidate runs within the memory envelope verified by the 4,096-token
+# G4 pilot.  Callers may still raise this deliberately after a measured memory
+# audit, but an implicit larger reservation should not turn an autoresearch
+# branch into an unrelated OOM experiment.
+vllm_utilization="${GRAF_VLLM_GPU_MEMORY_UTILIZATION:-0.35}"
 run_name="graf-${GRAF_CANDIDATE_ID}-${GRAF_MAX_STEPS}-${SLURM_JOB_ID}"; output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"; cp "${GRAF_CANDIDATE_CONFIG}" "${output_dir}/config.yaml"; cp "${GRAF_GRAPH_CACHE_MANIFEST}" "${output_dir}/graph-cache-manifest.json"; cp "${GRAF_VIABILITY_MANIFEST}" "${output_dir}/viability-manifest.json"
 export OPSD_TRAINING_PARTITION_MANIFEST="${output_dir}/training-partition.json"
