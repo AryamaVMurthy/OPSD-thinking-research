@@ -98,10 +98,12 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
             "tokens_per_second": token_total / elapsed_total if elapsed_total else None,
         },
         "graf_branch": {
-            "updates": len(branch_events),
-            "active_updates": len(branch_active),
-            "active_update_rate": len(branch_active) / len(branch_events) if branch_events else None,
-            "mean_active_forks": (
+            # This hook runs once per routed microbatch (including gradient
+            # accumulation), not once per optimizer update.
+            "loss_calls": len(branch_events),
+            "active_loss_calls": len(branch_active),
+            "active_loss_call_rate": len(branch_active) / len(branch_events) if branch_events else None,
+            "mean_active_forks_per_loss_call": (
                 sum(row["active_forks"] for row in branch_events) / len(branch_events)
                 if branch_events else None
             ),
@@ -133,13 +135,13 @@ def render_markdown(status: dict[str, Any]) -> str:
         f"- Generation throughput: `{rollouts['tokens_per_second']:.1f} tokens/s`" if rollouts["tokens_per_second"] is not None else "- Generation throughput: `n/a`",
     ]
     branch = status["graf_branch"]
-    if branch["updates"]:
+    if branch["loss_calls"]:
         lines.extend([
             "",
             "## GRAF routing activity",
             "",
-            f"- Branch-active updates: `{100 * branch['active_update_rate']:.1f}%` ({branch['active_updates']}/{branch['updates']})",
-            f"- Mean active forks/update: `{branch['mean_active_forks']:.2f}`",
+            f"- Branch-active loss calls: `{100 * branch['active_loss_call_rate']:.1f}%` ({branch['active_loss_calls']}/{branch['loss_calls']})",
+            f"- Mean active forks/loss call: `{branch['mean_active_forks_per_loss_call']:.2f}`",
             f"- Mean branch KL (active updates): `{branch['mean_branch_kl_when_active']:.6f}`",
             f"- Mean entropy-floor term (active updates): `{branch['mean_entropy_floor_when_active']:.6f}`",
             f"- Mean weighted routing loss (active updates): `{branch['mean_weighted_loss_when_active']:.6f}`",
