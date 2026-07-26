@@ -81,6 +81,7 @@ def test_four_complete_shards_merge_into_a_verified_manifest(tmp_path) -> None:
                     "problem_sha256": f"problem-{shard_id}",
                     "teacher_dossier": f"dossier-{shard_id}",
                     "teacher_dossier_tokens": 20 + shard_id,
+                    "teacher_prompt_tokens": 40 + shard_id,
                     "blind_attempt_count": 3,
                     "num_shards": 4,
                     "shard_id": shard_id,
@@ -124,6 +125,7 @@ def test_cache_summary_measures_third_attempt_unique_recovery() -> None:
             "blind_attempt_output_tokens": [10, 11, 12],
             "audit_output_tokens": 20,
             "teacher_dossier_tokens": 100,
+            "teacher_prompt_tokens": 150,
         },
         {
             "accepted": True,
@@ -135,6 +137,7 @@ def test_cache_summary_measures_third_attempt_unique_recovery() -> None:
             "blind_attempt_output_tokens": [13, 14, 15],
             "audit_output_tokens": 21,
             "teacher_dossier_tokens": 200,
+            "teacher_prompt_tokens": 250,
         },
     ]
 
@@ -146,3 +149,4 @@ def test_cache_summary_measures_third_attempt_unique_recovery() -> None:
     assert summary["correct_rate_by_attempt"] == [0.5, 0.5, 0.5]
     assert summary["total_generation_tokens"] == 116
     assert summary["max_teacher_dossier_tokens"] == 200
+    assert summary["max_teacher_prompt_tokens"] == 250

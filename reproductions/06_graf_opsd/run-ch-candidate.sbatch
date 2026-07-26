@@ -83,7 +83,7 @@ accelerate launch \
   --logging_steps 1 \
   --attn_implementation flash_attention_2 \
   --torch_dtype bfloat16 \
-  --max_length 12000 \
+  --max_length 24576 \
   --beta 0 \
   --use_vllm \
   --vllm_mode colocate \

@@ -35,13 +35,15 @@ print(json.dumps({"event": "ch_cache_gate", "accepted": len(accepted),
                       summary["third_attempt_unique_recovery_rate"],
                   "max_teacher_dossier_tokens":
                       summary["max_teacher_dossier_tokens"],
+                  "max_teacher_prompt_tokens":
+                      summary["max_teacher_prompt_tokens"],
                   "total_generation_tokens":
                       summary["total_generation_tokens"]}, sort_keys=True))
 if rate < 0.95:
     raise SystemExit("CH cache acceptance rate is below the 95% coverage gate")
-if summary["max_teacher_dossier_tokens"] > 12000:
+if summary["max_teacher_prompt_tokens"] > 24576:
     raise SystemExit(
-        "CH teacher dossier exceeds the training context gate; "
+        "CH teacher prompt exceeds the training context gate; "
         "increase the context budget instead of silently truncating it"
     )
 PY

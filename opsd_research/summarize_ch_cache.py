@@ -31,6 +31,7 @@ def summarize_ch_records(records: list[dict[str, Any]]) -> dict[str, Any]:
     output_tokens_by_attempt: list[list[int]] = [[] for _ in range(num_attempts)]
     audit_tokens: list[int] = []
     teacher_dossier_tokens: list[int] = []
+    teacher_prompt_tokens: list[int] = []
     any_correct = 0
     mixed_correctness = 0
     unique_recoveries = 0
@@ -64,6 +65,10 @@ def summarize_ch_records(records: list[dict[str, Any]]) -> dict[str, Any]:
         if dossier_tokens < 1:
             raise ValueError("accepted CH record lacks a teacher-dossier token count")
         teacher_dossier_tokens.append(dossier_tokens)
+        prompt_tokens = int(record.get("teacher_prompt_tokens", 0))
+        if prompt_tokens < 1:
+            raise ValueError("accepted CH record lacks a teacher-prompt token count")
+        teacher_prompt_tokens.append(prompt_tokens)
 
     count = len(accepted)
     rejection_reasons = Counter(
@@ -97,6 +102,11 @@ def summarize_ch_records(records: list[dict[str, Any]]) -> dict[str, Any]:
         "max_teacher_dossier_tokens": max(teacher_dossier_tokens),
         "teacher_dossiers_over_12000": sum(
             tokens > 12_000 for tokens in teacher_dossier_tokens
+        ),
+        "mean_teacher_prompt_tokens": mean(teacher_prompt_tokens),
+        "max_teacher_prompt_tokens": max(teacher_prompt_tokens),
+        "teacher_prompts_over_24576": sum(
+            tokens > 24_576 for tokens in teacher_prompt_tokens
         ),
         "total_blind_generation_tokens": total_blind_tokens,
         "total_audit_generation_tokens": total_audit_tokens,

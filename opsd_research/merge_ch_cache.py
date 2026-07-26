@@ -65,6 +65,10 @@ def merge_ch_cache_shards(
                     raise ValueError(
                         "accepted CH record has no teacher-dossier token count"
                     )
+                if int(record.get("teacher_prompt_tokens", 0)) < 1:
+                    raise ValueError(
+                        "accepted CH record has no teacher-prompt token count"
+                    )
             elif not str(record.get("rejection_reason", "")).strip():
                 raise ValueError("rejected CH record has no rejection reason")
             records[index] = record

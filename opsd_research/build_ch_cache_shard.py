@@ -20,9 +20,34 @@ from .training_data import DATASET_REVISION, load_math_cot_20k
 
 DEFAULT_MODEL = "Qwen/Qwen3-4B"
 DEFAULT_MODEL_REVISION = "1cfa9a7208912126459214e8b04321603b3df60c"
-MAX_MODEL_LEN = 16384
+MAX_MODEL_LEN = 24576
 BLIND_MAX_TOKENS = 1024
 AUDIT_MAX_TOKENS = 768
+
+
+def _teacher_training_prompt(tokenizer: Any, problem: str, dossier: str) -> str:
+    """Mirror OPSD's non-reason-first teacher prompt for admission accounting."""
+    transition_prompt = (
+        "\n\nAfter reading the reference solution above, make sure you truly understand "
+        "the reasoning behind each step — do not copy or paraphrase it. Now, using your "
+        "own words and independent reasoning, derive the same final answer to the problem above. "
+        "Think step by step, explore different approaches, and don't be afraid to backtrack "
+        "or reconsider if something doesn't work out:\n"
+    )
+    user_message = (
+        f"Problem: {problem}\n\n"
+        f"Here is a reference solution to this problem:\n"
+        f"=== Reference Solution Begin ===\n{dossier}\n"
+        f"=== Reference Solution End ===\n"
+        f"{transition_prompt}\n"
+        f"Please reason step by step, and put your final answer within \\boxed{{}}."
+    )
+    return tokenizer.apply_chat_template(
+        [{"role": "user", "content": user_message}],
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=True,
+    )
 
 
 def _chat_prompt(
@@ -263,6 +288,14 @@ def main() -> None:
                         str(record["teacher_dossier"]),
                         add_special_tokens=False,
                     )
+                )
+                teacher_prompt = _teacher_training_prompt(
+                    tokenizer,
+                    problem,
+                    str(record["teacher_dossier"]),
+                )
+                record["teacher_prompt_tokens"] = len(
+                    tokenizer.encode(teacher_prompt, add_special_tokens=False)
                 )
                 records[index] = record
                 pending.remove(index)
