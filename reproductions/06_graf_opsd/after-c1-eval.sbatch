@@ -40,7 +40,7 @@ python3 -m opsd_research.graf_autoresearch register \
   --ledger artifacts/graf_opsd/candidate-ledger.jsonl \
   --candidate-id g4-graph-backtrack-entropy-4096 --parent-id c1-long-rollout-4096 --stage G4 \
   --hypothesis "Distil verifier-calibrated distributions over answer-masked teacher-proposed graph actions, including recovery actions and a target-adaptive entropy floor, at a 4,096-token on-policy rollout budget." \
-  --changed-field graph_mode
+  --changed-field full_graph_method
 graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
 viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
 g4_smoke="$(GRAF_GRAPH_CACHE_MANIFEST="${graph_manifest}" GRAF_VIABILITY_MANIFEST="${viability_manifest}" sbatch --parsable reproductions/06_graf_opsd/g4-smoke.sbatch)"

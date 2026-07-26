@@ -16,6 +16,7 @@ actions_per_fork: 3
 forced_continuations_per_action: 2
 allowed_mutations:
   - heldout_diagnostic_fraction
+  - full_graph_method
   - graph_mode
   - max_completion_length
   - fork_threshold
