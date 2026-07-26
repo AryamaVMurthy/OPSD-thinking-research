@@ -25,5 +25,6 @@ python3 -m opsd_research.prepare_assets --scope aime
 python3 -m opsd_research.smoke
 "${SCORE_ENV_DIR}/bin/python" -c \
   "from opsd_research.matharena_grading import grade_response; assert grade_response(r'\\boxed{26!}', r'2^{25} \\cdot 26!', strict_parsing=False)['correct'] is False"
-"${ENV_DIR}/bin/python" -m pip freeze > "${SCRATCH_ROOT}/environment-freeze.txt"
-"${SCORE_ENV_DIR}/bin/python" -m pip freeze > "${SCRATCH_ROOT}/score-environment-freeze.txt"
+UV_BIN="${HOME}/.local/bin/uv"
+"${UV_BIN}" pip freeze > "${SCRATCH_ROOT}/environment-freeze.txt"
+"${UV_BIN}" pip freeze --python "${SCORE_ENV_DIR}/bin/python" > "${SCRATCH_ROOT}/score-environment-freeze.txt"
