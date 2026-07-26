@@ -42,12 +42,17 @@ fi
 start_gpu_telemetry() {
   local label="$1"
   local path="${TELEMETRY_ROOT}/${label}-${SLURM_JOB_ID:-manual}.csv"
+  local interval="${GPU_TELEMETRY_INTERVAL_SECONDS:-10}"
+  if ! [[ "${interval}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "GPU_TELEMETRY_INTERVAL_SECONDS must be a positive integer" >&2
+    return 1
+  fi
   (
     while true; do
       nvidia-smi \
         --query-gpu=timestamp,index,name,utilization.gpu,memory.used,memory.total,power.draw,temperature.gpu \
         --format=csv,noheader,nounits >> "${path}"
-      sleep 30
+      sleep "${interval}"
     done
   ) &
   GPU_TELEMETRY_PID=$!
@@ -88,6 +93,13 @@ record_run_manifest() {
     printf 'slurm_job_id=%s\n' "${run_id}"
     printf 'node=%s\n' "${NODE_NAME}"
     printf 'cuda_visible_devices=%s\n' "${CUDA_VISIBLE_DEVICES:-unset}"
+    printf 'gpu_telemetry_interval_seconds=%s\n' "${GPU_TELEMETRY_INTERVAL_SECONDS:-10}"
+    printf '\n[gpu_inventory]\n'
+    nvidia-smi --query-gpu=index,name,driver_version,memory.total --format=csv,noheader 2>&1
+    printf '\n[cpu_inventory]\n'
+    lscpu | awk -F: '/Model name|CPU\(s\)|Socket\(s\)|Thread\(s\) per core/ {gsub(/^ +/, "", $2); print $1 "=" $2}'
+    printf '\n[memory_inventory]\n'
+    free -h
   } > "${output_dir}/${runtime_file}"
   local extra_file
   for extra_file in "$@"; do

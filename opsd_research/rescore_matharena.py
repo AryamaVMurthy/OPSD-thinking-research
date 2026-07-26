@@ -16,6 +16,7 @@ import yaml
 from .config import MATH_DATASETS, load_config
 from .matharena_grading import rescore_record, summarize_rescored
 from .records import read_jsonl, validate_consistent_fields
+from .run_report import write_evaluation_report
 
 
 COMPETITION_CONFIGS = {
@@ -189,6 +190,7 @@ def rescore_run(
         summary_output,
         json.dumps(summary, indent=2, sort_keys=True) + "\n",
     )
+    write_evaluation_report(summary, summary_output.parent)
     return summary
 
 

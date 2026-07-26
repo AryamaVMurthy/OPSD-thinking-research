@@ -9,6 +9,8 @@ from pathlib import Path
 from statistics import mean
 from typing import Any
 
+from .run_report import write_training_report
+
 
 PROGRESS_RE = re.compile(r"(?P<step>\d+)/(?P<total>\d+)")
 VLLM_RE = re.compile(
@@ -216,6 +218,7 @@ def main() -> None:
     args.output.write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    write_training_report(summary, args.output.parent)
     print(json.dumps(summary, indent=2, sort_keys=True))
 
 
