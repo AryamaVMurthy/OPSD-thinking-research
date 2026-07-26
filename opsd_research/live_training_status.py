@@ -142,9 +142,9 @@ def render_markdown(status: dict[str, Any]) -> str:
             "",
             f"- Branch-active loss calls: `{100 * branch['active_loss_call_rate']:.1f}%` ({branch['active_loss_calls']}/{branch['loss_calls']})",
             f"- Mean active forks/loss call: `{branch['mean_active_forks_per_loss_call']:.2f}`",
-            f"- Mean branch KL (active updates): `{branch['mean_branch_kl_when_active']:.6f}`",
-            f"- Mean entropy-floor term (active updates): `{branch['mean_entropy_floor_when_active']:.6f}`",
-            f"- Mean weighted routing loss (active updates): `{branch['mean_weighted_loss_when_active']:.6f}`",
+            f"- Mean branch KL (active loss calls): `{branch['mean_branch_kl_when_active']:.6f}`",
+            f"- Mean entropy-floor term (active loss calls): `{branch['mean_entropy_floor_when_active']:.6f}`",
+            f"- Mean weighted routing loss (active loss calls): `{branch['mean_weighted_loss_when_active']:.6f}`",
         ])
     losses = status["loss_history"]
     if losses:
