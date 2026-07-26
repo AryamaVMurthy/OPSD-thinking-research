@@ -48,6 +48,25 @@ class GrafGraphTests(unittest.TestCase):
         self.assertEqual(target[-1], 0.0)
         self.assertGreater(target[0], target[1])
 
+    def test_graph_rejects_a_fork_with_no_viable_target_action(self):
+        payload = self.payload()
+        payload["forks"][0]["actions"] = [
+            {
+                "action_id": "dead", "description": "Follow an inconsistent case.",
+                "status": "dead_end", "validation_test": "Check the assumption.",
+                "recovery_action": "Return to the valid constraints.",
+            },
+            {
+                "action_id": "invalid", "description": "Discard a contradictory branch.",
+                "status": "invalid", "validation_test": "Find the contradiction.",
+                "recovery_action": "Use a consistent alternative.",
+            },
+        ]
+        with self.assertRaisesRegex(ValueError, "non-invalid"):
+            parse_answer_masked_graph(
+                payload, problem="Solve x.", reference_solution="Therefore \\boxed{7}."
+            )
+
     def test_scaffold_is_answer_masked_and_contains_actions(self):
         graph = parse_answer_masked_graph(
             self.payload(), problem="Solve x.",

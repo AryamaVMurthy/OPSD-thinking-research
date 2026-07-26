@@ -191,6 +191,12 @@ def parse_answer_masked_graph(
                 raise ValueError(f"unsupported action status {action.status!r}")
             seen_actions.add(action.action_id)
             actions.append(action)
+        # A routed decision fork must preserve at least one continuation that
+        # can receive frozen-student viability mass.  A fork made exclusively
+        # of invalid/dead-end actions has no well-defined target distribution
+        # and is neither useful supervision nor a meaningful alternative.
+        if not any(action.status not in {"invalid", "dead_end"} for action in actions):
+            raise ValueError("each fork requires at least one non-invalid action")
         forks.append(GraphFork(fork_id=fork_id, state=state, actions=tuple(actions)))
     return ReasoningGraph(
         problem_sha256=hashlib.sha256(problem.encode("utf-8")).hexdigest(),
