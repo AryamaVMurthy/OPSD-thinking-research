@@ -14,6 +14,7 @@ module load u22/cuda/12.4
 source "${HOME}/OPSD-thinking-research/infra/turing/common.sh"
 cd "${PROJECT_SOURCE}"
 : "${C1_SMOKE_JOB_ID:?missing C1 smoke job}"
+: "${CACHE_BUILD_JOB_ID:?missing graph cache job}" "${G2_VIABILITY_ARRAY_JOB_ID:?missing viability cache job}"
 training_dir="${TRAIN_ROOT}/graf-c1-long-4096-smoke-${C1_SMOKE_JOB_ID}"
 summary="${training_dir}/training-summary.json"
 test -f "${summary}"
@@ -29,4 +30,6 @@ for row in payload["loss_history"]:
 PY
 c1_pilot="$(sbatch --parsable reproductions/06_graf_opsd/c1-pilot.sbatch)"
 echo "c1_pilot_job=${c1_pilot}"
-sbatch --parsable --dependency="afterok:${c1_pilot}" --export="ALL,C1_PILOT_JOB_ID=${c1_pilot}" reproductions/06_graf_opsd/after-c1-pilot.sbatch
+sbatch --parsable --dependency="afterok:${c1_pilot}" \
+  --export="ALL,C1_PILOT_JOB_ID=${c1_pilot},CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G2_VIABILITY_ARRAY_JOB_ID=${G2_VIABILITY_ARRAY_JOB_ID}" \
+  reproductions/06_graf_opsd/after-c1-pilot.sbatch

@@ -65,5 +65,7 @@ else
     --changed-field max_completion_length
   c1_smoke="$(sbatch --parsable reproductions/06_graf_opsd/c1-smoke.sbatch)"
   echo "c1_smoke_job=${c1_smoke}"
-  sbatch --parsable --dependency="afterok:${c1_smoke}" --export="ALL,C1_SMOKE_JOB_ID=${c1_smoke}" reproductions/06_graf_opsd/after-c1-smoke.sbatch
+  sbatch --parsable --dependency="afterok:${c1_smoke}" \
+    --export="ALL,C1_SMOKE_JOB_ID=${c1_smoke},CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G2_VIABILITY_ARRAY_JOB_ID=${G2_VIABILITY_ARRAY_JOB_ID}" \
+    reproductions/06_graf_opsd/after-c1-smoke.sbatch
 fi

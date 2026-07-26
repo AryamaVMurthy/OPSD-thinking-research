@@ -44,5 +44,21 @@ if [[ "${promote}" == "1" ]]; then
   echo "c1_full_confirmation_job=${full}"
   sbatch --parsable --dependency="afterok:${full}" --export="ALL,FULL_JOB_ID=${full},CANDIDATE_ID=c1-long-rollout-4096,METHOD=opsd-long-4096" reproductions/06_graf_opsd/after-promoted-full-train.sbatch
 else
-  echo "c1 did not clear the development gate; inspect the immutable ledger before proposing G4 recovery routing"
+  # G4 holds G2's objective fixed and changes only the completion length.  It
+  # follows C1 specifically because C1 first isolates whether any effect comes
+  # from avoiding truncated on-policy trajectories alone.
+  python3 -m opsd_research.graf_autoresearch register \
+    --policy reproductions/06_graf_opsd/configs/autoresearch.yaml \
+    --config reproductions/06_graf_opsd/configs/g4-viability-long-4096.yaml \
+    --ledger artifacts/graf_opsd/candidate-ledger.jsonl \
+    --candidate-id g4-viability-long-4096 --parent-id g2-viability-routed-2048 --stage G4 \
+    --hypothesis "Give the unchanged viability-routed GRAF objective 4,096 on-policy tokens so its branch actions are trained in trajectories that can reach an answer." \
+    --changed-field max_completion_length
+  graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
+  viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
+  g4_smoke="$(GRAF_GRAPH_CACHE_MANIFEST="${graph_manifest}" GRAF_VIABILITY_MANIFEST="${viability_manifest}" sbatch --parsable reproductions/06_graf_opsd/g4-smoke.sbatch)"
+  echo "g4_smoke_job=${g4_smoke}"
+  sbatch --parsable --dependency="afterok:${g4_smoke}" \
+    --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G2_VIABILITY_ARRAY_JOB_ID=${G2_VIABILITY_ARRAY_JOB_ID},G4_SMOKE_JOB_ID=${g4_smoke}" \
+    reproductions/06_graf_opsd/after-g4-smoke.sbatch
 fi
