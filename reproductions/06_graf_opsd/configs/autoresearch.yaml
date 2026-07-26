@@ -18,6 +18,7 @@ allowed_mutations:
   - graph_mode
   - max_completion_length
   - fork_threshold
+  - fork_information_threshold
   - graph_budget
   - viability_temperature
   - branch_loss_weight

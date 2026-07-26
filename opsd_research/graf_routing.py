@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,6 +39,7 @@ def load_routing_targets(
     viability_manifest_path: str | Path,
     *,
     min_target_margin: float = 0.0,
+    min_target_information: float = 0.0,
 ) -> dict[int, tuple[ForkTarget, ...]]:
     """Verify caches and optionally retain outcome-differential branch targets.
 
@@ -48,6 +50,8 @@ def load_routing_targets(
     """
     if not 0.0 <= min_target_margin <= 1.0:
         raise ValueError("min_target_margin must be in [0, 1]")
+    if not 0.0 <= min_target_information <= 1.0:
+        raise ValueError("min_target_information must be in [0, 1]")
     graph_manifest_path = Path(graph_manifest_path)
     viability_manifest_path = Path(viability_manifest_path)
     graph_manifest = validate_graph_cache_manifest(graph_manifest_path)
@@ -102,6 +106,16 @@ def load_routing_targets(
             sorted_values = sorted(values, reverse=True)
             margin = sorted_values[0] - sorted_values[1] if len(sorted_values) > 1 else 0.0
             if margin < min_target_margin:
+                continue
+            # Retain any target that carries information about its action set.
+            # This differs from a top-two winner margin: [viable, viable,
+            # invalid] should preserve the two viable alternatives while
+            # explicitly suppressing the invalid one.
+            uniform = 1.0 / len(values)
+            information = sum(
+                value * math.log(value / uniform) for value in values if value > 0.0
+            )
+            if information < min_target_information:
                 continue
             forks.append(ForkTarget(
                 fork_id=str(fork["fork_id"]),

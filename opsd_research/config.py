@@ -254,6 +254,15 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         or not 0.0 <= float(fork_threshold) <= 1.0
     ):
         raise ConfigError(f"{source}: fork_threshold must be a probability margin in [0, 1]")
+    fork_information_threshold = data.get("fork_information_threshold", 0.0)
+    if (
+        not isinstance(fork_information_threshold, (int, float))
+        or isinstance(fork_information_threshold, bool)
+        or not 0.0 <= float(fork_information_threshold) <= 1.0
+    ):
+        raise ConfigError(
+            f"{source}: fork_information_threshold must be a target-KL threshold in [0, 1]"
+        )
     if data.get("graph_mode") == "viability_routed":
         if float(data["branch_loss_weight"]) <= 0:
             raise ConfigError(f"{source}: viability_routed requires branch_loss_weight > 0")
@@ -263,6 +272,7 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         float(data["branch_loss_weight"]) != 0
         or float(data["entropy_floor_weight"]) != 0
         or float(fork_threshold) != 0
+        or float(fork_information_threshold) != 0
     ):
         raise ConfigError(f"{source}: branch settings require graph_mode=viability_routed")
 
@@ -289,7 +299,7 @@ def _validate_graf_autoresearch(data: dict[str, Any], source: str) -> None:
     if not isinstance(data.get("max_candidates"), int) or not 1 <= data["max_candidates"] <= 24:
         raise ConfigError(f"{source}: max_candidates must be in [1, 24]")
     expected_mutations = {
-        "max_completion_length", "graph_mode", "fork_threshold", "graph_budget",
+        "max_completion_length", "graph_mode", "fork_threshold", "fork_information_threshold", "graph_budget",
         "viability_temperature", "branch_loss_weight", "entropy_floor_weight",
     }
     if not set(data.get("allowed_mutations", [])).issubset(expected_mutations):

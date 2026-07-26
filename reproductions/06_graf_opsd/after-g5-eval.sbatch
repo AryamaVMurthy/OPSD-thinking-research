@@ -33,5 +33,15 @@ if [[ "${promote}" == 1 ]]; then
  echo "g5_full_confirmation_job=${full}"
  sbatch --parsable --dependency="afterok:${full}" --export="ALL,FULL_JOB_ID=${full},CANDIDATE_ID=g5-differential-routing,METHOD=graf-differential-routing" reproductions/06_graf_opsd/after-promoted-full-train.sbatch
 else
- echo "g5 did not clear the development gate."
+ python3 -m opsd_research.graf_autoresearch register \
+   --policy reproductions/06_graf_opsd/configs/autoresearch.yaml \
+   --config reproductions/06_graf_opsd/configs/g6-information-routed.yaml \
+   --ledger artifacts/graf_opsd/candidate-ledger.jsonl \
+   --candidate-id g6-information-routed --parent-id g2-viability-routed-2048 --stage G6 \
+   --hypothesis "Retain every non-uniform viability distribution, including multiple viable actions plus an invalid action, rather than selecting only a single top action." \
+   --changed-field fork_information_threshold
+ graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"; viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
+ g6_smoke="$(GRAF_GRAPH_CACHE_MANIFEST="${graph_manifest}" GRAF_VIABILITY_MANIFEST="${viability_manifest}" GRAF_CANDIDATE_ID=g6-information-routed GRAF_CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/g6-information-routed.yaml GRAF_MAX_STEPS=5 GRAF_PORT=12980 sbatch --parsable reproductions/06_graf_opsd/run-routed-candidate.sbatch)"
+ echo "g6_smoke_job=${g6_smoke}"
+ sbatch --parsable --dependency="afterok:${g6_smoke}" --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G2_VIABILITY_ARRAY_JOB_ID=${G2_VIABILITY_ARRAY_JOB_ID},G6_SMOKE_JOB_ID=${g6_smoke}" reproductions/06_graf_opsd/after-g6-smoke.sbatch
 fi
