@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Five-step feasibility test for the 4,096-token OPSD truncation control.
-#SBATCH --job-name=graf-c1-smoke
+# Five-step feasibility test for the held-out 4,096-token control.
+#SBATCH --job-name=graf-c2-smoke
 #SBATCH --account=priyesh.shukla
 #SBATCH --partition=u22
 #SBATCH --qos=high
@@ -15,19 +15,19 @@ set -euo pipefail
 module load u22/cuda/12.4
 source "${HOME}/OPSD-thinking-research/infra/turing/common.sh"
 cd "${PROJECT_SOURCE}"
-CONFIG="reproductions/06_graf_opsd/configs/c1-long-rollout-4096.yaml"
+CONFIG="reproductions/06_graf_opsd/configs/c2-long-rollout-4096-heldout.yaml"
 python3 -m opsd_research.cli validate-config "${CONFIG}"
 export GRAF_CONFIG="${PROJECT_SOURCE}/${CONFIG}"
 export GRAF_SMOKE_MAX_STEPS=5
 export OPSD_DATASET_REVISION=1435fb21d4fecc8ad4966a26f22a874cf2b527f1
 export OPSD_EXACT_JSD_VOCAB_CHUNK_SIZE=4096
 export OPSD_TAIL_LOGITS_ONLY=1
-run_name="graf-c1-long-4096-smoke-${SLURM_JOB_ID}"
+run_name="graf-c2-long-4096-heldout-smoke-${SLURM_JOB_ID}"
 output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"
 export OPSD_TRAINING_PARTITION_MANIFEST="${output_dir}/training-partition.json"
 cp "${CONFIG}" "${output_dir}/config.yaml"
-printf 'candidate=c1-long-rollout-4096\nmax_steps=5\nnum_gpus=4\ngradient_accumulation_steps=8\neffective_batch_size=32\n' > "${output_dir}/runtime-overrides.txt"
+printf 'candidate=c2-long-rollout-4096-heldout\nmax_steps=5\nnum_gpus=4\ngradient_accumulation_steps=8\neffective_batch_size=32\n' > "${output_dir}/runtime-overrides.txt"
 record_run_manifest "${output_dir}" runtime-overrides.txt
 start_gpu_telemetry "${run_name}"
 trap stop_gpu_telemetry EXIT

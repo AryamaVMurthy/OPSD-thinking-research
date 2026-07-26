@@ -22,6 +22,7 @@ export GRAF_CONFIG="${PROJECT_SOURCE}/${CONFIG}" OPSD_DATASET_REVISION=1435fb21d
 run_name="graf-g4-viability-long-4096-50-${SLURM_JOB_ID}"
 output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"
+export OPSD_TRAINING_PARTITION_MANIFEST="${output_dir}/training-partition.json"
 cp "${CONFIG}" "${output_dir}/config.yaml"; cp "${GRAF_GRAPH_CACHE_MANIFEST}" "${output_dir}/graph-cache-manifest.json"; cp "${GRAF_VIABILITY_MANIFEST}" "${output_dir}/viability-manifest.json"
 printf 'candidate=g4-viability-long-4096\nmax_steps=50\nnum_gpus=4\ngradient_accumulation_steps=8\neffective_batch_size=32\nvllm_gpu_memory_utilization=%s\n' "${vllm_utilization}" > "${output_dir}/runtime-overrides.txt"
 record_run_manifest "${output_dir}" runtime-overrides.txt graph-cache-manifest.json viability-manifest.json

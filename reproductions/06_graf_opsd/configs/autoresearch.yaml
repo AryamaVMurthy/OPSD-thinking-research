@@ -15,6 +15,7 @@ max_forks_per_problem: 2
 actions_per_fork: 3
 forced_continuations_per_action: 2
 allowed_mutations:
+  - heldout_diagnostic_fraction
   - graph_mode
   - max_completion_length
   - fork_threshold

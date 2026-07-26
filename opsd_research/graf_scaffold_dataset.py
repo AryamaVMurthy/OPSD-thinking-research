@@ -96,7 +96,10 @@ def install_graph_scaffold_dataset_redirect(
         if args or kwargs:
             raise RuntimeError("official OPSD dataset call unexpectedly supplied arguments")
         from .training_data import load_math_cot_20k
-        loaded = load_math_cot_20k()["train"]
+        # Cache identities always use the full source corpus. The launcher
+        # selects training indices afterwards, so a held-out row cannot become
+        # model-visible merely because it has a cached scaffold.
+        loaded = load_math_cot_20k(heldout_fraction=0.0)["train"]
         selected_indices = sorted(scaffolds)
         selected = loaded.select(selected_indices).add_column(
             "_graf_source_index", selected_indices

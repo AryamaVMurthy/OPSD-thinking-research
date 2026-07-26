@@ -24,6 +24,7 @@ export OPSD_TAIL_LOGITS_ONLY=1
 run_name="graf-c1-long-4096-50-${SLURM_JOB_ID}"
 output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"
+export OPSD_TRAINING_PARTITION_MANIFEST="${output_dir}/training-partition.json"
 cp "${CONFIG}" "${output_dir}/config.yaml"
 printf 'candidate=c1-long-rollout-4096\nmax_steps=50\nnum_gpus=4\ngradient_accumulation_steps=8\neffective_batch_size=32\n' > "${output_dir}/runtime-overrides.txt"
 record_run_manifest "${output_dir}" runtime-overrides.txt

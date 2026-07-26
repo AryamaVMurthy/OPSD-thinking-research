@@ -30,6 +30,8 @@ lora_r: 64
 lora_alpha: 128
 lora_target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
 seed: 42
+# C1 is a historical-control continuation; preserve its all-corpus protocol.
+heldout_diagnostic_fraction: 0.0
 graph_mode: disabled
 branch_loss_weight: 0.0
 entropy_floor_weight: 0.0

@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import runpy
 import sys
+import json
 from pathlib import Path
 
 from .config import load_config
@@ -71,12 +72,45 @@ def main() -> None:
     from . import launch_official_opsd as official
 
     os.environ.setdefault("OPSD_DATASET_REVISION", str(config["dataset_revision"]))
+    heldout_fraction = float(config.get("heldout_diagnostic_fraction", 0.0))
+    os.environ["OPSD_HELDOUT_DIAGNOSTIC_FRACTION"] = str(heldout_fraction)
+    from .training_data import (
+        load_math_cot_20k,
+        partition_indices,
+        write_partition_manifest,
+    )
+    raw_dataset = load_math_cot_20k(
+        str(config["dataset_revision"]), heldout_fraction=0.0
+    )["train"]
+    train_indices, heldout_indices = partition_indices(raw_dataset, heldout_fraction)
+    manifest_path = os.environ.get("OPSD_TRAINING_PARTITION_MANIFEST")
+    is_primary = os.environ.get("RANK", os.environ.get("LOCAL_RANK", "0")) == "0"
+    if manifest_path and is_primary:
+        manifest = write_partition_manifest(Path(manifest_path), raw_dataset, heldout_fraction)
+    else:
+        manifest = {
+            "source_examples": len(raw_dataset),
+            "train_examples": len(train_indices),
+            "heldout_diagnostic_examples": len(heldout_indices),
+            "heldout_diagnostic_fraction": heldout_fraction,
+        }
+    if is_primary:
+        print(
+            json.dumps({"event": "training_partition", **manifest}, sort_keys=True),
+            flush=True,
+        )
+    train_index_set = set(train_indices)
     routed_targets = None
     if config["graph_mode"] == "scaffold_graph":
-        from .graf_scaffold_dataset import install_graph_scaffold_dataset_redirect
+        from .graf_scaffold_dataset import (
+            accepted_scaffolds,
+            install_graph_scaffold_dataset_redirect,
+        )
 
+        available = accepted_scaffolds(os.environ["GRAF_GRAPH_CACHE_MANIFEST"])
+        eligible = sorted(set(available).intersection(train_index_set))
         records = install_graph_scaffold_dataset_redirect(
-            os.environ["GRAF_GRAPH_CACHE_MANIFEST"]
+            os.environ["GRAF_GRAPH_CACHE_MANIFEST"], source_indices=eligible
         )
         print(
             '{"event":"graf_answer_masked_scaffold_enabled",'
@@ -98,6 +132,10 @@ def main() -> None:
             target_information_quantile=float(config.get("fork_information_quantile", 0.0)),
             information_weighting=bool(config.get("information_weighted_routing", False)),
         )
+        routed_targets = {
+            index: forks for index, forks in routed_targets.items()
+            if index in train_index_set
+        }
         active_examples = sum(bool(forks) for forks in routed_targets.values())
         if not routed_targets or not active_examples:
             raise SystemExit("viability-routed candidates require at least one active joined target")

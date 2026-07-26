@@ -48,6 +48,17 @@ def _config(run_dir: Path) -> dict[str, Any]:
     return loaded if isinstance(loaded, dict) else {}
 
 
+def _json_object(path: Path) -> dict[str, Any]:
+    text = _read_text(path)
+    if text is None:
+        return {}
+    try:
+        loaded = json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
 def _fmt(value: Any, digits: int = 4) -> str:
     if value is None:
         return "—"
@@ -82,7 +93,7 @@ def _artifact_names(run_dir: Path) -> list[str]:
     interesting = (
         "config.yaml", "runtime-overrides.txt", "source-commit.txt",
         "environment-freeze.txt", "training-summary.json", "summary.json",
-        "official-grades.jsonl", "paired-vs-base.json",
+        "training-partition.json", "official-grades.jsonl", "paired-vs-base.json",
     )
     found = [name for name in interesting if (run_dir / name).is_file()]
     found.extend(sorted(path.name for path in run_dir.glob("manifest-*.sha256")))
@@ -116,6 +127,7 @@ def training_report(summary: dict[str, Any], run_dir: Path) -> dict[str, Any]:
         "runtime": _key_values(next(iter(run_dir.glob("runtime-*.txt")), run_dir / "runtime.txt")),
         "runtime_overrides": _key_values(run_dir / "runtime-overrides.txt"),
         "config": config,
+        "training_partition": _json_object(run_dir / "training-partition.json"),
         "optimization": {
             "loss_points": len(losses),
             "initial_loss": losses[0] if losses else None,
@@ -201,6 +213,14 @@ def _training_markdown(report: dict[str, Any]) -> str:
             ("LoRA r / alpha", f"{config.get('lora_r')} / {config.get('lora_alpha')}"),
             ("Teacher", "fixed privileged teacher" if config.get("fixed_teacher") else "not fixed"),
             ("Objective", "full-vocabulary teacher→student KL (beta=0), clipped"),
+        ]), "",
+        "## Data partition", "",
+        *_table([
+            ("Partition protocol", report.get("training_partition", {}).get("partition_protocol")),
+            ("Training examples", report.get("training_partition", {}).get("train_examples")),
+            ("Held-out diagnostic examples", report.get("training_partition", {}).get("heldout_diagnostic_examples")),
+            ("Held-out fraction", report.get("training_partition", {}).get("heldout_diagnostic_fraction")),
+            ("Held-out content SHA-256", report.get("training_partition", {}).get("heldout_content_sha256")),
         ]), "",
         "## Optimization trace", "",
         *_table([

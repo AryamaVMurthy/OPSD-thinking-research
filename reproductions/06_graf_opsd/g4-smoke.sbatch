@@ -31,6 +31,7 @@ export OPSD_EXACT_JSD_VOCAB_CHUNK_SIZE=4096 OPSD_TAIL_LOGITS_ONLY=1
 run_name="graf-g4-viability-long-4096-smoke-${SLURM_JOB_ID}"
 output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"
+export OPSD_TRAINING_PARTITION_MANIFEST="${output_dir}/training-partition.json"
 cp "${CONFIG}" "${output_dir}/config.yaml"
 cp "${GRAF_GRAPH_CACHE_MANIFEST}" "${output_dir}/graph-cache-manifest.json"
 cp "${GRAF_VIABILITY_MANIFEST}" "${output_dir}/viability-manifest.json"

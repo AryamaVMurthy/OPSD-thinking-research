@@ -21,6 +21,7 @@ export GRAF_FULL_MAX_STEPS=200 OPSD_DATASET_REVISION=1435fb21d4fecc8ad4966a26f22
 run_name="graf-${CANDIDATE_ID}-200-${SLURM_JOB_ID}"
 output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"
+export OPSD_TRAINING_PARTITION_MANIFEST="${output_dir}/training-partition.json"
 cp "${CANDIDATE_CONFIG}" "${output_dir}/config.yaml"
 printf 'candidate=%s\nmax_steps=200\nconfirmation=fresh_from_base\n' "${CANDIDATE_ID}" > "${output_dir}/runtime-overrides.txt"
 files=(runtime-overrides.txt)

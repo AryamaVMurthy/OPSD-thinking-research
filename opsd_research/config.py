@@ -228,6 +228,15 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         raise ConfigError(f"{source}: max_steps must be 5, 50, or 200")
     if data.get("save_steps") != data.get("max_steps"):
         raise ConfigError(f"{source}: pilot candidates save only at their final step")
+    heldout_fraction = data.get("heldout_diagnostic_fraction", 0.0)
+    if (
+        not isinstance(heldout_fraction, (int, float))
+        or isinstance(heldout_fraction, bool)
+        or not 0.0 <= float(heldout_fraction) < 0.5
+    ):
+        raise ConfigError(
+            f"{source}: heldout_diagnostic_fraction must be in [0, 0.5)"
+        )
     computed_batch = (
         int(data.get("per_device_train_batch_size", 0))
         * int(data.get("gradient_accumulation_steps", 0))
@@ -323,7 +332,7 @@ def _validate_graf_autoresearch(data: dict[str, Any], source: str) -> None:
     if not isinstance(data.get("max_candidates"), int) or not 1 <= data["max_candidates"] <= 24:
         raise ConfigError(f"{source}: max_candidates must be in [1, 24]")
     expected_mutations = {
-        "max_completion_length", "graph_mode", "fork_threshold", "fork_information_threshold", "fork_information_quantile", "information_weighted_routing", "graph_budget",
+        "max_completion_length", "heldout_diagnostic_fraction", "graph_mode", "fork_threshold", "fork_information_threshold", "fork_information_quantile", "information_weighted_routing", "graph_budget",
         "viability_temperature", "branch_loss_weight", "entropy_floor_weight",
     }
     if not set(data.get("allowed_mutations", [])).issubset(expected_mutations):
