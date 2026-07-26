@@ -43,6 +43,7 @@ def load_routing_targets(
     min_target_information: float = 0.0,
     target_information_quantile: float = 0.0,
     information_weighting: bool = False,
+    viability_beta_prior: float = 0.0,
 ) -> dict[int, tuple[ForkTarget, ...]]:
     """Verify caches and optionally retain outcome-differential branch targets.
 
@@ -57,6 +58,8 @@ def load_routing_targets(
         raise ValueError("min_target_information must be in [0, 1]")
     if not 0.0 <= target_information_quantile <= 1.0:
         raise ValueError("target_information_quantile must be in [0, 1]")
+    if not math.isfinite(viability_beta_prior) or viability_beta_prior < 0.0:
+        raise ValueError("viability_beta_prior must be a finite nonnegative number")
     if min_target_information and target_information_quantile:
         raise ValueError("choose either min_target_information or target_information_quantile")
     graph_manifest_path = Path(graph_manifest_path)
@@ -88,6 +91,51 @@ def load_routing_targets(
         if record.get("accepted")
     }
     records = _read_jsonl(viability_path)
+
+    def posterior_target(record: dict, fork: dict, action_ids: list[str]) -> list[float]:
+        """Return a Beta-posterior target without inventing a graph arity.
+
+        A forced-continuation cache stores a success rate from a finite number
+        of samples.  With a symmetric Beta(alpha, alpha) prior, its posterior
+        mean is (successes + alpha) / (trials + 2 alpha).  This only changes
+        measured, non-dead-end actions; explicitly invalid actions retain zero
+        probability.  alpha=0 is deliberately bit-for-bit cache behavior.
+        """
+        target = [float(value) for value in fork["target"]]
+        if viability_beta_prior == 0.0:
+            return target
+        raw = fork.get("viability")
+        try:
+            trials = int(record["samples_per_action"])
+            temperature = float(record["temperature"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError(
+                "posterior routing requires samples_per_action and temperature in every viability record"
+            ) from error
+        if trials < 1 or not math.isfinite(temperature) or temperature <= 0.0:
+            raise ValueError("invalid viability sampling metadata for posterior routing")
+        if not isinstance(raw, dict):
+            raise ValueError("posterior routing requires per-action viability estimates")
+        scores: list[float] = []
+        for action_id in action_ids:
+            if action_id not in raw:
+                # Invalid/dead-end actions were intentionally never sampled.
+                scores.append(float("-inf"))
+                continue
+            value = float(raw[action_id])
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(f"invalid viability for action {action_id!r}")
+            posterior_mean = (value * trials + viability_beta_prior) / (
+                trials + 2.0 * viability_beta_prior
+            )
+            scores.append(posterior_mean / temperature)
+        finite = [score for score in scores if math.isfinite(score)]
+        if not finite:
+            raise ValueError("posterior routing found no measured action in a fork")
+        maximum = max(finite)
+        weights = [0.0 if not math.isfinite(score) else math.exp(score - maximum) for score in scores]
+        normalizer = sum(weights)
+        return [weight / normalizer for weight in weights]
 
     def target_information(values: list[float]) -> float:
         uniform = 1.0 / len(values)
@@ -131,7 +179,7 @@ def load_routing_targets(
         forks = []
         for fork in record.get("fork_targets", []):
             action_ids = [str(action_id) for action_id in fork["action_ids"]]
-            values = [float(value) for value in fork["target"]]
+            values = posterior_target(record, fork, action_ids)
             if len(action_ids) != len(values) or not action_ids:
                 raise ValueError(f"invalid target shape for example {index}")
             if any(value < 0 for value in values) or abs(sum(values) - 1.0) > 1e-6:

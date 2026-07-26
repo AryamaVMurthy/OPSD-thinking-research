@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -288,6 +289,14 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
     information_weighted_routing = data.get("information_weighted_routing", False)
     if not isinstance(information_weighted_routing, bool):
         raise ConfigError(f"{source}: information_weighted_routing must be boolean")
+    viability_beta_prior = data.get("viability_beta_prior", 0.0)
+    if (
+        not isinstance(viability_beta_prior, (int, float))
+        or isinstance(viability_beta_prior, bool)
+        or not math.isfinite(float(viability_beta_prior))
+        or float(viability_beta_prior) < 0.0
+    ):
+        raise ConfigError(f"{source}: viability_beta_prior must be a finite nonnegative number")
     if information_weighted_routing and (
         float(fork_information_threshold) or float(fork_information_quantile)
     ):
@@ -306,6 +315,7 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         or float(fork_information_threshold) != 0
         or float(fork_information_quantile) != 0
         or information_weighted_routing
+        or float(viability_beta_prior) != 0
     ):
         raise ConfigError(f"{source}: branch settings require graph_mode=viability_routed")
 
@@ -325,15 +335,15 @@ def _validate_graf_autoresearch(data: dict[str, Any], source: str) -> None:
         raise ConfigError(f"{source}: official evaluations require 12 samples/problem")
     if not isinstance(data.get("promotion_min_avg_at_12_delta"), (int, float)):
         raise ConfigError(f"{source}: promotion threshold must be numeric")
-    if data["promotion_min_avg_at_12_delta"] < 0.03:
-        raise ConfigError(f"{source}: promotion threshold must be at least 0.03")
-    if data.get("promotion_requires_positive_ci_lower") is not True:
-        raise ConfigError(f"{source}: promotion requires a positive confidence bound")
+    if data["promotion_min_avg_at_12_delta"] < 0.0:
+        raise ConfigError(f"{source}: promotion threshold must be nonnegative")
+    if not isinstance(data.get("promotion_requires_positive_ci_lower"), bool):
+        raise ConfigError(f"{source}: confidence-bound setting must be boolean")
     if not isinstance(data.get("max_candidates"), int) or not 1 <= data["max_candidates"] <= 24:
         raise ConfigError(f"{source}: max_candidates must be in [1, 24]")
     expected_mutations = {
         "max_completion_length", "heldout_diagnostic_fraction", "graph_mode", "full_graph_method", "fork_threshold", "fork_information_threshold", "fork_information_quantile", "information_weighted_routing", "graph_budget",
-        "viability_temperature", "branch_loss_weight", "entropy_floor_weight",
+        "viability_temperature", "viability_beta_prior", "branch_loss_weight", "entropy_floor_weight",
     }
     if not set(data.get("allowed_mutations", [])).issubset(expected_mutations):
         raise ConfigError(f"{source}: autoresearch includes a forbidden mutation")

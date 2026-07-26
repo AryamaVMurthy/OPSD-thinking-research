@@ -33,5 +33,15 @@ if [[ "${promote}" == 1 ]]; then
  echo "g7_full_confirmation_job=${full}"
  sbatch --parsable --dependency="afterok:${full}" --export="ALL,FULL_JOB_ID=${full},CANDIDATE_ID=g7-information-weighted,METHOD=graf-information-weighted" reproductions/06_graf_opsd/after-promoted-full-train.sbatch
 else
- echo "g7 did not clear the development gate; use its paired result to choose the next measured graph/data mutation."
+ python3 -m opsd_research.graf_autoresearch register \
+   --policy reproductions/06_graf_opsd/configs/autoresearch.yaml \
+   --config reproductions/06_graf_opsd/configs/g8-posterior-calibrated.yaml \
+   --ledger artifacts/graf_opsd/candidate-ledger.jsonl \
+   --candidate-id g8-posterior-calibrated --parent-id g7-information-weighted --stage G8 \
+   --hypothesis "Replace raw finite-sample forced-continuation rates with symmetric-Beta posterior means before dynamic action-distribution distillation, reducing spurious certainty without fixing a graph arity or class pattern." \
+   --changed-field viability_beta_prior
+ graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"; viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
+ g8_smoke="$(GRAF_GRAPH_CACHE_MANIFEST="${graph_manifest}" GRAF_VIABILITY_MANIFEST="${viability_manifest}" GRAF_CANDIDATE_ID=g8-posterior-calibrated GRAF_CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/g8-posterior-calibrated.yaml GRAF_MAX_STEPS=5 GRAF_PORT=12982 sbatch --parsable reproductions/06_graf_opsd/run-routed-candidate.sbatch)"
+ echo "g8_smoke_job=${g8_smoke}"
+ sbatch --parsable --dependency="afterok:${g8_smoke}" --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G2_VIABILITY_ARRAY_JOB_ID=${G2_VIABILITY_ARRAY_JOB_ID},G8_SMOKE_JOB_ID=${g8_smoke}" reproductions/06_graf_opsd/after-g8-smoke.sbatch
 fi

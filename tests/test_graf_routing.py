@@ -96,3 +96,35 @@ def test_information_filter_retains_two_viable_actions_and_suppresses_uniform(tm
     )
     assert [fork.fork_id for fork in weighted_targets[3]] == ["informative"]
     assert 0.0 < weighted_targets[3][0].information_weight < 1.0
+
+
+def test_beta_posterior_smooths_small_sample_action_targets(tmp_path: Path) -> None:
+    graph_cache = tmp_path / "graphs.jsonl"
+    graph = {
+        "accepted": True, "example_index": 3, "graph_sha256": "graph-hash",
+        "graph": {"forks": [{"actions": [
+            {"action_id": "a", "description": "factor", "status": "viable"},
+            {"action_id": "b", "description": "substitute", "status": "risky"},
+        ]}]},
+    }
+    graph_cache.write_text(json.dumps(graph) + "\n", encoding="utf-8")
+    digest = hashlib.sha256(graph_cache.read_bytes()).hexdigest()
+    graph_manifest = tmp_path / "graph-manifest.json"
+    graph_manifest.write_text(json.dumps({"schema_version": 1, "cache": "graphs.jsonl", "cache_sha256": digest, "requested_examples": 1, "accepted_examples": 1, "rejected_examples": 0}), encoding="utf-8")
+    viability_cache = tmp_path / "viability.jsonl"
+    viability_cache.write_text(json.dumps({
+        "example_index": 3, "graph_sha256": "graph-hash",
+        "forced_prefix_protocol": ASSISTANT_ACTION_PREFIX_PROTOCOL,
+        "samples_per_action": 2, "temperature": 1.0,
+        "fork_targets": [{"fork_id": "f", "action_ids": ["a", "b"],
+                          "viability": {"a": 1.0, "b": 0.0},
+                          "target": [0.7310585786, 0.2689414214]}],
+    }) + "\n", encoding="utf-8")
+    viability_manifest = tmp_path / "viability-manifest.json"
+    viability_manifest.write_text(json.dumps({"schema_version": 1, "graph_cache_sha256": digest, "viability_cache": "viability.jsonl", "viability_cache_sha256": hashlib.sha256(viability_cache.read_bytes()).hexdigest(), "examples": 1, "forced_prefix_protocol": ASSISTANT_ACTION_PREFIX_PROTOCOL}), encoding="utf-8")
+
+    target = load_routing_targets(graph_manifest, viability_manifest, viability_beta_prior=1.0)[3][0]
+    # With two trials, Beta(1, 1) turns 1/0 into posterior means .75/.25;
+    # its softmax target is less overconfident than the raw 1/0 target.
+    assert 0.5 < target.actions[0].target_probability < 0.7310585786
+    assert abs(sum(action.target_probability for action in target.actions) - 1.0) < 1e-8

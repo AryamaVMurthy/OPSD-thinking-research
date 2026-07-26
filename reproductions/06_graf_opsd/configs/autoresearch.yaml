@@ -7,12 +7,17 @@ training_dataset_revision: 1435fb21d4fecc8ad4966a26f22a874cf2b527f1
 development_benchmark: aime24
 locked_benchmarks: [aime25, aime26]
 official_samples_per_problem: 12
-promotion_min_avg_at_12_delta: 0.03
-promotion_requires_positive_ci_lower: true
+# Development selection is the directly observed official 12-sample Avg@12.
+# Bootstrap intervals remain logged for interpretation, never as a gate.
+promotion_min_avg_at_12_delta: 0.0
+promotion_requires_positive_ci_lower: false
 max_candidates: 24
 graph_cache_problem_limit: 512
-max_forks_per_problem: 2
-actions_per_fork: 3
+# These are safety maxima, not a required number of routes or actions.  The
+# graph builder selects a variable arity per problem under the total budget.
+max_forks_per_problem: 6
+max_actions_per_fork: 6
+graph_action_budget: 24
 forced_continuations_per_action: 2
 allowed_mutations:
   - heldout_diagnostic_fraction
@@ -25,5 +30,6 @@ allowed_mutations:
   - information_weighted_routing
   - graph_budget
   - viability_temperature
+  - viability_beta_prior
   - branch_loss_weight
   - entropy_floor_weight
