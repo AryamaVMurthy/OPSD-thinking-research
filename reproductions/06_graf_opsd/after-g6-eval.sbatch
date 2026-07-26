@@ -37,7 +37,7 @@ else
    --policy reproductions/06_graf_opsd/configs/autoresearch.yaml \
    --config reproductions/06_graf_opsd/configs/g7-information-weighted.yaml \
    --ledger artifacts/graf_opsd/candidate-ledger.jsonl \
-   --candidate-id g7-information-weighted --parent-id g2-viability-routed-2048 --stage G7 \
+   --candidate-id g7-information-weighted --parent-id g6-information-routed --stage G7 \
    --hypothesis "Weight every non-uniform branch target continuously by normalized information rather than using any action-count or information-cutoff rule." \
    --changed-field information_weighted_routing
  graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"; viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
