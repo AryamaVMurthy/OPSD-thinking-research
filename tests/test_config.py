@@ -116,6 +116,20 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "branch settings"):
             validate_config(changed)
 
+    def test_information_quantile_is_mutually_exclusive_with_explicit_threshold(self):
+        data = load_config(
+            ROOT / "reproductions/06_graf_opsd/configs/g6-information-routed.yaml"
+        ).data
+        validate_config(data)
+        changed = copy.deepcopy(data)
+        changed["fork_information_threshold"] = 0.05
+        with self.assertRaisesRegex(ConfigError, "choose either"):
+            validate_config(changed)
+        changed = copy.deepcopy(data)
+        changed["fork_information_quantile"] = 1.1
+        with self.assertRaisesRegex(ConfigError, "fork_information_quantile"):
+            validate_config(changed)
+
 
 if __name__ == "__main__":
     unittest.main()

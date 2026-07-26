@@ -33,7 +33,7 @@ seed: 42
 graph_mode: viability_routed
 branch_loss_weight: 0.10
 entropy_floor_weight: 0.0
-# Apply GRAF only when the frozen target differs materially from uniform.
-# This retains [viable, viable, invalid] distributions (their signal is to
-# preserve the first two branches while driving down the invalid branch).
-fork_information_threshold: 0.05
+# Cache-adaptive rather than action-count-specific: use the median measured
+# non-uniform target-information value as the cutoff.  This supports any
+# graph arity and every viability pattern; the value is independently tunable.
+fork_information_quantile: 0.50

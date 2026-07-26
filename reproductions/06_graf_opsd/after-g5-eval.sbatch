@@ -39,7 +39,7 @@ else
    --ledger artifacts/graf_opsd/candidate-ledger.jsonl \
    --candidate-id g6-information-routed --parent-id g2-viability-routed-2048 --stage G6 \
    --hypothesis "Retain every non-uniform viability distribution, including multiple viable actions plus an invalid action, rather than selecting only a single top action." \
-   --changed-field fork_information_threshold
+   --changed-field fork_information_quantile
  graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"; viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
  g6_smoke="$(GRAF_GRAPH_CACHE_MANIFEST="${graph_manifest}" GRAF_VIABILITY_MANIFEST="${viability_manifest}" GRAF_CANDIDATE_ID=g6-information-routed GRAF_CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/g6-information-routed.yaml GRAF_MAX_STEPS=5 GRAF_PORT=12980 sbatch --parsable reproductions/06_graf_opsd/run-routed-candidate.sbatch)"
  echo "g6_smoke_job=${g6_smoke}"

@@ -87,3 +87,7 @@ def test_information_filter_retains_two_viable_actions_and_suppresses_uniform(tm
 
     targets = load_routing_targets(graph_manifest, viability_manifest, min_target_information=0.05)
     assert [fork.fork_id for fork in targets[3]] == ["informative"]
+    quantile_targets = load_routing_targets(
+        graph_manifest, viability_manifest, target_information_quantile=0.5
+    )
+    assert [fork.fork_id for fork in quantile_targets[3]] == ["informative"]

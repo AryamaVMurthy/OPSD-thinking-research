@@ -95,6 +95,7 @@ def main() -> None:
             raw_viability_manifest,
             min_target_margin=float(config.get("fork_threshold", 0.0)),
             min_target_information=float(config.get("fork_information_threshold", 0.0)),
+            target_information_quantile=float(config.get("fork_information_quantile", 0.0)),
         )
         active_examples = sum(bool(forks) for forks in routed_targets.values())
         if not routed_targets or not active_examples:
@@ -112,7 +113,8 @@ def main() -> None:
             f'"routed_examples":{len(routed_targets)},'
             f'"active_routed_examples":{active_examples},'
             f'"fork_threshold":{float(config.get("fork_threshold", 0.0))},'
-            f'"fork_information_threshold":{float(config.get("fork_information_threshold", 0.0))}' + "}",
+            f'"fork_information_threshold":{float(config.get("fork_information_threshold", 0.0))},'
+            f'"fork_information_quantile":{float(config.get("fork_information_quantile", 0.0))}' + "}",
             flush=True,
         )
     else:
