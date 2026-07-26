@@ -81,7 +81,7 @@ comparison="$(
   sbatch --parsable \
     --dependency="afterok:${baseline}" \
     --output="${SCRATCH_ROOT}/slurm-after-ch-full-aime24-%j.out" \
-    --export="ALL,CH_FULL_TREATMENT_RUN=${treatment_run},CH_FULL_BASELINE_RUN=${baseline_run}" \
+    --export="ALL,CH_FULL_TRAIN_JOB_ID=${CH_FULL_TRAIN_JOB_ID},CH_FULL_TREATMENT_RUN=${treatment_run},CH_FULL_BASELINE_RUN=${baseline_run}" \
     reproductions/06_graf_opsd/after-ch-full-aime24.sbatch
 )"
 printf 'ch1_full_aime24_treatment=%s run=%s\n' "${treatment}" "${treatment_run}"
