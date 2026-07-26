@@ -1,5 +1,5 @@
 kind: graf_train
-variant: g4_graph_backtrack_entropy_4096
+variant: g4_graph_backtrack_entropy_symmetric_jsd_4096
 model: Qwen/Qwen3-4B
 model_revision: 1cfa9a7208912126459214e8b04321603b3df60c
 dataset: jasonrqh/Math-CoT-20k
@@ -25,7 +25,9 @@ top_p: 0.95
 top_k: 20
 presence_penalty: 0.0
 lmbda: 1.0
-beta: 0.0
+# Unlike the upstream reproduction (beta=0, forward KL), this GRAF ablation
+# uses the actual symmetric Jensen-Shannon divergence.
+beta: 0.5
 jsd_token_clip: 0.05
 exact_jsd_vocab_chunk_size: 4096
 tail_logits_only: true
