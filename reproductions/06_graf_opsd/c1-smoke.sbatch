@@ -7,7 +7,7 @@
 #SBATCH --nodelist=node03
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=32
-#SBATCH --mem=384G
+#SBATCH --mem=350G
 #SBATCH --time=04:00:00
 #SBATCH --output=logs/%x-%j.out
 

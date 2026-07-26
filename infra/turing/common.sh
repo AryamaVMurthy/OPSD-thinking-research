@@ -3,7 +3,11 @@ set -euo pipefail
 
 PROJECT_SOURCE="${PROJECT_SOURCE:-${HOME}/OPSD-thinking-research}"
 NODE_NAME="${SLURMD_NODENAME:-$(hostname -s)}"
-SCRATCH_ROOT="/scratch/${NODE_NAME}/${USER}/opsd-thinking-research"
+# Each compute host mounts its local scratch at /scratch.  The old layout
+# assumed that /scratch/<node> was user-owned, which is not true on the
+# four-GPU hosts.  Use the user-owned directory at the mount root instead.
+SCRATCH_BASE="${OPSD_SCRATCH_BASE:-/scratch/${USER}}"
+SCRATCH_ROOT="${SCRATCH_BASE}/opsd-thinking-research"
 ENV_DIR="${SCRATCH_ROOT}/env"
 SCORE_ENV_DIR="${SCRATCH_ROOT}/score-env"
 HF_HOME="${SCRATCH_ROOT}/hf"
