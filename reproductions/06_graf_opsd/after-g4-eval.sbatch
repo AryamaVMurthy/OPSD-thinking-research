@@ -36,5 +36,16 @@ if [[ "${promote}" == 1 ]]; then
   echo "g4_full_confirmation_job=${full}"
   sbatch --parsable --dependency="afterok:${full}" --export="ALL,FULL_JOB_ID=${full},CANDIDATE_ID=g4-viability-long-4096,METHOD=graf-viability-long-4096" reproductions/06_graf_opsd/after-promoted-full-train.sbatch
 else
-  echo "g4 did not clear the development gate; next candidate must address the measured action-target information deficit."
+  python3 -m opsd_research.graf_autoresearch register \
+    --policy reproductions/06_graf_opsd/configs/autoresearch.yaml \
+    --config reproductions/06_graf_opsd/configs/g5-differential-routing.yaml \
+    --ledger artifacts/graf_opsd/candidate-ledger.jsonl \
+    --candidate-id g5-differential-routing --parent-id g2-viability-routed-2048 --stage G5 \
+    --hypothesis "Apply GRAF only to frozen branch targets with a meaningful empirical action preference while retaining base OPSD on all examples." \
+    --changed-field fork_threshold
+  graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
+  viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
+  g5_smoke="$(GRAF_GRAPH_CACHE_MANIFEST="${graph_manifest}" GRAF_VIABILITY_MANIFEST="${viability_manifest}" GRAF_CANDIDATE_ID=g5-differential-routing GRAF_CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/g5-differential-routing.yaml GRAF_MAX_STEPS=5 GRAF_PORT=12978 sbatch --parsable reproductions/06_graf_opsd/run-routed-candidate.sbatch)"
+  echo "g5_smoke_job=${g5_smoke}"
+  sbatch --parsable --dependency="afterok:${g5_smoke}" --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G2_VIABILITY_ARRAY_JOB_ID=${G2_VIABILITY_ARRAY_JOB_ID},G5_SMOKE_JOB_ID=${g5_smoke}" reproductions/06_graf_opsd/after-g5-smoke.sbatch
 fi
