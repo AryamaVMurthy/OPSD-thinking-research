@@ -88,3 +88,49 @@ Graph construction is cached and starts on 512 Math-CoT problems. It uses at
 most two forks, three actions, and two forced continuations per fork. The
 first Turing job is a five-step eight-A100 smoke. A 50-step pilot follows only
 after it is accepted. Full 200-step runs are reserved for promoted candidates.
+
+## Resource-aware contrastive-hindsight extension
+
+The G-series screen exposed two constraints that require a separately named
+method family rather than another silent GRAF mutation:
+
+1. only 22 unique routed identities reached the G4 pilot;
+2. almost every 2,048-token thinking rollout was cut off before finishing.
+
+The CH family preserves ordinary OPSD's free-form student reasoning. For each
+training problem, an answer-blind student samples independent natural
+solutions. A privileged auditor then receives those attempts plus the trusted
+answer and reference solution and writes an unrestricted prose comparison.
+The complete prose dossier is supplied only to the fixed teacher. The student
+still receives only the original problem. No JSON schema, fixed method
+taxonomy, or formatting-based example selection is permitted.
+
+CH0 uses three 2,048-token blind attempts, a 1,536-token natural audit, and
+2,048-token on-policy training. CH1 changes only completion allocation: two
+4,096-token blind attempts and 4,096-token on-policy training. Its 12-step
+pilot has a maximum rollout budget of 1,572,864 tokens, versus 1,638,400 for
+CH0's 25-step pilot, so the comparison does not reward CH1 with more training
+tokens.
+
+Admission gates are coverage and context gates, not response-shape gates:
+
+- every requested source identity is retained unless generation itself fails;
+- accepted coverage must be at least 95%, and a final run targets 100%;
+- exact rendered teacher prompts must fit the configured 28,672-token context;
+- undersized context is fixed by increasing the budget, never by silently
+  dropping long examples;
+- a one-step engineering smoke must complete generation, forward/backward,
+  optimization, adapter save, and rollout-integrity checks before a pilot.
+
+The paired development screen uses the same four full-context AIME-2024
+samples and seeds for untouched and treatment models. It is a method-selection
+screen, not a paper result. A selected method is retrained fresh for 200 steps
+at effective batch 32 and evaluated at the official 12-sample protocol.
+
+For CH1 publication-scale training, cache the first 6,912 pinned Math-CoT-20k
+identities. The fixed content-hash 5% diagnostic partition leaves exactly
+6,526 trainable identities, enough for all 6,400 first-pass examples consumed
+by 200 optimizer steps without schema-driven reduction or early recycling.
+The preferred allocation is eight GPUs with data parallelism 8 and gradient
+accumulation 4; the four-GPU fallback uses accumulation 8. Both preserve the
+same effective batch, optimizer, seed, and scientific token budget.
