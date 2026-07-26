@@ -33,6 +33,7 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
     rollouts = []
     losses = []
     branch_events = []
+    forward_kl_values = []
     observed_step = 0
     for match in _ROLLOUT.finditer(text):
         rollouts.append({
@@ -45,6 +46,17 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
     # HF logs Python dicts, one per rank.  Only accept complete, literal dicts
     # carrying an actual loss to avoid interpreting arbitrary log fragments.
     for line in text.splitlines():
+        kl_start = line.find('{"event":"exact_forward_kl_loss"')
+        if kl_start >= 0:
+            kl_end = line.find("}", kl_start)
+            if kl_end >= 0:
+                try:
+                    event = json.loads(line[kl_start : kl_end + 1])
+                except json.JSONDecodeError:
+                    event = None
+                value = _finite_number(event.get("value")) if isinstance(event, dict) else None
+                if value is not None:
+                    forward_kl_values.append(value)
         branch_start = line.find('{"event":"graf_branch_loss"')
         if branch_start >= 0:
             branch_end = line.find("}", branch_start)
@@ -120,6 +132,16 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
                 if branch_active else None
             ),
         },
+        "forward_kl": {
+            "loss_calls": len(forward_kl_values),
+            "min": min(forward_kl_values) if forward_kl_values else None,
+            "max": max(forward_kl_values) if forward_kl_values else None,
+            "mean": (
+                sum(forward_kl_values) / len(forward_kl_values)
+                if forward_kl_values else None
+            ),
+            "negative_loss_calls": sum(value < 0.0 for value in forward_kl_values),
+        },
     }
 
 
@@ -135,6 +157,16 @@ def render_markdown(status: dict[str, Any]) -> str:
         f"- Generation throughput: `{rollouts['tokens_per_second']:.1f} tokens/s`" if rollouts["tokens_per_second"] is not None else "- Generation throughput: `n/a`",
     ]
     branch = status["graf_branch"]
+    forward_kl = status["forward_kl"]
+    if forward_kl["loss_calls"]:
+        lines.extend([
+            "",
+            "## Exact forward-KL telemetry",
+            "",
+            f"- Loss calls: `{forward_kl['loss_calls']}`",
+            f"- Mean / min / max: `{forward_kl['mean']:.10g}` / `{forward_kl['min']:.10g}` / `{forward_kl['max']:.10g}`",
+            f"- Negative loss calls: `{forward_kl['negative_loss_calls']}`",
+        ])
     if branch["loss_calls"]:
         lines.extend([
             "",

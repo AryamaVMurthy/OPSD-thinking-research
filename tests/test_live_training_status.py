@@ -13,6 +13,8 @@ class LiveTrainingStatusTests(unittest.TestCase):
                 "Normalizing pinned Math-CoT-20k: 100%| | 19428/19428 [00:01<00:00, 13000 examples/s]\n"
                 "\r  2%| | 1/50 [08:09<6:39:26, 489.11s/it]\r"
                 "{'loss': 0.0028, 'grad_norm': 0.105459, 'epoch': 0.0}\n"
+                '{"event":"exact_forward_kl_loss","value":1.25e-06}\n'
+                '{"event":"exact_forward_kl_loss","value":2.5e-06}\n'
                 '{"event":"graf_branch_loss","active_forks":2.0,"effective_fork_weight":0.5,"branch_kl":0.2,"entropy_floor":0.01,"weighted_loss":0.021}\n'
                 '{"event":"graf_branch_loss","active_forks":0.0,"effective_fork_weight":0.0,"branch_kl":0.0,"entropy_floor":0.0,"weighted_loss":0.0}\n'
                 "vLLM generation done - elapsed time: 56.77s, prompts: 1, total tokens: 4096, avg length: 4096.0\n"
@@ -27,7 +29,11 @@ class LiveTrainingStatusTests(unittest.TestCase):
         self.assertEqual(status["graf_branch"]["active_loss_calls"], 1)
         self.assertEqual(status["graf_branch"]["loss_calls"], 2)
         self.assertEqual(status["graf_branch"]["mean_active_forks_per_loss_call"], 1.0)
+        self.assertEqual(status["forward_kl"]["loss_calls"], 2)
+        self.assertEqual(status["forward_kl"]["negative_loss_calls"], 0)
+        self.assertEqual(status["forward_kl"]["min"], 1.25e-06)
         report = render_markdown(status)
         self.assertIn("`50.0%` (1/2)", report)
         self.assertIn("0.002800", report)
         self.assertIn("Branch-active loss calls: `50.0%` (1/2)", report)
+        self.assertIn("Negative loss calls: `0`", report)

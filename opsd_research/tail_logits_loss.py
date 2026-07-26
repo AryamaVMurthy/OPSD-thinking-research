@@ -124,6 +124,16 @@ def compute_loss_with_tail_logits(
         )
         del student_logits_for_loss, teacher_logits_for_loss
 
+    # Trainer's normal progress display rounds this scalar to four decimal
+    # places.  Preserve the unrounded value separately so a tiny forward KL
+    # cannot be mistaken for a zero loss during a long-running experiment.
+    if self.accelerator.is_main_process:
+        print(
+            '{"event":"exact_forward_kl_loss",'
+            f'"value":{float(loss.detach().float()):.10g}' + "}",
+            flush=True,
+        )
+
     empty_cache()
     if return_outputs:
         minimal_output.loss = loss
