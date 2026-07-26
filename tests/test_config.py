@@ -86,6 +86,15 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "branch_loss_weight"):
             validate_config(changed)
 
+    def test_teacher_graph_critique_must_be_boolean(self):
+        data = load_config(
+            ROOT / "reproductions/06_graf_opsd/configs/g10-teacher-critique.yaml"
+        ).data
+        changed = copy.deepcopy(data)
+        changed["teacher_graph_critique"] = "yes"
+        with self.assertRaisesRegex(ConfigError, "teacher_graph_critique"):
+            validate_config(changed)
+
     def test_fork_threshold_requires_routed_mode_and_probability_margin(self):
         data = load_config(
             ROOT / "reproductions/06_graf_opsd/configs/g2-viability-routed.yaml"

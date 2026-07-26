@@ -300,6 +300,9 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
     recovery_conditioned_routing = data.get("recovery_conditioned_routing", False)
     if not isinstance(recovery_conditioned_routing, bool):
         raise ConfigError(f"{source}: recovery_conditioned_routing must be boolean")
+    teacher_graph_critique = data.get("teacher_graph_critique", False)
+    if not isinstance(teacher_graph_critique, bool):
+        raise ConfigError(f"{source}: teacher_graph_critique must be boolean")
     if information_weighted_routing and (
         float(fork_information_threshold) or float(fork_information_quantile)
     ):
@@ -320,6 +323,7 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         or information_weighted_routing
         or float(viability_beta_prior) != 0
         or recovery_conditioned_routing
+        or teacher_graph_critique
     ):
         raise ConfigError(f"{source}: branch settings require graph_mode=viability_routed")
 

@@ -32,6 +32,8 @@ lora_target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_p
 seed: 42
 heldout_diagnostic_fraction: 0.05
 graph_mode: viability_routed
+# Enforced against the immutable graph-cache manifest at launch.
+teacher_graph_critique: true
 branch_loss_weight: 0.10
 entropy_floor_weight: 0.0
 information_weighted_routing: true

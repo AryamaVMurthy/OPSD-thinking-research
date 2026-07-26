@@ -59,9 +59,15 @@ def _validate_invocation() -> dict[str, object]:
             raise SystemExit("graph-routed candidates require GRAF_GRAPH_CACHE_MANIFEST")
         from .graf_cache import validate_graph_cache_manifest
         try:
-            validate_graph_cache_manifest(manifest)
+            graph_manifest = validate_graph_cache_manifest(manifest)
         except ValueError as error:
             raise SystemExit(f"invalid GRAF graph cache: {error}") from error
+        if bool(config.get("teacher_graph_critique", False)) and not bool(
+            graph_manifest.get("teacher_critique", False)
+        ):
+            raise SystemExit(
+                "teacher_graph_critique requires a graph cache built with teacher critique"
+            )
     return config
 
 
