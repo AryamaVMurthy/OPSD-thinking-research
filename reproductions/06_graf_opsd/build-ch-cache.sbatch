@@ -67,10 +67,15 @@ python3 -m opsd_research.merge_ch_cache \
   --training-dataset-revision 1435fb21d4fecc8ad4966a26f22a874cf2b527f1 \
   --builder-seed 42
 
+python3 -m opsd_research.summarize_ch_cache \
+  --input "${CH_RUN_DIR}/dossiers.jsonl" \
+  --output "${CH_RUN_DIR}/cache-summary.json"
+
 sha256sum \
   "${CH_RUN_DIR}"/dossiers.shard*.jsonl \
   "${CH_RUN_DIR}/dossiers.jsonl" \
   "${CH_RUN_DIR}/manifest.json" \
+  "${CH_RUN_DIR}/cache-summary.json" \
   "${CH_RUN_DIR}/runtime-parameters.txt" \
   "${CH_RUN_DIR}/source-commit.txt" \
   > "${CH_RUN_DIR}/artifact-manifest.sha256"

@@ -16,18 +16,25 @@ source "${HOME}/OPSD-thinking-research/infra/turing/common.sh"
 cd "${PROJECT_SOURCE}"
 : "${CH_CACHE_JOB_ID:?}" "${CH_LIMIT:?}"
 manifest="${SCRATCH_ROOT}/ch_cache/ch-${CH_LIMIT}-${CH_CACHE_JOB_ID}/manifest.json"
+summary="${SCRATCH_ROOT}/ch_cache/ch-${CH_LIMIT}-${CH_CACHE_JOB_ID}/cache-summary.json"
 test -f "${manifest}"
-python3 - "${manifest}" <<'PY'
+test -f "${summary}"
+python3 - "${manifest}" "${summary}" <<'PY'
 import json, sys
 from opsd_research.ch_dossier import accepted_teacher_dossiers
 
 path = sys.argv[1]
 payload = json.load(open(path, encoding="utf-8"))
+summary = json.load(open(sys.argv[2], encoding="utf-8"))
 accepted = accepted_teacher_dossiers(path)
 rate = len(accepted) / int(payload["requested_examples"])
 print(json.dumps({"event": "ch_cache_gate", "accepted": len(accepted),
                   "requested": payload["requested_examples"],
-                  "acceptance_rate": rate}, sort_keys=True))
+                  "acceptance_rate": rate,
+                  "third_attempt_unique_recovery_rate":
+                      summary["third_attempt_unique_recovery_rate"],
+                  "total_generation_tokens":
+                      summary["total_generation_tokens"]}, sort_keys=True))
 if rate < 0.95:
     raise SystemExit("CH cache acceptance rate is below the 95% coverage gate")
 PY

@@ -8,6 +8,7 @@ from opsd_research.ch_cache import (
 )
 from opsd_research.ch_dossier import accepted_teacher_dossiers
 from opsd_research.merge_ch_cache import merge_ch_cache_shards
+from opsd_research.summarize_ch_cache import summarize_ch_records
 
 
 def test_blind_student_prompt_has_no_reference_or_answer_context() -> None:
@@ -145,3 +146,36 @@ def test_four_complete_shards_merge_into_a_verified_manifest(tmp_path) -> None:
     assert accepted_teacher_dossiers(manifest) == {
         index: f"dossier-{index}" for index in range(4)
     }
+
+
+def test_cache_summary_measures_third_attempt_unique_recovery() -> None:
+    records = [
+        {
+            "accepted": True,
+            "blind_attempt_count": 3,
+            "blind_attempts": [
+                "wrong \\boxed{1}", "wrong \\boxed{2}", "right \\boxed{7}"
+            ],
+            "reference_answer": "7",
+            "blind_attempt_output_tokens": [10, 11, 12],
+            "audit_output_tokens": 20,
+        },
+        {
+            "accepted": True,
+            "blind_attempt_count": 3,
+            "blind_attempts": [
+                "right \\boxed{5}", "also right \\boxed{5}", "wrong \\boxed{4}"
+            ],
+            "reference_answer": "5",
+            "blind_attempt_output_tokens": [13, 14, 15],
+            "audit_output_tokens": 21,
+        },
+    ]
+
+    summary = summarize_ch_records(records)
+
+    assert summary["accepted_examples"] == 2
+    assert summary["third_attempt_unique_recoveries"] == 1
+    assert summary["third_attempt_unique_recovery_rate"] == 0.5
+    assert summary["correct_rate_by_attempt"] == [0.5, 0.5, 0.5]
+    assert summary["total_generation_tokens"] == 116
