@@ -2,7 +2,9 @@ import hashlib
 import json
 from pathlib import Path
 
-from opsd_research.graf_scaffold_dataset import accepted_scaffolds
+import pytest
+
+from opsd_research.graf_scaffold_dataset import accepted_scaffolds, select_scaffolds
 
 
 def test_loads_only_verified_accepted_graphs(tmp_path: Path) -> None:
@@ -37,3 +39,12 @@ def test_loads_only_verified_accepted_graphs(tmp_path: Path) -> None:
     scaffolds = accepted_scaffolds(manifest)
     assert list(scaffolds) == [4]
     assert "factor symbolically" in scaffolds[4]
+
+
+def test_select_scaffolds_is_exact_and_rejects_unverified_indices() -> None:
+    scaffolds = {7: "seven", 2: "two", 5: "five"}
+    assert select_scaffolds(scaffolds, [7, 2]) == {2: "two", 7: "seven"}
+    with pytest.raises(ValueError, match="not accepted graph rows"):
+        select_scaffolds(scaffolds, [9])
+    with pytest.raises(ValueError, match="must not be empty"):
+        select_scaffolds(scaffolds, [])

@@ -90,14 +90,18 @@ def main() -> None:
         raw_viability_manifest = os.environ.get("GRAF_VIABILITY_MANIFEST")
         if not raw_viability_manifest:
             raise SystemExit("viability-routed candidates require GRAF_VIABILITY_MANIFEST")
-        records = install_graph_scaffold_dataset_redirect(
-            os.environ["GRAF_GRAPH_CACHE_MANIFEST"]
-        )
         routed_targets = load_routing_targets(
             os.environ["GRAF_GRAPH_CACHE_MANIFEST"], raw_viability_manifest
         )
         if not routed_targets:
             raise SystemExit("viability-routed candidates require at least one joined target")
+        # Train only on identities with measured continuation viability.  This
+        # makes every distributed batch exercise the GRAF loss instead of
+        # silently reducing it to a shuffle-dependent sparse regularizer.
+        records = install_graph_scaffold_dataset_redirect(
+            os.environ["GRAF_GRAPH_CACHE_MANIFEST"],
+            source_indices=routed_targets.keys(),
+        )
         print(
             '{"event":"graf_viability_routing_enabled",'
             f'"accepted_graph_records":{records},'

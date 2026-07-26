@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from collections.abc import Collection
 from typing import Any
 
 from .graf_cache import validate_graph_cache_manifest
@@ -52,9 +53,39 @@ def accepted_scaffolds(manifest_path: str | Path) -> dict[int, str]:
     return scaffolds
 
 
-def install_graph_scaffold_dataset_redirect(manifest_path: str | Path) -> int:
-    """Replace upstream's hard-coded dataset with accepted graph-scaffold rows."""
-    scaffolds = accepted_scaffolds(manifest_path)
+def select_scaffolds(
+    scaffolds: dict[int, str], source_indices: Collection[int] | None
+) -> dict[int, str]:
+    """Return a deterministic, validated subset of immutable graph rows."""
+    if source_indices is None:
+        return scaffolds
+    selected = {int(index) for index in source_indices}
+    unknown = selected.difference(scaffolds)
+    if unknown:
+        raise ValueError(
+            "requested GRAF source indices are not accepted graph rows: "
+            f"{sorted(unknown)[:5]}"
+        )
+    if not selected:
+        raise ValueError("GRAF source-index selection must not be empty")
+    return {index: scaffolds[index] for index in sorted(selected)}
+
+
+def install_graph_scaffold_dataset_redirect(
+    manifest_path: str | Path,
+    *,
+    source_indices: Collection[int] | None = None,
+) -> int:
+    """Replace upstream's hard-coded dataset with verified graph-scaffold rows.
+
+    ``source_indices`` is deliberately an immutable cache identity rather than
+    a sampling hint.  A viability-routed run must use exactly the rows for
+    which it has independently measured targets: otherwise many updates carry
+    no routed branch signal and the effective objective weight depends on the
+    data-loader shuffle.  Scaffold-only candidates retain the full accepted
+    graph set by leaving this argument unset.
+    """
+    scaffolds = select_scaffolds(accepted_scaffolds(manifest_path), source_indices)
     import datasets
 
     original_load_dataset = datasets.load_dataset
