@@ -12,66 +12,8 @@ from opsd_research.ch_dossier_dataset import (
 )
 from opsd_research.ch_dossier import (
     accepted_teacher_dossiers,
-    parse_audit,
-    render_teacher_dossier,
     select_teacher_dossiers,
 )
-
-
-def test_audited_blind_attempts_become_privileged_teacher_context() -> None:
-    audit = parse_audit(
-        {
-            "attempts": [
-                {
-                    "attempt_index": 0,
-                    "verdict": "incorrect",
-                    "method": "factor the polynomial",
-                    "first_error": "discarded a valid root",
-                    "valid_insights": ["the initial factorization is useful"],
-                    "missing_checks": ["substitute every candidate"],
-                },
-                {
-                    "attempt_index": 1,
-                    "verdict": "partial",
-                    "method": "use the discriminant",
-                    "first_error": "did not enforce the domain",
-                    "valid_insights": ["identified the relevant parameter range"],
-                    "missing_checks": ["check endpoint cases"],
-                },
-                {
-                    "attempt_index": 2,
-                    "verdict": "correct",
-                    "method": "factor and verify",
-                    "first_error": None,
-                    "valid_insights": ["verified both roots"],
-                    "missing_checks": [],
-                },
-            ],
-            "best_attempt_index": 2,
-            "shared_failure_mode": "The weaker attempts skipped final verification.",
-            "corrected_method": [
-                "factor exactly",
-                "retain every domain-valid candidate",
-                "substitute candidates into the original equation",
-            ],
-            "verification_checks": ["confirm the original equation and domain"],
-        },
-        expected_attempts=3,
-    )
-
-    rendered = render_teacher_dossier(
-        problem="Solve the equation.",
-        reference_solution="A verified derivation ending in \\boxed{7}.",
-        reference_answer="7",
-        blind_attempts=("attempt zero", "attempt one", "attempt two"),
-        audit=audit,
-    )
-
-    assert "Verified answer: 7" in rendered
-    assert "A verified derivation ending in \\boxed{7}." in rendered
-    assert "Attempt 2 [correct]" in rendered
-    assert "attempt zero" in rendered
-    assert "The student never receives this dossier" in rendered
 
 
 def test_only_hash_verified_accepted_dossiers_are_loaded(tmp_path: Path) -> None:
@@ -89,7 +31,7 @@ def test_only_hash_verified_accepted_dossiers_are_loaded(tmp_path: Path) -> None
         "accepted": False,
         "example_index": 12,
         "problem_sha256": "other-hash",
-        "rejection_reason": "auditor JSON was invalid",
+        "rejection_reason": "auditor response was empty",
     }
     cache.write_text(
         json.dumps(accepted) + "\n" + json.dumps(rejected) + "\n",

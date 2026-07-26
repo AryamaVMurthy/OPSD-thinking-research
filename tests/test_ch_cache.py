@@ -3,7 +3,6 @@ import json
 from opsd_research.ch_cache import (
     auditor_prompt,
     blind_student_prompt,
-    build_dossier_record,
     build_dynamic_dossier_record,
 )
 from opsd_research.ch_dossier import accepted_teacher_dossiers
@@ -28,46 +27,10 @@ def test_privileged_auditor_requests_free_form_comparison() -> None:
     )
     assert "Verified answer: 7" in prompt
     assert "Verified work gives \\boxed{7}." in prompt
-    assert "Blind attempt 0: first" in prompt
-    assert "Blind attempt 2: third" in prompt
+    assert "Blind attempt 1: first" in prompt
+    assert "Blind attempt 3: third" in prompt
     assert "Write naturally" in prompt
     assert "Return only one JSON" not in prompt
-
-
-def test_valid_audit_becomes_one_traceable_teacher_dossier() -> None:
-    record = build_dossier_record(
-        example_index=7,
-        problem="Find the integer.",
-        reference_solution="Verified work gives \\boxed{7}.",
-        blind_attempts=("first", "second", "third"),
-        audit_payload={
-            "attempts": [
-                {
-                    "attempt_index": index,
-                    "verdict": "correct" if index == 2 else "incorrect",
-                    "method": f"method {index}",
-                    "first_error": None if index == 2 else f"error {index}",
-                    "valid_insights": [],
-                    "missing_checks": [] if index == 2 else ["verify"],
-                }
-                for index in range(3)
-            ],
-            "best_attempt_index": 2,
-            "shared_failure_mode": "the first two attempts skipped verification",
-            "corrected_method": ["derive", "verify"],
-            "verification_checks": ["substitute the result"],
-        },
-        builder_seed=42,
-    )
-
-    assert record["accepted"] is True
-    assert record["example_index"] == 7
-    assert record["reference_answer"] == "7"
-    assert record["blind_attempt_count"] == 3
-    assert record["blind_attempts"] == ["first", "second", "third"]
-    assert "Verified answer: 7" in record["teacher_dossier"]
-
-
 def test_natural_audit_preserves_a_training_example_without_schema_parsing() -> None:
     audit = (
         "The first attempt uses factoring but loses a root, so it is wrong. "
