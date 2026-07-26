@@ -57,3 +57,23 @@ class GrafGraphTests(unittest.TestCase):
         self.assertIn("Factor the symbolic expression.", scaffold)
         self.assertNotIn("7", scaffold)
         self.assertNotIn("\\boxed", scaffold)
+
+    def test_graph_allows_variable_arity_but_enforces_total_budget(self):
+        payload = self.payload()
+        payload["forks"][0]["actions"].append({
+            "action_id": "substitute",
+            "description": "Substitute into a reduced relation.",
+            "status": "recoverable",
+            "validation_test": "Check every original constraint.",
+            "recovery_action": "Return to the original constraint system.",
+        })
+        graph = parse_answer_masked_graph(
+            payload, problem="Solve x.", reference_solution="Therefore \\boxed{7}.",
+            max_actions_per_fork=5, graph_budget=4,
+        )
+        self.assertEqual(len(graph.forks[0].actions), 4)
+        with self.assertRaisesRegex(ValueError, "graph_budget"):
+            parse_answer_masked_graph(
+                payload, problem="Solve x.", reference_solution="Therefore \\boxed{7}.",
+                max_actions_per_fork=5, graph_budget=3,
+            )
