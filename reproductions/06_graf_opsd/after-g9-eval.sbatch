@@ -39,5 +39,22 @@ if [[ "${promote}" == 1 ]]; then
  echo "g9_full_confirmation_job=${full}"
  sbatch --parsable --dependency="afterok:${full}" --export="ALL,FULL_JOB_ID=${full},CANDIDATE_ID=g9-recovery-conditioned,METHOD=graf-recovery-conditioned" reproductions/06_graf_opsd/after-promoted-full-train.sbatch
 else
- echo "G9 did not improve AIME24 Avg@12; retain its recovery protocol artifacts for the next measured intervention."
+ python3 -m opsd_research.graf_autoresearch register \
+   --policy reproductions/06_graf_opsd/configs/autoresearch.yaml \
+   --config reproductions/06_graf_opsd/configs/g10-teacher-critique.yaml \
+   --ledger artifacts/graf_opsd/candidate-ledger.jsonl \
+   --candidate-id g10-teacher-critique --parent-id g9-recovery-conditioned --stage G10 \
+   --hypothesis "Ask a privileged teacher to criticize and revise each graph before student-context viability measurement, then distill the dynamically routed revised action distribution." \
+   --changed-field teacher_graph_critique
+ g10_cache="$(GRAPH_LIMIT=512 GRAPH_ATTEMPTS=3 GRAPH_TEACHER_CRITIQUE=1 sbatch --parsable reproductions/06_graf_opsd/build-graph-cache.sbatch)"
+ echo "g10_teacher_critique_cache_job=${g10_cache}"
+ g10_viability="$(sbatch --parsable --dependency="afterok:${g10_cache}" --array=0-7%4 --export="ALL,CACHE_BUILD_JOB_ID=${g10_cache},G2_SHARD_COUNT=8,VIABILITY_CACHE_LABEL=g10-critique-viability" reproductions/06_graf_opsd/build-g2-viability-shard.sbatch)"
+ echo "g10_viability_array_job=${g10_viability}"
+ g10_merge="$(sbatch --parsable --dependency="afterok:${g10_viability}" --export="ALL,CACHE_BUILD_JOB_ID=${g10_cache},G2_VIABILITY_ARRAY_JOB_ID=${g10_viability},G2_SHARD_COUNT=8,VIABILITY_CACHE_LABEL=g10-critique-viability" reproductions/06_graf_opsd/merge-g2-viability.sbatch)"
+ echo "g10_viability_merge_job=${g10_merge}"
+ graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${g10_cache}/manifest.json"
+ viability_manifest="${SCRATCH_ROOT}/graf_cache/g10-critique-viability-${g10_viability}/manifest.json"
+ g10_smoke="$(GRAF_GRAPH_CACHE_MANIFEST="${graph_manifest}" GRAF_VIABILITY_MANIFEST="${viability_manifest}" GRAF_CANDIDATE_ID=g10-teacher-critique GRAF_CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/g10-teacher-critique.yaml GRAF_MAX_STEPS=5 GRAF_PORT=12984 sbatch --parsable --dependency="afterok:${g10_merge}" reproductions/06_graf_opsd/run-routed-candidate.sbatch)"
+ echo "g10_smoke_job=${g10_smoke}"
+ sbatch --parsable --dependency="afterok:${g10_smoke}" --export="ALL,G10_CACHE_BUILD_JOB_ID=${g10_cache},G10_VIABILITY_ARRAY_JOB_ID=${g10_viability},G10_SMOKE_JOB_ID=${g10_smoke}" reproductions/06_graf_opsd/after-g10-smoke.sbatch
 fi
