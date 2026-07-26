@@ -24,6 +24,17 @@ log="${PROJECT_SOURCE}/logs/graf-g2-smoke-${G2_SMOKE_JOB_ID}.out"
 test -f "${summary}"
 grep -F '"event":"graf_routed_branch_loss_enabled"' "${log}" >/dev/null
 grep -F '"event":"graf_branch_loss"' "${log}" >/dev/null
+python3 - "${log}" <<'PY'
+import json
+import sys
+
+active = []
+for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    if '"event":"graf_branch_loss"' in line:
+        active.append(float(json.loads(line[line.index("{"):])['active_forks']))
+if not active or max(active) <= 0:
+    raise SystemExit("G2 smoke never activated a routed branch target")
+PY
 python3 - "${summary}" <<'PY'
 import json
 import math
