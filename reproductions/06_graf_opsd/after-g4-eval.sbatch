@@ -38,14 +38,14 @@ if [[ "${promote}" == 1 ]]; then
 else
   python3 -m opsd_research.graf_autoresearch register \
     --policy reproductions/06_graf_opsd/configs/autoresearch.yaml \
-    --config reproductions/06_graf_opsd/configs/g5-differential-routing.yaml \
+    --config reproductions/06_graf_opsd/configs/g6-information-routed.yaml \
     --ledger artifacts/graf_opsd/candidate-ledger.jsonl \
-    --candidate-id g5-differential-routing --parent-id g2-viability-routed-2048 --stage G5 \
-    --hypothesis "Apply GRAF only to frozen branch targets with a meaningful empirical action preference while retaining base OPSD on all examples." \
-    --changed-field fork_threshold
+    --candidate-id g6-information-routed --parent-id g4-viability-long-4096 --stage G6 \
+    --hypothesis "Route every action distribution with adaptive information content, retaining multiple viable and invalid alternatives without a fixed action-count or preference-margin rule." \
+    --changed-field fork_information_quantile
   graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
   viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
-  g5_smoke="$(GRAF_GRAPH_CACHE_MANIFEST="${graph_manifest}" GRAF_VIABILITY_MANIFEST="${viability_manifest}" GRAF_CANDIDATE_ID=g5-differential-routing GRAF_CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/g5-differential-routing.yaml GRAF_MAX_STEPS=5 GRAF_PORT=12978 sbatch --parsable reproductions/06_graf_opsd/run-routed-candidate.sbatch)"
-  echo "g5_smoke_job=${g5_smoke}"
-  sbatch --parsable --dependency="afterok:${g5_smoke}" --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G2_VIABILITY_ARRAY_JOB_ID=${G2_VIABILITY_ARRAY_JOB_ID},G5_SMOKE_JOB_ID=${g5_smoke}" reproductions/06_graf_opsd/after-g5-smoke.sbatch
+  g6_smoke="$(GRAF_GRAPH_CACHE_MANIFEST="${graph_manifest}" GRAF_VIABILITY_MANIFEST="${viability_manifest}" GRAF_CANDIDATE_ID=g6-information-routed GRAF_CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/g6-information-routed.yaml GRAF_MAX_STEPS=5 GRAF_PORT=12980 sbatch --parsable reproductions/06_graf_opsd/run-routed-candidate.sbatch)"
+  echo "g6_smoke_job=${g6_smoke}"
+  sbatch --parsable --dependency="afterok:${g6_smoke}" --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G2_VIABILITY_ARRAY_JOB_ID=${G2_VIABILITY_ARRAY_JOB_ID},G6_SMOKE_JOB_ID=${g6_smoke}" reproductions/06_graf_opsd/after-g6-smoke.sbatch
 fi
