@@ -88,6 +88,28 @@ class ChunkedJSDTests(unittest.TestCase):
                 chunk_size=2,
             )
 
+    def test_low_precision_inputs_are_reduced_in_fp32(self):
+        """Near-identical BF16 distributions must not acquire a negative KL."""
+        generator = torch.Generator().manual_seed(11)
+        teacher = torch.randn(1, 3, 257, generator=generator, dtype=torch.float32)
+        # This is representative of an early LoRA update: distinguishable in
+        # FP32, but vulnerable to cancellation if the KL reduction is BF16.
+        student = (teacher + 0.003 * torch.randn(
+            1, 3, 257, generator=generator, dtype=torch.float32
+        )).to(torch.bfloat16).requires_grad_(True)
+        labels = torch.ones(1, 3, dtype=torch.long)
+        result = exact_forward_kl_vocab_chunked(
+            student,
+            teacher.to(torch.bfloat16),
+            labels,
+            beta=0,
+            chunk_size=31,
+        )
+        self.assertEqual(result.dtype, torch.float32)
+        self.assertGreaterEqual(float(result.detach()), 0.0)
+        result.backward()
+        self.assertTrue(torch.isfinite(student.grad).all())
+
 
 if __name__ == "__main__":
     unittest.main()

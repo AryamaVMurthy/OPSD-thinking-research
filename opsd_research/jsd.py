@@ -42,8 +42,16 @@ def exact_forward_kl_vocab_chunked(
     if student_logits.ndim != 3:
         raise ValueError("expected logits shaped [batch, sequence, vocabulary]")
 
-    student_scaled = student_logits / temperature
-    teacher_scaled = teacher_logits / temperature
+    # A KL between the frozen base model and a freshly initialized LoRA model
+    # is very small.  Performing ``p * (log p - log q)`` and its vocabulary
+    # reduction in BF16 then suffers catastrophic cancellation: in practice
+    # it can round a non-negative KL to zero (or even a small negative value).
+    # Keep model activations in their requested dtype, but promote only this
+    # numerically sensitive reduction to FP32.  Retain FP64 for reference
+    # tests and callers that intentionally supplied it.
+    work_dtype = torch.float64 if student_logits.dtype == torch.float64 else torch.float32
+    student_scaled = student_logits.to(work_dtype) / temperature
+    teacher_scaled = teacher_logits.to(work_dtype) / temperature
     student_log_normalizer = torch.logsumexp(
         student_scaled, dim=-1, keepdim=True
     )
@@ -64,7 +72,7 @@ def exact_forward_kl_vocab_chunked(
     else:
         denominator = student_logits.new_tensor(student_logits.shape[0])
 
-    total = student_logits.new_zeros(())
+    total = student_scaled.new_zeros(())
     vocabulary_size = student_logits.shape[-1]
     for start in range(0, vocabulary_size, chunk_size):
         stop = min(start + chunk_size, vocabulary_size)
