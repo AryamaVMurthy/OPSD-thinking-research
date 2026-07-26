@@ -34,4 +34,7 @@ graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.jso
 viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
 pilot="$(GRAF_GRAPH_CACHE_MANIFEST="${graph_manifest}" GRAF_VIABILITY_MANIFEST="${viability_manifest}" sbatch --parsable reproductions/06_graf_opsd/g4-pilot.sbatch)"
 echo "g4_pilot_job=${pilot}"
+monitor_stem="${PROJECT_SOURCE}/logs/graf-g4-pilot-${pilot}.live"
+monitor="$(sbatch --parsable --dependency="after:${pilot}" --export="ALL,MONITOR_JOB_ID=${pilot},MONITOR_LOG=${PROJECT_SOURCE}/logs/graf-g4-pilot-${pilot}.out,MONITOR_MAX_COMPLETION_LENGTH=4096,MONITOR_REPORT_STEM=${monitor_stem}" reproductions/06_graf_opsd/monitor-live-training.sbatch)"
+echo "g4_pilot_monitor_job=${monitor}"
 sbatch --parsable --dependency="afterok:${pilot}" --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G2_VIABILITY_ARRAY_JOB_ID=${G2_VIABILITY_ARRAY_JOB_ID},G4_PILOT_JOB_ID=${pilot}" reproductions/06_graf_opsd/after-g4-pilot.sbatch
