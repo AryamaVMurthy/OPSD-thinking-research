@@ -14,7 +14,10 @@ _ROLLOUT = re.compile(
     r"vLLM generation done - elapsed time: (?P<seconds>[0-9.]+)s, prompts: "
     r"(?P<prompts>\d+), total tokens: (?P<tokens>\d+)"
 )
-_PROGRESS = re.compile(r"(?P<step>\d+)/(?:\d+)")
+# Dataset preprocessing has its own ``19428/19428 ... examples/s`` bar.  A
+# trainer update bar carries an iteration duration, so only that form is a
+# valid observed optimizer step.
+_PROGRESS = re.compile(r"(?P<step>\d+)/(?:\d+)\s+\[[^\]]*s/it\]")
 
 
 def _finite_number(value: object) -> float | None:
