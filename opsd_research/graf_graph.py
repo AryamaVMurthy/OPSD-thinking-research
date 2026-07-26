@@ -136,39 +136,7 @@ def parse_answer_masked_graph(
 
     Redaction would leave unknown semantic leakage in a target.  A failed graph
     is rebuilt with a new builder seed and recorded as rejected by the cache.
-"""
-
-
-def graph_critic_prompt(
-    problem: str, reference_solution: str, candidate_graph: dict[str, Any], *, graph_budget: int = 24
-) -> str:
-    """Ask the privileged cache builder to revise, not merely format, a graph.
-
-    The reference is available only in this offline call.  The returned graph
-    is subsequently subjected to the ordinary answer-masking and reference
-    fragment checks before it can enter the immutable cache.
     """
-    return f"""You are auditing a proposed strategy graph for a math problem.
-You may use the reference solution only to detect omitted cases, invalid
-assumptions, weak checks, and ineffective recovery actions. Return a revised
-graph that improves the plan, but never include a final answer, numerical
-result, or wording copied from the reference.
-
-Problem:
-{problem}
-
-Reference solution (private; do not copy it into JSON):
-{reference_solution}
-
-Candidate answer-masked graph:
-{json.dumps(candidate_graph, ensure_ascii=False, sort_keys=True)}
-
-Return JSON with only `forks`. Each fork has `fork_id`, `state`, and a variable
-number of actions within a total action budget of {graph_budget}. Each action
-has `action_id`, `description`, `status`, `validation_test`, and
-`recovery_action`. Status is one of viable, conditionally_viable, risky,
-invalid, dead_end. Preserve multiple genuinely useful approaches; do not
-invent a fixed number of actions or statuses. JSON only."""
     if not isinstance(payload.get("forks"), list) or not payload["forks"]:
         raise ValueError("graph requires a nonempty forks list")
     if len(payload["forks"]) > max_forks:
@@ -228,6 +196,38 @@ invent a fixed number of actions or statuses. JSON only."""
         problem_sha256=hashlib.sha256(problem.encode("utf-8")).hexdigest(),
         forks=tuple(forks),
     )
+
+
+def graph_critic_prompt(
+    problem: str, reference_solution: str, candidate_graph: dict[str, Any], *, graph_budget: int = 24
+) -> str:
+    """Ask the privileged cache builder to revise, not merely format, a graph.
+
+    The reference is available only in this offline call. The returned graph is
+    subsequently subjected to the ordinary answer-masking and reference-fragment
+    checks before it can enter the immutable cache.
+    """
+    return f"""You are auditing a proposed strategy graph for a math problem.
+You may use the reference solution only to detect omitted cases, invalid
+assumptions, weak checks, and ineffective recovery actions. Return a revised
+graph that improves the plan, but never include a final answer, numerical
+result, or wording copied from the reference.
+
+Problem:
+{problem}
+
+Reference solution (private; do not copy it into JSON):
+{reference_solution}
+
+Candidate answer-masked graph:
+{json.dumps(candidate_graph, ensure_ascii=False, sort_keys=True)}
+
+Return JSON with only `forks`. Each fork has `fork_id`, `state`, and a variable
+number of actions within a total action budget of {graph_budget}. Each action
+has `action_id`, `description`, `status`, `validation_test`, and
+`recovery_action`. Status is one of viable, conditionally_viable, risky,
+invalid, dead_end. Preserve multiple genuinely useful approaches; do not
+invent a fixed number of actions or statuses. JSON only."""
 
 
 def branch_target(
