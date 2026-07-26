@@ -17,6 +17,7 @@ cd "${PROJECT_SOURCE}"
 baseline="${RESULTS_ROOT}/graf-aime24-base-20260726"; treatment="${RESULTS_ROOT}/${G4_EVAL_RUN}"
 test -f "${baseline}/summary.json"; test -f "${treatment}/summary.json"
 python3 -m opsd_research.compare_math --baseline-input "${baseline}"/generations.shard*.jsonl --baseline-grades "${baseline}/official-grades.jsonl" --treatment-input "${treatment}"/generations.shard*.jsonl --treatment-grades "${treatment}/official-grades.jsonl" --samples-per-problem 12 --output "${treatment}/paired-vs-base.json"
+python3 -m opsd_research.graf_development_report --comparison "${treatment}/paired-vs-base.json" --candidate-id g4-graph-backtrack-entropy-4096 --output "${treatment}/development-report.md"
 python3 - "${treatment}/paired-vs-base.json" artifacts/graf_opsd/candidate-ledger.jsonl <<'PY'
 import json, sys
 from pathlib import Path
