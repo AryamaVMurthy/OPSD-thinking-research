@@ -46,6 +46,19 @@ class ConfigTests(unittest.TestCase):
 
         validate_config(changed)
 
+    def test_math_development_full_context_keeps_four_long_samples(self):
+        data = load_config(
+            ROOT
+            / "reproductions/06_graf_opsd/configs/qwen3-4b-aime24-dev.yaml"
+        ).data
+        changed = copy.deepcopy(data)
+        changed.update(
+            evaluation_protocol="development_full_context",
+            samples_per_problem=4,
+        )
+
+        validate_config(changed)
+
     def test_thinking_off_is_rejected(self):
         data = load_config(
             ROOT / "reproductions/03_opsd_thinking_1p7b/configs/train.yaml"

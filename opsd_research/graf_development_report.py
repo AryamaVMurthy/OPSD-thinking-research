@@ -43,6 +43,7 @@ def render(comparison: dict[str, Any], *, candidate_id: str) -> str:
         f"- Model: `{comparison['model']}`",
         f"- Protocol: `{comparison['comparison_protocol']}`",
         f"- Evaluation tier: `{evaluation_protocol}`",
+        f"- Sample subset: `{comparison.get('sample_subset_protocol', 'exact-run-v1')}`",
         f"- Paired problems / samples per problem: `{comparison['num_problems']}` / `{comparison['samples_per_problem']}`", "",
         f"## {result_heading}", "",
         "| Metric | Baseline | Candidate | Delta | Paired bootstrap 95% CI |",

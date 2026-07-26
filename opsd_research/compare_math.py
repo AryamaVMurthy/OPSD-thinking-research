@@ -109,8 +109,30 @@ def compare_paired_math(
     *,
     samples_per_problem: int,
     bootstrap_samples: int = 5000,
+    take_first_samples: bool = False,
 ) -> dict[str, Any]:
     """Compare two official-scored math runs using paired problem clusters."""
+    if take_first_samples:
+        baseline_records = [
+            record
+            for record in baseline_records
+            if int(record["sample_index"]) < samples_per_problem
+        ]
+        baseline_grades = [
+            grade
+            for grade in baseline_grades
+            if int(grade["sample_index"]) < samples_per_problem
+        ]
+        treatment_records = [
+            record
+            for record in treatment_records
+            if int(record["sample_index"]) < samples_per_problem
+        ]
+        treatment_grades = [
+            grade
+            for grade in treatment_grades
+            if int(grade["sample_index"]) < samples_per_problem
+        ]
     baseline = apply_official_grades(baseline_records, baseline_grades)
     treatment = apply_official_grades(treatment_records, treatment_grades)
     baseline_by_key = {_pair_key(record): record for record in baseline}
@@ -167,6 +189,9 @@ def compare_paired_math(
         "evaluation_protocol": (
             "official" if samples_per_problem == 12 else "development"
         ),
+        "sample_subset_protocol": (
+            "first-n-paired-samples-v1" if take_first_samples else "exact-run-v1"
+        ),
         "pairing_verified": True,
         "model": first_baseline["model"],
         "benchmark": first_baseline["benchmark"],
@@ -207,6 +232,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--treatment-grades", required=True, type=Path)
     parser.add_argument("--samples-per-problem", required=True, type=int)
     parser.add_argument("--bootstrap-samples", type=int, default=5000)
+    parser.add_argument("--take-first-samples", action="store_true")
     parser.add_argument("--output", required=True, type=Path)
     return parser.parse_args()
 
@@ -228,6 +254,7 @@ def main() -> None:
         read_jsonl(args.treatment_grades),
         samples_per_problem=args.samples_per_problem,
         bootstrap_samples=args.bootstrap_samples,
+        take_first_samples=args.take_first_samples,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(

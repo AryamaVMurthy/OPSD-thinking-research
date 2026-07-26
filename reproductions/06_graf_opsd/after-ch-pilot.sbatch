@@ -31,9 +31,9 @@ if any(not math.isfinite(float(row["loss"])) or
     raise SystemExit("CH pilot optimization is non-finite")
 PY
 
-eval_run="ch0-contrastive-hindsight-2048-25-aime24-screen-${CH_PILOT_JOB_ID}"
+eval_run="ch0-contrastive-hindsight-2048-25-aime24-full-context-screen-${CH_PILOT_JOB_ID}"
 eval_job="$(
-  CONFIG=reproductions/06_graf_opsd/configs/qwen3-4b-aime24-screen.yaml \
+  CONFIG=reproductions/06_graf_opsd/configs/qwen3-4b-aime24-full-context-screen.yaml \
   EVAL_MODULE=math_eval \
   RUN_NAME="${eval_run}" \
   METHOD=ch0-contrastive-hindsight-2048 \

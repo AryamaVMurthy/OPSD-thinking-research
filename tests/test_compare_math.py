@@ -80,3 +80,25 @@ def test_paired_math_comparison_reports_problem_clustered_deltas() -> None:
     }
     assert comparison["pairing_verified"] is True
     assert comparison["evaluation_protocol"] == "development"
+
+
+def test_explicit_prefix_subset_reuses_first_samples_from_larger_run() -> None:
+    baseline_records, baseline_grades = _run(
+        "untouched", "none", [[True, False]]
+    )
+    treatment_records, treatment_grades = _run(
+        "trained", "50", [[True, False, True, True]]
+    )
+
+    comparison = compare_paired_math(
+        baseline_records,
+        baseline_grades,
+        treatment_records,
+        treatment_grades,
+        samples_per_problem=2,
+        bootstrap_samples=100,
+        take_first_samples=True,
+    )
+
+    assert comparison["pairing_verified"] is True
+    assert comparison["sample_subset_protocol"] == "first-n-paired-samples-v1"
