@@ -117,9 +117,12 @@ def build_dynamic_dossier_record(
     """Build one free-form CH record without schema-based example rejection."""
     if example_index < 0:
         raise ValueError("example_index must be nonnegative")
-    reference_answer = extract_last_boxed(reference_solution)
-    if reference_answer is None:
-        raise ValueError("reference solution has no boxed answer")
+    if not reference_solution.strip():
+        raise ValueError("reference solution must be nonempty")
+    reference_answer = (
+        extract_last_boxed(reference_solution)
+        or "Established by the trusted reference reasoning"
+    )
     audit = audit_text.strip()
     dossier = render_dynamic_teacher_dossier(
         problem=problem,

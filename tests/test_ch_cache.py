@@ -89,6 +89,21 @@ def test_natural_audit_preserves_a_training_example_without_schema_parsing() -> 
     assert audit in record["teacher_dossier"]
 
 
+def test_dynamic_dossier_preserves_reference_without_boxed_formatting() -> None:
+    record = build_dynamic_dossier_record(
+        example_index=9,
+        problem="Find the value.",
+        reference_solution="A trusted derivation concludes that the value is 7.",
+        blind_attempts=("attempt one", "attempt two"),
+        audit_text="Attempt one is wrong; attempt two follows the trusted derivation.",
+        builder_seed=42,
+    )
+
+    assert record["accepted"] is True
+    assert record["reference_answer"] == "Established by the trusted reference reasoning"
+    assert "trusted derivation concludes" in record["teacher_dossier"]
+
+
 def test_four_complete_shards_merge_into_a_verified_manifest(tmp_path) -> None:
     shards = []
     for shard_id in range(4):

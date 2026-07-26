@@ -128,7 +128,7 @@ def main() -> None:
     for index in source_indices:
         problem = str(rows[index]["question"])
         reference = str(rows[index]["response"])
-        if extract_last_boxed(reference) is None:
+        if not problem.strip() or not reference.strip():
             records[index] = _rejected_record(
                 index=index,
                 problem=problem,
@@ -136,7 +136,7 @@ def main() -> None:
                 blind_attempts=args.blind_attempts,
                 shard_id=args.shard_id,
                 num_shards=args.num_shards,
-                reason="reference solution has no boxed answer",
+                reason="source problem or reference solution is empty",
             )
             continue
         try:
@@ -206,7 +206,10 @@ def main() -> None:
                     auditor_prompt(
                         problem=problem,
                         reference_solution=reference,
-                        reference_answer=str(extract_last_boxed(reference)),
+                        reference_answer=(
+                            extract_last_boxed(reference)
+                            or "Established by the trusted reference reasoning"
+                        ),
                         attempts=attempts,
                     ),
                     enable_thinking=False,
