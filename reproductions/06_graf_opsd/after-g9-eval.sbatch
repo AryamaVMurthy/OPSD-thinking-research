@@ -14,7 +14,12 @@ source "${HOME}/OPSD-thinking-research/infra/turing/common.sh"
 cd "${PROJECT_SOURCE}"
 : "${CACHE_BUILD_JOB_ID:?}" "${G9_VIABILITY_ARRAY_JOB_ID:?}" "${G9_EVAL_RUN:?}"
 treatment="${RESULTS_ROOT}/${G9_EVAL_RUN}"; baseline="${RESULTS_ROOT}/graf-aime24-base-20260726"
-python3 -m opsd_research.compare_math --baseline "${baseline}/records.jsonl" --treatment "${treatment}/records.jsonl" --samples-per-problem 12 --output "${treatment}/paired-vs-base.json"
+python3 -m opsd_research.compare_math \
+  --baseline-input "${baseline}"/generations.shard*.jsonl \
+  --baseline-grades "${baseline}/official-grades.jsonl" \
+  --treatment-input "${treatment}"/generations.shard*.jsonl \
+  --treatment-grades "${treatment}/official-grades.jsonl" \
+  --samples-per-problem 12 --output "${treatment}/paired-vs-base.json"
 python3 -m opsd_research.graf_development_report --comparison "${treatment}/paired-vs-base.json" --candidate-id g9-recovery-conditioned --output "${treatment}/development-report.md"
 python3 - "${treatment}/paired-vs-base.json" artifacts/graf_opsd/candidate-ledger.jsonl <<'PY'
 import json,sys
