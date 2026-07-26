@@ -71,6 +71,8 @@ Return JSON with `forks`. Each fork has `fork_id`, `state`, and a variable
 number of genuinely distinct `actions`. Use only as many forks/actions as the
 problem warrants, while staying within a total graph budget of {graph_budget}
 action records. Every retained fork must have at least two alternatives.
+Every fork must retain at least one action whose status is not `invalid` or
+`dead_end`, so it remains a real decision with a possible continuation.
 Each action has `action_id`, `description`, `status`, `validation_test`, and
 `recovery_action`. Status must be one of: viable, conditionally_viable, risky,
 invalid, dead_end, recoverable, redundant.
@@ -103,6 +105,7 @@ variable number of distinct actions within a total budget of {graph_budget}.
 Each action has `action_id`, `description`, `status`,
 `validation_test`, and `recovery_action`. Status must be one of: viable,
 conditionally_viable, risky, invalid, dead_end, recoverable, redundant.
+Every fork must contain at least one status other than invalid or dead_end.
 Do not include a final answer, a boxed expression, a numerical intermediate,
 or any explanation outside the JSON object."""
 
@@ -232,7 +235,8 @@ Return JSON with only `forks`. Each fork has `fork_id`, `state`, and a variable
 number of actions within a total action budget of {graph_budget}. Each action
 has `action_id`, `description`, `status`, `validation_test`, and
 `recovery_action`. Status is one of viable, conditionally_viable, risky,
-invalid, dead_end. Preserve multiple genuinely useful approaches; do not
+invalid, dead_end. Every fork must contain at least one status other than
+invalid or dead_end. Preserve multiple genuinely useful approaches; do not
 invent a fixed number of actions or statuses. JSON only."""
 
 
