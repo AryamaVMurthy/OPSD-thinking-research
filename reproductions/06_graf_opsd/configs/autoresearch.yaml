@@ -33,5 +33,7 @@ allowed_mutations:
   - graph_budget
   - viability_temperature
   - viability_beta_prior
+  - recovery_conditioned_routing
+  - teacher_graph_critique
   - branch_loss_weight
   - entropy_floor_weight
