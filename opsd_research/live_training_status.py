@@ -32,6 +32,7 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8", errors="replace")
     rollouts = []
     losses = []
+    branch_events = []
     observed_step = 0
     for match in _ROLLOUT.finditer(text):
         rollouts.append({
@@ -44,6 +45,26 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
     # HF logs Python dicts, one per rank.  Only accept complete, literal dicts
     # carrying an actual loss to avoid interpreting arbitrary log fragments.
     for line in text.splitlines():
+        branch_start = line.find('{"event":"graf_branch_loss"')
+        if branch_start >= 0:
+            branch_end = line.find("}", branch_start)
+            if branch_end >= 0:
+                try:
+                    event = json.loads(line[branch_start : branch_end + 1])
+                except json.JSONDecodeError:
+                    event = None
+                if isinstance(event, dict):
+                    active = _finite_number(event.get("active_forks"))
+                    branch_kl = _finite_number(event.get("branch_kl"))
+                    entropy_floor = _finite_number(event.get("entropy_floor"))
+                    weighted_loss = _finite_number(event.get("weighted_loss"))
+                    if None not in (active, branch_kl, entropy_floor, weighted_loss):
+                        branch_events.append({
+                            "active_forks": active,
+                            "branch_kl": branch_kl,
+                            "entropy_floor": entropy_floor,
+                            "weighted_loss": weighted_loss,
+                        })
         start = line.find("{'loss':")
         if start < 0:
             continue
@@ -61,6 +82,7 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
     token_total = sum(row["tokens"] for row in rollouts)
     elapsed_total = sum(row["elapsed_seconds"] for row in rollouts)
     capped = sum(row["tokens"] >= max_completion_length for row in rollouts)
+    branch_active = [row for row in branch_events if row["active_forks"] > 0]
     return {
         "schema_version": 1,
         "log": str(path),
@@ -74,6 +96,27 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
             "cap_rate": capped / len(rollouts) if rollouts else None,
             "mean_generation_seconds": elapsed_total / len(rollouts) if rollouts else None,
             "tokens_per_second": token_total / elapsed_total if elapsed_total else None,
+        },
+        "graf_branch": {
+            "updates": len(branch_events),
+            "active_updates": len(branch_active),
+            "active_update_rate": len(branch_active) / len(branch_events) if branch_events else None,
+            "mean_active_forks": (
+                sum(row["active_forks"] for row in branch_events) / len(branch_events)
+                if branch_events else None
+            ),
+            "mean_branch_kl_when_active": (
+                sum(row["branch_kl"] for row in branch_active) / len(branch_active)
+                if branch_active else None
+            ),
+            "mean_entropy_floor_when_active": (
+                sum(row["entropy_floor"] for row in branch_active) / len(branch_active)
+                if branch_active else None
+            ),
+            "mean_weighted_loss_when_active": (
+                sum(row["weighted_loss"] for row in branch_active) / len(branch_active)
+                if branch_active else None
+            ),
         },
     }
 
@@ -89,6 +132,18 @@ def render_markdown(status: dict[str, Any]) -> str:
         f"- Completion cap rate: `{100 * rollouts['cap_rate']:.1f}%` ({rollouts['capped_calls']}/{rollouts['calls']})" if rollouts["cap_rate"] is not None else "- Completion cap rate: `n/a`",
         f"- Generation throughput: `{rollouts['tokens_per_second']:.1f} tokens/s`" if rollouts["tokens_per_second"] is not None else "- Generation throughput: `n/a`",
     ]
+    branch = status["graf_branch"]
+    if branch["updates"]:
+        lines.extend([
+            "",
+            "## GRAF routing activity",
+            "",
+            f"- Branch-active updates: `{100 * branch['active_update_rate']:.1f}%` ({branch['active_updates']}/{branch['updates']})",
+            f"- Mean active forks/update: `{branch['mean_active_forks']:.2f}`",
+            f"- Mean branch KL (active updates): `{branch['mean_branch_kl_when_active']:.6f}`",
+            f"- Mean entropy-floor term (active updates): `{branch['mean_entropy_floor_when_active']:.6f}`",
+            f"- Mean weighted routing loss (active updates): `{branch['mean_weighted_loss_when_active']:.6f}`",
+        ])
     losses = status["loss_history"]
     if losses:
         lines.extend(["", "## Optimizer metrics", "", "| Update | Loss | Gradient norm |", "|---:|---:|---:|"])
