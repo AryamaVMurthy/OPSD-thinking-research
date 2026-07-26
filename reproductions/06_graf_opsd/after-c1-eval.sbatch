@@ -43,14 +43,17 @@ python3 -m opsd_research.graf_autoresearch register \
   --changed-field full_graph_method
 # Graph preparation consumes GPUs too. Build it only after the four-GPU C1
 # pilot and its four-GPU official evaluation have released node03.
-cache_job="$(GRAPH_LIMIT=512 sbatch --parsable reproductions/06_graf_opsd/build-graph-cache.sbatch)"
+# 128 graphs gives the first complete dynamic method materially broader
+# coverage than the historical 64-record pilot, while keeping forced-
+# continuation scoring short enough for rapid autoresearch iteration.
+cache_job="$(GRAPH_LIMIT=128 sbatch --parsable reproductions/06_graf_opsd/build-graph-cache.sbatch)"
 echo "graph_cache_job=${cache_job}"
 g2_array="$(sbatch --parsable --dependency="afterok:${cache_job}" --array=0-7%4 \
-  --export="ALL,CACHE_BUILD_JOB_ID=${cache_job}" \
+  --export="ALL,CACHE_BUILD_JOB_ID=${cache_job},G2_SHARD_COUNT=8" \
   reproductions/06_graf_opsd/build-g2-viability-shard.sbatch)"
 echo "g2_viability_array_job=${g2_array}"
 g2_merge="$(sbatch --parsable --dependency="afterok:${g2_array}" \
-  --export="ALL,CACHE_BUILD_JOB_ID=${cache_job},G2_VIABILITY_ARRAY_JOB_ID=${g2_array}" \
+  --export="ALL,CACHE_BUILD_JOB_ID=${cache_job},G2_VIABILITY_ARRAY_JOB_ID=${g2_array},G2_SHARD_COUNT=8" \
   reproductions/06_graf_opsd/merge-g2-viability.sbatch)"
 echo "g2_viability_merge_job=${g2_merge}"
 graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${cache_job}/manifest.json"

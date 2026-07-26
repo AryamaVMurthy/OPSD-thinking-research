@@ -17,11 +17,12 @@ cd "${PROJECT_SOURCE}"
 
 : "${CACHE_BUILD_JOB_ID:?missing immutable graph-cache build job ID}"
 : "${G2_VIABILITY_ARRAY_JOB_ID:?missing completed viability array job ID}"
+: "${G2_SHARD_COUNT:=8}"
 graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
 target_root="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}"
 
 shards=()
-for task in {0..7}; do
+for ((task=0; task<G2_SHARD_COUNT; task++)); do
   shards+=(--shard "${target_root}/part-${task}.jsonl")
 done
 python3 -m opsd_research.merge_graf_viability \

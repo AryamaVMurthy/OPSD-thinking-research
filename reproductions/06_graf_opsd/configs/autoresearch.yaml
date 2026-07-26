@@ -12,7 +12,9 @@ official_samples_per_problem: 12
 promotion_min_avg_at_12_delta: 0.0
 promotion_requires_positive_ci_lower: false
 max_candidates: 24
-graph_cache_problem_limit: 512
+# First full graph candidate: all accepted rows from this bounded cache are
+# viability-scored.  The controller preserves cache/viability cardinality.
+graph_cache_problem_limit: 128
 # These are safety maxima, not a required number of routes or actions.  The
 # graph builder selects a variable arity per problem under the total budget.
 max_forks_per_problem: 6
