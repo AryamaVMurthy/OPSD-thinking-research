@@ -37,8 +37,8 @@ import sys
 print(load_config(sys.argv[1]).data.get("max_sequence_length", 28672))
 PY
 )"
-if [[ "${CH_MAX_STEPS}" == 5 ]]; then
-  export GRAF_SMOKE_MAX_STEPS=5
+if [[ "${CH_MAX_STEPS}" == 1 || "${CH_MAX_STEPS}" == 5 ]]; then
+  export GRAF_SMOKE_MAX_STEPS="${CH_MAX_STEPS}"
 elif [[ "${CH_MAX_STEPS}" != "${configured_steps}" ]]; then
   echo "CH_MAX_STEPS must be 5 or the configured ${configured_steps}" >&2
   exit 2

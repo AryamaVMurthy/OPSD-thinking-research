@@ -44,10 +44,12 @@ def _validate_invocation() -> dict[str, object]:
     smoke_steps = os.environ.get("GRAF_SMOKE_MAX_STEPS")
     full_steps = os.environ.get("GRAF_FULL_MAX_STEPS")
     if requested_steps != str(config["max_steps"]):
-        is_smoke = requested_steps == "5" and smoke_steps == "5"
+        is_smoke = requested_steps in {"1", "5"} and smoke_steps == requested_steps
         is_full_confirmation = requested_steps == "200" and full_steps == "200"
         if not is_smoke and not is_full_confirmation:
-            raise SystemExit("--max_steps must match config except explicit five-step smoke")
+            raise SystemExit(
+                "--max_steps must match config except an explicit one- or five-step smoke"
+            )
     for flag in ("--student_thinking", "--teacher_thinking", "--fixed_teacher", "--use_peft"):
         if flag not in sys.argv:
             raise SystemExit(f"required flag is missing: {flag}")
