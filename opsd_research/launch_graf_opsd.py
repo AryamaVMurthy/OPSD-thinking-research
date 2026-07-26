@@ -132,6 +132,7 @@ def main() -> None:
             target_information_quantile=float(config.get("fork_information_quantile", 0.0)),
             information_weighting=bool(config.get("information_weighted_routing", False)),
             viability_beta_prior=float(config.get("viability_beta_prior", 0.0)),
+            recovery_conditioned=bool(config.get("recovery_conditioned_routing", False)),
         )
         routed_targets = {
             index: forks for index, forks in routed_targets.items()
@@ -156,7 +157,8 @@ def main() -> None:
             f'"fork_information_threshold":{float(config.get("fork_information_threshold", 0.0))},'
             f'"fork_information_quantile":{float(config.get("fork_information_quantile", 0.0))},'
             f'"information_weighted_routing":{bool(config.get("information_weighted_routing", False))},'
-            f'"viability_beta_prior":{float(config.get("viability_beta_prior", 0.0))}' + "}",
+            f'"viability_beta_prior":{float(config.get("viability_beta_prior", 0.0))},'
+            f'"recovery_conditioned_routing":{bool(config.get("recovery_conditioned_routing", False))}' + "}",
             flush=True,
         )
     else:

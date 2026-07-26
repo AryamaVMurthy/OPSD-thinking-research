@@ -22,13 +22,15 @@ cd "${PROJECT_SOURCE}"
 : "${CACHE_BUILD_JOB_ID:?missing immutable graph-cache build job ID}"
 : "${SLURM_ARRAY_TASK_ID:?this job must be submitted as an eight-task array}"
 : "${G2_SHARD_COUNT:=8}"
+: "${VIABILITY_CACHE_LABEL:=g2-viability}"
+: "${GRAF_RECOVERY_CONDITIONED:=0}"
 if (( SLURM_ARRAY_TASK_ID < 0 || SLURM_ARRAY_TASK_ID >= G2_SHARD_COUNT )); then
   echo "G2 viability task index is outside the declared shard count" >&2
   exit 2
 fi
 
 graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
-target_root="${SCRATCH_ROOT}/graf_cache/g2-viability-${SLURM_ARRAY_JOB_ID}"
+target_root="${SCRATCH_ROOT}/graf_cache/${VIABILITY_CACHE_LABEL}-${SLURM_ARRAY_JOB_ID}"
 mkdir -p "${target_root}"
 accepted_graphs="$(python3 - "${graph_manifest}" <<'PY'
 import json, sys
@@ -45,6 +47,13 @@ start_index=$(( SLURM_ARRAY_TASK_ID * records_per_shard ))
 remaining=$(( accepted_graphs - start_index ))
 limit=$(( remaining < records_per_shard ? remaining : records_per_shard ))
 output="${target_root}/part-${SLURM_ARRAY_TASK_ID}.jsonl"
+recovery_args=()
+if [[ "${GRAF_RECOVERY_CONDITIONED}" == 1 ]]; then
+  recovery_args+=(--recovery-conditioned)
+elif [[ "${GRAF_RECOVERY_CONDITIONED}" != 0 ]]; then
+  echo "GRAF_RECOVERY_CONDITIONED must be 0 or 1" >&2
+  exit 2
+fi
 
 python3 -m opsd_research.build_graf_viability \
   --graph-manifest "${graph_manifest}" \
@@ -53,4 +62,4 @@ python3 -m opsd_research.build_graf_viability \
   --samples-per-action 2 --temperature 1.0 \
   --model Qwen/Qwen3-4B \
   --model-revision 1cfa9a7208912126459214e8b04321603b3df60c \
-  --tensor-parallel-size 1 --seed 42
+  --tensor-parallel-size 1 --seed 42 "${recovery_args[@]}"

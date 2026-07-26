@@ -154,6 +154,17 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "branch settings"):
             validate_config(changed)
 
+    def test_recovery_conditioning_requires_routed_mode(self):
+        data = load_config(
+            ROOT / "reproductions/06_graf_opsd/configs/g7-information-weighted.yaml"
+        ).data
+        changed = copy.deepcopy(data)
+        changed["graph_mode"] = "disabled"
+        changed["branch_loss_weight"] = 0.0
+        changed["recovery_conditioned_routing"] = True
+        with self.assertRaisesRegex(ConfigError, "branch settings"):
+            validate_config(changed)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,7 +9,12 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from .graf_actions import ASSISTANT_ACTION_PREFIX_PROTOCOL, action_continuation
+from .graf_actions import (
+    ASSISTANT_ACTION_PREFIX_PROTOCOL,
+    RECOVERY_ACTION_PREFIX_PROTOCOL,
+    action_continuation,
+    recovery_conditioned_description,
+)
 from .generation_common import extract_last_boxed, grade_math
 from .graf_cache import validate_graph_cache_manifest
 from .graf_graph import GraphAction, branch_target
@@ -50,6 +55,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--model-revision", default=DEFAULT_MODEL_REVISION)
     parser.add_argument("--tensor-parallel-size", type=int, default=1)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--recovery-conditioned", action="store_true")
     return parser.parse_args()
 
 
@@ -66,6 +72,10 @@ def main() -> None:
         raise SystemExit("GRAF viability building is pinned to Qwen3-4B@1cfa9a7")
     if args.output.exists() or (args.manifest is not None and args.manifest.exists()):
         raise SystemExit("refusing to alter an existing viability cache or manifest")
+    action_protocol = (
+        RECOVERY_ACTION_PREFIX_PROTOCOL if args.recovery_conditioned
+        else ASSISTANT_ACTION_PREFIX_PROTOCOL
+    )
     graph_manifest = validate_graph_cache_manifest(args.graph_manifest)
     graph_cache_path = Path(str(graph_manifest["cache"]))
     if not graph_cache_path.is_absolute():
@@ -93,12 +103,19 @@ def main() -> None:
                 if action["status"] in {"invalid", "dead_end"}:
                     continue
                 for sample_index in range(args.samples_per_action):
+                    description = str(action["description"])
+                    if args.recovery_conditioned:
+                        description = recovery_conditioned_description(
+                            description,
+                            str(action["validation_test"]),
+                            str(action["recovery_action"]),
+                        )
                     requests.append((
                         int(record["example_index"]), str(fork["fork_id"]),
-                        str(action["action_id"]), str(row["response"]), str(action["description"]),
+                        str(action["action_id"]), str(row["response"]), description,
                     ))
                     prompts.append(forced_action_prompt(
-                        tokenizer, str(row["question"]), str(action["description"])
+                        tokenizer, str(row["question"]), description
                     ))
     llm = LLM(
         model=args.model, revision=args.model_revision, dtype="bfloat16",
@@ -140,7 +157,7 @@ def main() -> None:
             "fork_targets": fork_targets,
             "samples_per_action": args.samples_per_action,
             "temperature": args.temperature,
-            "forced_prefix_protocol": ASSISTANT_ACTION_PREFIX_PROTOCOL,
+            "forced_prefix_protocol": action_protocol,
             "model": args.model,
             "model_revision": args.model_revision,
         })
@@ -152,7 +169,7 @@ def main() -> None:
         "examples": len(accepted),
         "samples_per_action": args.samples_per_action,
         "temperature": args.temperature,
-        "forced_prefix_protocol": ASSISTANT_ACTION_PREFIX_PROTOCOL,
+        "forced_prefix_protocol": action_protocol,
         "model": args.model,
         "model_revision": args.model_revision,
         "training_dataset_revision": TRAINING_DATASET_REVISION,

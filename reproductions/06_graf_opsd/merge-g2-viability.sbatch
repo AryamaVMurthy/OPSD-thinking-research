@@ -18,13 +18,22 @@ cd "${PROJECT_SOURCE}"
 : "${CACHE_BUILD_JOB_ID:?missing immutable graph-cache build job ID}"
 : "${G2_VIABILITY_ARRAY_JOB_ID:?missing completed viability array job ID}"
 : "${G2_SHARD_COUNT:=8}"
+: "${VIABILITY_CACHE_LABEL:=g2-viability}"
+: "${GRAF_RECOVERY_CONDITIONED:=0}"
 graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
-target_root="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}"
+target_root="${SCRATCH_ROOT}/graf_cache/${VIABILITY_CACHE_LABEL}-${G2_VIABILITY_ARRAY_JOB_ID}"
 
 shards=()
 for ((task=0; task<G2_SHARD_COUNT; task++)); do
   shards+=(--shard "${target_root}/part-${task}.jsonl")
 done
+protocol="assistant_action_continuation_v1"
+if [[ "${GRAF_RECOVERY_CONDITIONED}" == 1 ]]; then
+  protocol="assistant_recovery_conditioned_continuation_v1"
+elif [[ "${GRAF_RECOVERY_CONDITIONED}" != 0 ]]; then
+  echo "GRAF_RECOVERY_CONDITIONED must be 0 or 1" >&2
+  exit 2
+fi
 python3 -m opsd_research.merge_graf_viability \
   --graph-manifest "${graph_manifest}" \
   "${shards[@]}" \
@@ -33,4 +42,4 @@ python3 -m opsd_research.merge_graf_viability \
   --samples-per-action 2 --temperature 1.0 \
   --model Qwen/Qwen3-4B \
   --model-revision 1cfa9a7208912126459214e8b04321603b3df60c \
-  --seed 42
+  --seed 42 --forced-prefix-protocol "${protocol}"

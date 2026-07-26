@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 from .graf_cache import validate_graph_cache_manifest
-from .graf_actions import ASSISTANT_ACTION_PREFIX_PROTOCOL
+from .graf_actions import ASSISTANT_ACTION_PREFIX_PROTOCOL, RECOVERY_ACTION_PREFIX_PROTOCOL
 from .records import append_jsonl, read_jsonl
 
 
@@ -23,6 +23,7 @@ def _args() -> argparse.Namespace:
     parser.add_argument("--model", required=True)
     parser.add_argument("--model-revision", required=True)
     parser.add_argument("--seed", required=True, type=int)
+    parser.add_argument("--forced-prefix-protocol", default=ASSISTANT_ACTION_PREFIX_PROTOCOL)
     return parser.parse_args()
 
 
@@ -30,6 +31,10 @@ def main() -> None:
     args = _args()
     if args.output.exists() or args.manifest.exists():
         raise SystemExit("refusing to overwrite an immutable viability cache or manifest")
+    if args.forced_prefix_protocol not in {
+        ASSISTANT_ACTION_PREFIX_PROTOCOL, RECOVERY_ACTION_PREFIX_PROTOCOL,
+    }:
+        raise SystemExit("unsupported forced action-prefix protocol")
     graph_manifest = validate_graph_cache_manifest(args.graph_manifest)
     graph_path = Path(str(graph_manifest["cache"]))
     if not graph_path.is_absolute():
@@ -53,7 +58,7 @@ def main() -> None:
                 raise SystemExit("viability shard samples-per-action mismatch")
             if float(record.get("temperature", -1)) != args.temperature:
                 raise SystemExit("viability shard temperature mismatch")
-            if record.get("forced_prefix_protocol") != ASSISTANT_ACTION_PREFIX_PROTOCOL:
+            if record.get("forced_prefix_protocol") != args.forced_prefix_protocol:
                 raise SystemExit("viability shard action-prefix protocol mismatch")
             if record.get("model") != args.model or record.get("model_revision") != args.model_revision:
                 raise SystemExit("viability shard model pin mismatch")
@@ -70,7 +75,7 @@ def main() -> None:
         "examples": len(records),
         "samples_per_action": args.samples_per_action,
         "temperature": args.temperature,
-        "forced_prefix_protocol": ASSISTANT_ACTION_PREFIX_PROTOCOL,
+        "forced_prefix_protocol": args.forced_prefix_protocol,
         "model": args.model,
         "model_revision": args.model_revision,
         "seed": args.seed,

@@ -297,6 +297,9 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         or float(viability_beta_prior) < 0.0
     ):
         raise ConfigError(f"{source}: viability_beta_prior must be a finite nonnegative number")
+    recovery_conditioned_routing = data.get("recovery_conditioned_routing", False)
+    if not isinstance(recovery_conditioned_routing, bool):
+        raise ConfigError(f"{source}: recovery_conditioned_routing must be boolean")
     if information_weighted_routing and (
         float(fork_information_threshold) or float(fork_information_quantile)
     ):
@@ -316,6 +319,7 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         or float(fork_information_quantile) != 0
         or information_weighted_routing
         or float(viability_beta_prior) != 0
+        or recovery_conditioned_routing
     ):
         raise ConfigError(f"{source}: branch settings require graph_mode=viability_routed")
 
@@ -343,7 +347,7 @@ def _validate_graf_autoresearch(data: dict[str, Any], source: str) -> None:
         raise ConfigError(f"{source}: max_candidates must be in [1, 24]")
     expected_mutations = {
         "max_completion_length", "heldout_diagnostic_fraction", "graph_mode", "full_graph_method", "fork_threshold", "fork_information_threshold", "fork_information_quantile", "information_weighted_routing", "graph_budget",
-        "viability_temperature", "viability_beta_prior", "branch_loss_weight", "entropy_floor_weight",
+        "viability_temperature", "viability_beta_prior", "recovery_conditioned_routing", "branch_loss_weight", "entropy_floor_weight",
     }
     if not set(data.get("allowed_mutations", [])).issubset(expected_mutations):
         raise ConfigError(f"{source}: autoresearch includes a forbidden mutation")

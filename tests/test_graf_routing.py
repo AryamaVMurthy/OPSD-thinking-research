@@ -128,3 +128,32 @@ def test_beta_posterior_smooths_small_sample_action_targets(tmp_path: Path) -> N
     # its softmax target is less overconfident than the raw 1/0 target.
     assert 0.5 < target.actions[0].target_probability < 0.7310585786
     assert abs(sum(action.target_probability for action in target.actions) - 1.0) < 1e-8
+
+
+def test_recovery_conditioned_routing_requires_and_uses_its_own_protocol(tmp_path: Path) -> None:
+    graph_cache = tmp_path / "graphs.jsonl"
+    graph = {
+        "accepted": True, "example_index": 3, "graph_sha256": "graph-hash",
+        "graph": {"forks": [{"actions": [
+            {"action_id": "a", "description": "factor", "status": "viable",
+             "validation_test": "substitute", "recovery_action": "use modular arithmetic"},
+            {"action_id": "b", "description": "substitute", "status": "risky",
+             "validation_test": "check sign", "recovery_action": "split cases"},
+        ]}]},
+    }
+    graph_cache.write_text(json.dumps(graph) + "\n", encoding="utf-8")
+    digest = hashlib.sha256(graph_cache.read_bytes()).hexdigest()
+    graph_manifest = tmp_path / "graph-manifest.json"
+    graph_manifest.write_text(json.dumps({"schema_version": 1, "cache": "graphs.jsonl", "cache_sha256": digest, "requested_examples": 1, "accepted_examples": 1, "rejected_examples": 0}), encoding="utf-8")
+    viability_cache = tmp_path / "viability.jsonl"
+    viability_cache.write_text(json.dumps({
+        "example_index": 3, "graph_sha256": "graph-hash",
+        "forced_prefix_protocol": "assistant_recovery_conditioned_continuation_v1",
+        "fork_targets": [{"fork_id": "f", "action_ids": ["a", "b"], "target": [0.75, 0.25]}],
+    }) + "\n", encoding="utf-8")
+    viability_manifest = tmp_path / "viability-manifest.json"
+    viability_manifest.write_text(json.dumps({"schema_version": 1, "graph_cache_sha256": digest, "viability_cache": "viability.jsonl", "viability_cache_sha256": hashlib.sha256(viability_cache.read_bytes()).hexdigest(), "examples": 1, "forced_prefix_protocol": "assistant_recovery_conditioned_continuation_v1"}), encoding="utf-8")
+
+    target = load_routing_targets(graph_manifest, viability_manifest, recovery_conditioned=True)[3][0]
+    assert "verify: substitute" in target.actions[0].description
+    assert "retract this route" in target.actions[0].description

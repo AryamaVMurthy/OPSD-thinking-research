@@ -8,7 +8,11 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 
-from .graf_actions import ASSISTANT_ACTION_PREFIX_PROTOCOL
+from .graf_actions import (
+    ASSISTANT_ACTION_PREFIX_PROTOCOL,
+    RECOVERY_ACTION_PREFIX_PROTOCOL,
+    recovery_conditioned_description,
+)
 from .graf_cache import validate_graph_cache_manifest
 
 
@@ -44,6 +48,7 @@ def load_routing_targets(
     target_information_quantile: float = 0.0,
     information_weighting: bool = False,
     viability_beta_prior: float = 0.0,
+    recovery_conditioned: bool = False,
 ) -> dict[int, tuple[ForkTarget, ...]]:
     """Verify caches and optionally retain outcome-differential branch targets.
 
@@ -71,7 +76,11 @@ def load_routing_targets(
         raise ValueError(f"invalid viability manifest: {error}") from error
     if viability_manifest.get("schema_version") != 1:
         raise ValueError("unsupported viability manifest schema")
-    if viability_manifest.get("forced_prefix_protocol") != ASSISTANT_ACTION_PREFIX_PROTOCOL:
+    expected_protocol = (
+        RECOVERY_ACTION_PREFIX_PROTOCOL if recovery_conditioned
+        else ASSISTANT_ACTION_PREFIX_PROTOCOL
+    )
+    if viability_manifest.get("forced_prefix_protocol") != expected_protocol:
         raise ValueError("viability cache uses an incompatible action-prefix protocol")
     if viability_manifest.get("graph_cache_sha256") != graph_manifest["cache_sha256"]:
         raise ValueError("viability cache was built from a different graph cache")
@@ -165,14 +174,20 @@ def load_routing_targets(
 
     targets: dict[int, tuple[ForkTarget, ...]] = {}
     for record in records:
-        if record.get("forced_prefix_protocol") != ASSISTANT_ACTION_PREFIX_PROTOCOL:
+        if record.get("forced_prefix_protocol") != expected_protocol:
             raise ValueError("viability record uses an incompatible action-prefix protocol")
         index = int(record["example_index"])
         graph = graphs.get(index)
         if graph is None or record.get("graph_sha256") != graph.get("graph_sha256"):
             raise ValueError(f"viability record {index} does not match an accepted graph")
         descriptions = {
-            str(action["action_id"]): str(action["description"])
+            str(action["action_id"]): (
+                recovery_conditioned_description(
+                    str(action["description"]),
+                    str(action["validation_test"]),
+                    str(action["recovery_action"]),
+                ) if recovery_conditioned else str(action["description"])
+            )
             for fork in graph["graph"]["forks"]
             for action in fork["actions"]
         }
