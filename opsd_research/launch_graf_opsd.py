@@ -116,6 +116,7 @@ def main() -> None:
     official._install_exact_jsd_chunking()
     official._install_tail_logits_loss()
     if routed_targets is not None:
+        official._install_nonreentrant_gradient_checkpointing()
         official._install_graf_source_index_collator()
         official._install_graf_routed_loss(
             routing_targets=routed_targets,

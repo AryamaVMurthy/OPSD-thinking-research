@@ -1,9 +1,12 @@
 import os
 from pathlib import Path
+import sys
+import types
 from unittest import mock
 import unittest
 
 from opsd_research import launch_graf_opsd
+from opsd_research import launch_official_opsd
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,3 +26,21 @@ class GrafLauncherTests(unittest.TestCase):
         with mock.patch.object(launch_graf_opsd.sys, "argv", arguments), mock.patch.dict(os.environ, environment, clear=False):
             loaded = launch_graf_opsd._validate_invocation()
         self.assertEqual(loaded["variant"], "c0_long_rollout_control")
+
+    def test_routed_loss_uses_nonreentrant_gradient_checkpointing(self):
+        class FakeModel:
+            def gradient_checkpointing_enable(self, gradient_checkpointing_kwargs=None):
+                self.kwargs = gradient_checkpointing_kwargs
+                return "enabled"
+
+        fake_transformers = types.SimpleNamespace(PreTrainedModel=FakeModel)
+        with mock.patch.dict(sys.modules, {"transformers": fake_transformers}):
+            launch_official_opsd._install_nonreentrant_gradient_checkpointing()
+            model = FakeModel()
+            self.assertEqual(model.gradient_checkpointing_enable(), "enabled")
+            self.assertEqual(model.kwargs, {"use_reentrant": False})
+            model.gradient_checkpointing_enable({"preserve_rng_state": False})
+            self.assertEqual(
+                model.kwargs,
+                {"preserve_rng_state": False, "use_reentrant": False},
+            )

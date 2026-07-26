@@ -221,6 +221,37 @@ def _install_graf_source_index_collator() -> None:
     print('{"event":"graf_source_index_collator_enabled"}', flush=True)
 
 
+def _install_nonreentrant_gradient_checkpointing() -> None:
+    """Make repeated GRAF policy forwards compatible with distributed ZeRO.
+
+    The routed action loss adds a second differentiable policy forward to the
+    OPSD forward.  Reentrant activation checkpointing is not supported when a
+    distributed rank re-enters the same checkpointed layer in one backward
+    graph; DeepSpeed then reports that its partition was reduced twice.
+    PyTorch documents non-reentrant checkpointing as the compatible default
+    for this pattern.  Preserve explicitly provided kwargs while selecting the
+    non-reentrant implementation for GRAF only.
+    """
+    from transformers import PreTrainedModel
+
+    original = PreTrainedModel.gradient_checkpointing_enable
+    if getattr(original, "_graf_nonreentrant_wrapper", False):
+        return
+
+    def enable_nonreentrant(self, gradient_checkpointing_kwargs=None):
+        kwargs = dict(gradient_checkpointing_kwargs or {})
+        kwargs.setdefault("use_reentrant", False)
+        return original(self, gradient_checkpointing_kwargs=kwargs)
+
+    enable_nonreentrant._graf_nonreentrant_wrapper = True
+    PreTrainedModel.gradient_checkpointing_enable = enable_nonreentrant
+    print(
+        '{"event":"graf_nonreentrant_gradient_checkpointing_enabled",'
+        '"use_reentrant":false}',
+        flush=True,
+    )
+
+
 def _install_final_generation_flush() -> None:
     import opsd_trainer
 
