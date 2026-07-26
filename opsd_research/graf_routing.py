@@ -36,8 +36,18 @@ def _resolve_manifest_path(manifest_path: Path, value: str) -> Path:
 def load_routing_targets(
     graph_manifest_path: str | Path,
     viability_manifest_path: str | Path,
+    *,
+    min_target_margin: float = 0.0,
 ) -> dict[int, tuple[ForkTarget, ...]]:
-    """Verify both cache digests and return only exactly joined branch targets."""
+    """Verify caches and optionally retain outcome-differential branch targets.
+
+    A uniform empirical target supplies no preference between actions.  Such a
+    fork should not contribute a KL/entropy action gradient, but its example
+    still remains in the base OPSD data stream.  Keeping an empty tuple for
+    that identity preserves this separation and makes the threshold auditable.
+    """
+    if not 0.0 <= min_target_margin <= 1.0:
+        raise ValueError("min_target_margin must be in [0, 1]")
     graph_manifest_path = Path(graph_manifest_path)
     viability_manifest_path = Path(viability_manifest_path)
     graph_manifest = validate_graph_cache_manifest(graph_manifest_path)
@@ -89,6 +99,10 @@ def load_routing_targets(
                 raise ValueError(f"invalid target probability for example {index}")
             if any(action_id not in descriptions for action_id in action_ids):
                 raise ValueError(f"unknown action ID for example {index}")
+            sorted_values = sorted(values, reverse=True)
+            margin = sorted_values[0] - sorted_values[1] if len(sorted_values) > 1 else 0.0
+            if margin < min_target_margin:
+                continue
             forks.append(ForkTarget(
                 fork_id=str(fork["fork_id"]),
                 actions=tuple(
@@ -96,8 +110,6 @@ def load_routing_targets(
                     for action_id, value in zip(action_ids, values, strict=True)
                 ),
             ))
-        if not forks:
-            raise ValueError(f"viability record {index} has no forks")
         targets[index] = tuple(forks)
     if len(targets) != int(viability_manifest.get("examples", -1)):
         raise ValueError("viability manifest count does not match target records")

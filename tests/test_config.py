@@ -86,6 +86,21 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "branch_loss_weight"):
             validate_config(changed)
 
+    def test_fork_threshold_requires_routed_mode_and_probability_margin(self):
+        data = load_config(
+            ROOT / "reproductions/06_graf_opsd/configs/g2-viability-routed.yaml"
+        ).data
+        changed = copy.deepcopy(data)
+        changed["fork_threshold"] = 1.1
+        with self.assertRaisesRegex(ConfigError, "fork_threshold"):
+            validate_config(changed)
+        changed = copy.deepcopy(data)
+        changed["graph_mode"] = "disabled"
+        changed["branch_loss_weight"] = 0.0
+        changed["fork_threshold"] = 0.15
+        with self.assertRaisesRegex(ConfigError, "branch settings"):
+            validate_config(changed)
+
 
 if __name__ == "__main__":
     unittest.main()

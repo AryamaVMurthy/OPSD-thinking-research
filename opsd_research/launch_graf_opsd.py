@@ -91,10 +91,13 @@ def main() -> None:
         if not raw_viability_manifest:
             raise SystemExit("viability-routed candidates require GRAF_VIABILITY_MANIFEST")
         routed_targets = load_routing_targets(
-            os.environ["GRAF_GRAPH_CACHE_MANIFEST"], raw_viability_manifest
+            os.environ["GRAF_GRAPH_CACHE_MANIFEST"],
+            raw_viability_manifest,
+            min_target_margin=float(config.get("fork_threshold", 0.0)),
         )
-        if not routed_targets:
-            raise SystemExit("viability-routed candidates require at least one joined target")
+        active_examples = sum(bool(forks) for forks in routed_targets.values())
+        if not routed_targets or not active_examples:
+            raise SystemExit("viability-routed candidates require at least one active joined target")
         # Train only on identities with measured continuation viability.  This
         # makes every distributed batch exercise the GRAF loss instead of
         # silently reducing it to a shuffle-dependent sparse regularizer.
@@ -105,7 +108,9 @@ def main() -> None:
         print(
             '{"event":"graf_viability_routing_enabled",'
             f'"accepted_graph_records":{records},'
-            f'"routed_examples":{len(routed_targets)}' + "}",
+            f'"routed_examples":{len(routed_targets)},'
+            f'"active_routed_examples":{active_examples},'
+            f'"fork_threshold":{float(config.get("fork_threshold", 0.0))}' + "}",
             flush=True,
         )
     else:
