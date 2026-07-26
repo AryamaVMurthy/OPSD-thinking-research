@@ -4,10 +4,9 @@
 #SBATCH --account=priyesh.shukla
 #SBATCH --partition=u22
 #SBATCH --qos=high
-#SBATCH --nodelist=node10
-#SBATCH --gres=gpu:8
-#SBATCH --cpus-per-task=64
-#SBATCH --mem=768G
+#SBATCH --gres=gpu:4
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=384G
 #SBATCH --time=04:00:00
 #SBATCH --output=logs/%x-%j.out
 
@@ -26,19 +25,19 @@ run_name="graf-c1-long-4096-smoke-${SLURM_JOB_ID}"
 output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"
 cp "${CONFIG}" "${output_dir}/config.yaml"
-printf 'candidate=c1-long-rollout-4096\nmax_steps=5\n' > "${output_dir}/runtime-overrides.txt"
+printf 'candidate=c1-long-rollout-4096\nmax_steps=5\nnum_gpus=4\ngradient_accumulation_steps=8\neffective_batch_size=32\n' > "${output_dir}/runtime-overrides.txt"
 record_run_manifest "${output_dir}" runtime-overrides.txt
 start_gpu_telemetry "${run_name}"
 trap stop_gpu_telemetry EXIT
 accelerate launch \
-  --config_file third_party/opsd/accelerate.yaml --num_processes 8 \
-  --gradient_accumulation_steps 4 --main_process_port 12972 \
+  --config_file third_party/opsd/accelerate.yaml --num_processes 4 \
+  --gradient_accumulation_steps 8 --main_process_port 12972 \
   -m opsd_research.launch_graf_opsd \
   --model_name_or_path Qwen/Qwen3-4B \
   --model_revision 1cfa9a7208912126459214e8b04321603b3df60c \
   --student_model_revision 1cfa9a7208912126459214e8b04321603b3df60c \
   --learning_rate 5e-6 --max_grad_norm 0.1 \
-  --per_device_train_batch_size 1 --gradient_checkpointing --gradient_accumulation_steps 4 \
+  --per_device_train_batch_size 1 --gradient_checkpointing --gradient_accumulation_steps 8 \
   --output_dir "${TRAIN_ROOT}" --run_config "${run_name}" --num_train_epochs 30 \
   --max_steps 5 --max_completion_length 4096 --save_steps 5 --logging_steps 1 \
   --attn_implementation flash_attention_2 --torch_dtype bfloat16 --max_length 20000 \

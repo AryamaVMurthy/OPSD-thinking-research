@@ -3,11 +3,10 @@
 #SBATCH --account=priyesh.shukla
 #SBATCH --partition=u22
 #SBATCH --qos=high
-#SBATCH --nodelist=node10
-#SBATCH --gres=gpu:8
-#SBATCH --ntasks=8
+#SBATCH --gres=gpu:4
+#SBATCH --ntasks=4
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=512G
+#SBATCH --mem=384G
 #SBATCH --time=24:00:00
 #SBATCH --output=logs/%x-%j.out
 
