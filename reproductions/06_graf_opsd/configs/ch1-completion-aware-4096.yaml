@@ -1,5 +1,5 @@
 kind: graf_train
-variant: ch0_contrastive_hindsight_2048
+variant: ch1_completion_aware_4096
 model: Qwen/Qwen3-4B
 model_revision: 1cfa9a7208912126459214e8b04321603b3df60c
 dataset: jasonrqh/Math-CoT-20k
@@ -13,10 +13,10 @@ per_device_train_batch_size: 1
 gradient_accumulation_steps: 8
 num_gpus: 4
 learning_rate: 5.0e-6
-max_completion_length: 2048
+max_completion_length: 4096
 max_sequence_length: 28672
-max_steps: 25
-save_steps: 25
+max_steps: 12
+save_steps: 12
 rollouts_per_prompt: 1
 temperature: 1.1
 top_p: 0.95

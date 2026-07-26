@@ -56,6 +56,7 @@ def _chat_prompt(
     *,
     enable_thinking: bool,
     completion_tokens: int,
+    max_model_len: int = MAX_MODEL_LEN,
 ) -> str:
     prompt = tokenizer.apply_chat_template(
         [{"role": "user", "content": text}],
@@ -64,10 +65,10 @@ def _chat_prompt(
         enable_thinking=enable_thinking,
     )
     prompt_tokens = len(tokenizer.encode(prompt, add_special_tokens=False))
-    if prompt_tokens + completion_tokens > MAX_MODEL_LEN:
+    if prompt_tokens + completion_tokens > max_model_len:
         raise ValueError(
             f"full prompt requires {prompt_tokens + completion_tokens} tokens, "
-            f"exceeding CH context {MAX_MODEL_LEN}"
+            f"exceeding CH context {max_model_len}"
         )
     return prompt
 
@@ -106,6 +107,9 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", required=True, type=int)
     parser.add_argument("--blind-attempts", type=int, default=3)
     parser.add_argument("--audit-attempts", type=int, default=3)
+    parser.add_argument("--blind-max-tokens", type=int, default=BLIND_MAX_TOKENS)
+    parser.add_argument("--audit-max-tokens", type=int, default=AUDIT_MAX_TOKENS)
+    parser.add_argument("--max-model-len", type=int, default=MAX_MODEL_LEN)
     parser.add_argument("--shard-id", required=True, type=int)
     parser.add_argument("--num-shards", required=True, type=int)
     parser.add_argument("--seed", type=int, default=42)
@@ -120,6 +124,12 @@ def main() -> None:
         raise SystemExit(f"refusing to alter existing CH shard {args.output}")
     if args.limit < 1 or args.blind_attempts not in {2, 3} or args.audit_attempts < 1:
         raise SystemExit("invalid CH cache limits or attempt counts")
+    if (
+        args.blind_max_tokens < 1
+        or args.audit_max_tokens < 1
+        or max(args.blind_max_tokens, args.audit_max_tokens) >= args.max_model_len
+    ):
+        raise SystemExit("invalid CH generation or context token limits")
     if args.num_shards < 1 or not 0 <= args.shard_id < args.num_shards:
         raise SystemExit("shard-id must be in [0, num-shards)")
     if args.model != DEFAULT_MODEL or args.model_revision != DEFAULT_MODEL_REVISION:
@@ -139,7 +149,7 @@ def main() -> None:
         trust_remote_code=True,
         dtype="bfloat16",
         tensor_parallel_size=1,
-        max_model_len=MAX_MODEL_LEN,
+        max_model_len=args.max_model_len,
         gpu_memory_utilization=0.90,
         enforce_eager=True,
         enable_prefix_caching=True,
@@ -170,7 +180,8 @@ def main() -> None:
                     tokenizer,
                     blind_student_prompt(problem, attempt_index=attempt),
                     enable_thinking=True,
-                    completion_tokens=BLIND_MAX_TOKENS,
+                    completion_tokens=args.blind_max_tokens,
+                    max_model_len=args.max_model_len,
                 )
                 for attempt in range(args.blind_attempts)
             ]
@@ -195,7 +206,7 @@ def main() -> None:
                     temperature=1.1,
                     top_p=0.95,
                     top_k=20,
-                    max_tokens=BLIND_MAX_TOKENS,
+                    max_tokens=args.blind_max_tokens,
                     seed=args.seed + index * args.blind_attempts + attempt,
                 )
             )
@@ -238,7 +249,8 @@ def main() -> None:
                         attempts=attempts,
                     ),
                     enable_thinking=False,
-                    completion_tokens=AUDIT_MAX_TOKENS,
+                    completion_tokens=args.audit_max_tokens,
+                    max_model_len=args.max_model_len,
                 )
             except ValueError as error:
                 last_errors[index] = str(error)
@@ -250,7 +262,7 @@ def main() -> None:
                     n=1,
                     temperature=0.2,
                     top_p=0.95,
-                    max_tokens=AUDIT_MAX_TOKENS,
+                    max_tokens=args.audit_max_tokens,
                     seed=args.seed + 100_000 + audit_attempt * args.limit + index,
                 )
             )
@@ -279,9 +291,9 @@ def main() -> None:
                         "shard_id": args.shard_id,
                         "num_shards": args.num_shards,
                         "blind_attempt_output_tokens": attempt_tokens[index],
-                        "blind_max_tokens": BLIND_MAX_TOKENS,
+                        "blind_max_tokens": args.blind_max_tokens,
                         "audit_output_tokens": len(output_token_ids(generated)),
-                        "audit_max_tokens": AUDIT_MAX_TOKENS,
+                        "audit_max_tokens": args.audit_max_tokens,
                         "audit_builder_attempt": audit_attempt + 1,
                     }
                 )

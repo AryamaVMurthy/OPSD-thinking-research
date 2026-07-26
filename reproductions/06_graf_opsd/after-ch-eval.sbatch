@@ -15,6 +15,7 @@ module load u22/cuda/12.4
 source "${HOME}/OPSD-thinking-research/infra/turing/common.sh"
 cd "${PROJECT_SOURCE}"
 : "${CH_EVAL_RUN:?}"
+: "${CH_CANDIDATE_ID:?}"
 baseline="${RESULTS_ROOT}/graf-aime24-base-full-context-screen-20260727"
 treatment="${RESULTS_ROOT}/${CH_EVAL_RUN}"
 test -f "${baseline}/summary.json"
@@ -28,7 +29,7 @@ python3 -m opsd_research.compare_math \
   --output "${treatment}/paired-vs-base.json"
 python3 -m opsd_research.graf_development_report \
   --comparison "${treatment}/paired-vs-base.json" \
-  --candidate-id ch0-contrastive-hindsight-2048 \
+  --candidate-id "${CH_CANDIDATE_ID}" \
   --output "${treatment}/development-report.md"
 python3 - "${treatment}/paired-vs-base.json" <<'PY'
 import json, sys

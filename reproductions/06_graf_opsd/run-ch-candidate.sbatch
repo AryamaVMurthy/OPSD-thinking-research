@@ -31,6 +31,12 @@ import sys
 print(load_config(sys.argv[1]).data["max_steps"])
 PY
 )"
+max_sequence_length="$(python3 - "${CH_CANDIDATE_CONFIG}" <<'PY'
+from opsd_research.config import load_config
+import sys
+print(load_config(sys.argv[1]).data.get("max_sequence_length", 28672))
+PY
+)"
 if [[ "${CH_MAX_STEPS}" == 5 ]]; then
   export GRAF_SMOKE_MAX_STEPS=5
 elif [[ "${CH_MAX_STEPS}" != "${configured_steps}" ]]; then
@@ -83,7 +89,7 @@ accelerate launch \
   --logging_steps 1 \
   --attn_implementation flash_attention_2 \
   --torch_dtype bfloat16 \
-  --max_length 28672 \
+  --max_length "${max_sequence_length}" \
   --beta 0 \
   --use_vllm \
   --vllm_mode colocate \

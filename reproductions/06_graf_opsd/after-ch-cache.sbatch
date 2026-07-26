@@ -15,6 +15,9 @@ module load u22/cuda/12.4
 source "${HOME}/OPSD-thinking-research/infra/turing/common.sh"
 cd "${PROJECT_SOURCE}"
 : "${CH_CACHE_JOB_ID:?}" "${CH_LIMIT:?}"
+CH_CANDIDATE_CONFIG="${CH_CANDIDATE_CONFIG:-reproductions/06_graf_opsd/configs/ch0-contrastive-hindsight-2048.yaml}"
+CH_CANDIDATE_ID="${CH_CANDIDATE_ID:-ch0-contrastive-hindsight-2048}"
+CH_PILOT_STEPS="${CH_PILOT_STEPS:-25}"
 manifest="${SCRATCH_ROOT}/ch_cache/ch-${CH_LIMIT}-${CH_CACHE_JOB_ID}/manifest.json"
 summary="${SCRATCH_ROOT}/ch_cache/ch-${CH_LIMIT}-${CH_CACHE_JOB_ID}/cache-summary.json"
 test -f "${manifest}"
@@ -54,8 +57,8 @@ PY
 
 smoke="$(
   CH_DOSSIER_MANIFEST="${manifest}" \
-  CH_CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/ch0-contrastive-hindsight-2048.yaml \
-  CH_CANDIDATE_ID=ch0-contrastive-hindsight-2048 \
+  CH_CANDIDATE_CONFIG="${CH_CANDIDATE_CONFIG}" \
+  CH_CANDIDATE_ID="${CH_CANDIDATE_ID}" \
   CH_MAX_STEPS=5 \
   CH_PORT=12985 \
   sbatch --parsable reproductions/06_graf_opsd/run-ch-candidate.sbatch
@@ -64,5 +67,5 @@ echo "ch_smoke_job=${smoke}"
 sbatch \
   --parsable \
   --dependency="afterok:${smoke}" \
-  --export="ALL,CH_CACHE_JOB_ID=${CH_CACHE_JOB_ID},CH_LIMIT=${CH_LIMIT},CH_SMOKE_JOB_ID=${smoke}" \
+  --export="ALL,CH_CACHE_JOB_ID=${CH_CACHE_JOB_ID},CH_LIMIT=${CH_LIMIT},CH_SMOKE_JOB_ID=${smoke},CH_CANDIDATE_CONFIG=${CH_CANDIDATE_CONFIG},CH_CANDIDATE_ID=${CH_CANDIDATE_ID},CH_PILOT_STEPS=${CH_PILOT_STEPS}" \
   reproductions/06_graf_opsd/after-ch-smoke.sbatch

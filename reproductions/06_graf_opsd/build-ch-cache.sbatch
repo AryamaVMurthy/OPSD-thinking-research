@@ -20,8 +20,13 @@ cd "${PROJECT_SOURCE}"
 CH_LIMIT="${CH_LIMIT:-128}"
 CH_BLIND_ATTEMPTS="${CH_BLIND_ATTEMPTS:-3}"
 CH_AUDIT_ATTEMPTS="${CH_AUDIT_ATTEMPTS:-3}"
-if (( CH_LIMIT < 1 || CH_AUDIT_ATTEMPTS < 1 )); then
-  echo "CH_LIMIT and CH_AUDIT_ATTEMPTS must be positive" >&2
+CH_BLIND_MAX_TOKENS="${CH_BLIND_MAX_TOKENS:-2048}"
+CH_AUDIT_MAX_TOKENS="${CH_AUDIT_MAX_TOKENS:-1536}"
+CH_MAX_MODEL_LEN="${CH_MAX_MODEL_LEN:-28672}"
+if (( CH_LIMIT < 1 || CH_AUDIT_ATTEMPTS < 1 || CH_BLIND_MAX_TOKENS < 1 ||
+      CH_AUDIT_MAX_TOKENS < 1 || CH_BLIND_MAX_TOKENS >= CH_MAX_MODEL_LEN ||
+      CH_AUDIT_MAX_TOKENS >= CH_MAX_MODEL_LEN )); then
+  echo "CH example, attempt, generation, and context limits are invalid" >&2
   exit 2
 fi
 if [[ "${CH_BLIND_ATTEMPTS}" != 2 && "${CH_BLIND_ATTEMPTS}" != 3 ]]; then
@@ -31,6 +36,7 @@ fi
 
 CH_RUN_DIR="${SCRATCH_ROOT}/ch_cache/ch-${CH_LIMIT}-${SLURM_JOB_ID}"
 export CH_RUN_DIR CH_LIMIT CH_BLIND_ATTEMPTS CH_AUDIT_ATTEMPTS
+export CH_BLIND_MAX_TOKENS CH_AUDIT_MAX_TOKENS CH_MAX_MODEL_LEN
 mkdir -p "${CH_RUN_DIR}"
 git rev-parse HEAD > "${CH_RUN_DIR}/source-commit.txt"
 {
@@ -38,9 +44,9 @@ git rev-parse HEAD > "${CH_RUN_DIR}/source-commit.txt"
   printf 'blind_attempts=%s\n' "${CH_BLIND_ATTEMPTS}"
   printf 'audit_attempts=%s\n' "${CH_AUDIT_ATTEMPTS}"
   printf 'num_shards=%s\n' "${SLURM_NTASKS}"
-  printf 'blind_max_tokens=2048\n'
-  printf 'audit_max_tokens=1536\n'
-  printf 'max_model_len=28672\n'
+  printf 'blind_max_tokens=%s\n' "${CH_BLIND_MAX_TOKENS}"
+  printf 'audit_max_tokens=%s\n' "${CH_AUDIT_MAX_TOKENS}"
+  printf 'max_model_len=%s\n' "${CH_MAX_MODEL_LEN}"
   printf 'parallelism=four-independent-vllm-replicas\n'
 } > "${CH_RUN_DIR}/runtime-parameters.txt"
 

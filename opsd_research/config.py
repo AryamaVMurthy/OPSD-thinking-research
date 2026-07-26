@@ -252,10 +252,19 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         raise ConfigError(
             f"{source}: max_completion_length must be 1024, 2048, or 4096"
         )
-    if data.get("max_steps") not in {5, 25, 50, 200}:
-        raise ConfigError(f"{source}: max_steps must be 5, 25, 50, or 200")
+    if data.get("max_steps") not in {5, 12, 25, 50, 200}:
+        raise ConfigError(f"{source}: max_steps must be 5, 12, 25, 50, or 200")
     if data.get("save_steps") != data.get("max_steps"):
         raise ConfigError(f"{source}: pilot candidates save only at their final step")
+    max_sequence_length = data.get("max_sequence_length", 28672)
+    if (
+        not isinstance(max_sequence_length, int)
+        or isinstance(max_sequence_length, bool)
+        or max_sequence_length < data["max_completion_length"]
+    ):
+        raise ConfigError(
+            f"{source}: max_sequence_length must cover max_completion_length"
+        )
     heldout_fraction = data.get("heldout_diagnostic_fraction", 0.0)
     if (
         not isinstance(heldout_fraction, (int, float))
