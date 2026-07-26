@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import argparse
+
 from datasets import load_dataset
 from huggingface_hub import snapshot_download
 
@@ -20,30 +22,43 @@ MATH_REVISIONS = {
 }
 
 
+def _cache_math(alias: str, revision: str) -> None:
+    spec = MATH_DATASETS[alias]
+    components = spec.get("components")
+    if components:
+        datasets = [
+            load_dataset(path, split=spec["split"], revision=component_revision,
+                         trust_remote_code=True)
+            for (_, path), component_revision in zip(
+                components, revision.split("+"), strict=True
+            )
+        ]
+        count = sum(len(dataset) for dataset in datasets)
+    else:
+        count = len(load_dataset(
+            spec["path"], split=spec["split"], revision=revision,
+            trust_remote_code=True,
+        ))
+    if count != spec["expected_count"]:
+        raise RuntimeError(f"{alias}: expected {spec['expected_count']}, found {count}")
+    print(f"cached {alias}: {count} rows", flush=True)
+
+
 def main() -> None:
-    for model, revision in MODELS:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--scope", choices=("all", "aime"), default="all")
+    scope = parser.parse_args().scope
+    models = MODELS if scope == "all" else (MODELS[1],)
+    for model, revision in models:
         path = snapshot_download(model, revision=revision)
         print(f"cached model {model}@{revision}: {path}", flush=True)
-    for alias, revision in MATH_REVISIONS.items():
-        spec = MATH_DATASETS[alias]
-        components = spec.get("components")
-        if components:
-            datasets = [
-                load_dataset(path, split=spec["split"], revision=component_revision,
-                             trust_remote_code=True)
-                for (_, path), component_revision in zip(
-                    components, revision.split("+"), strict=True
-                )
-            ]
-            count = sum(len(dataset) for dataset in datasets)
-        else:
-            count = len(load_dataset(
-                spec["path"], split=spec["split"], revision=revision,
-                trust_remote_code=True,
-            ))
-        if count != spec["expected_count"]:
-            raise RuntimeError(f"{alias}: expected {spec['expected_count']}, found {count}")
-        print(f"cached {alias}: {count} rows", flush=True)
+    math_sets = MATH_REVISIONS.items() if scope == "all" else (("aime24", MATH_REVISIONS["aime24"]),)
+    for alias, revision in math_sets:
+        _cache_math(alias, revision)
+    if scope == "aime":
+        training = load_math_cot_20k()["train"]
+        print(f"cached Math-CoT-20k: {len(training)} rows", flush=True)
+        return
     lcb = load_lcb_v6("0fe84c3912ea0c4d4a78037083943e8f0c4dd505")
     if len(lcb) != 175:
         raise RuntimeError(f"LCB v6: expected 175, found {len(lcb)}")
