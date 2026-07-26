@@ -60,6 +60,18 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _require_routable_forks(records: list[dict[str, Any]]) -> None:
+    """Fail before model loading if an immutable cache cannot define targets."""
+    for record in records:
+        for fork in record["graph"]["forks"]:
+            statuses = [str(action["status"]) for action in fork["actions"]]
+            if not any(status not in {"invalid", "dead_end"} for status in statuses):
+                raise SystemExit(
+                    "graph cache contains a non-routable fork: "
+                    f"example_index={record['example_index']} fork_id={fork['fork_id']}"
+                )
+
+
 def main() -> None:
     args = _parse_args()
     if (
@@ -86,6 +98,7 @@ def main() -> None:
     accepted = accepted[args.start_index : args.start_index + args.limit]
     if not accepted:
         raise SystemExit("graph cache contains no accepted records")
+    _require_routable_forks(accepted)
 
     from .training_data import load_math_cot_20k
     from transformers import AutoTokenizer
