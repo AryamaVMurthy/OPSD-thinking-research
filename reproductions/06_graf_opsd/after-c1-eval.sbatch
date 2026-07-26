@@ -41,10 +41,24 @@ python3 -m opsd_research.graf_autoresearch register \
   --candidate-id g4-graph-backtrack-entropy-4096 --parent-id c1-long-rollout-4096 --stage G4 \
   --hypothesis "Distil verifier-calibrated distributions over answer-masked teacher-proposed graph actions, including recovery actions and a target-adaptive entropy floor, at a 4,096-token on-policy rollout budget." \
   --changed-field full_graph_method
-graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
-viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
-g4_smoke="$(GRAF_GRAPH_CACHE_MANIFEST="${graph_manifest}" GRAF_VIABILITY_MANIFEST="${viability_manifest}" sbatch --parsable reproductions/06_graf_opsd/g4-smoke.sbatch)"
+# Graph preparation consumes GPUs too. Build it only after the four-GPU C1
+# pilot and its four-GPU official evaluation have released node03.
+cache_job="$(GRAPH_LIMIT=512 sbatch --parsable reproductions/06_graf_opsd/build-graph-cache.sbatch)"
+echo "graph_cache_job=${cache_job}"
+g2_array="$(sbatch --parsable --dependency="afterok:${cache_job}" --array=0-7%4 \
+  --export="ALL,CACHE_BUILD_JOB_ID=${cache_job}" \
+  reproductions/06_graf_opsd/build-g2-viability-shard.sbatch)"
+echo "g2_viability_array_job=${g2_array}"
+g2_merge="$(sbatch --parsable --dependency="afterok:${g2_array}" \
+  --export="ALL,CACHE_BUILD_JOB_ID=${cache_job},G2_VIABILITY_ARRAY_JOB_ID=${g2_array}" \
+  reproductions/06_graf_opsd/merge-g2-viability.sbatch)"
+echo "g2_viability_merge_job=${g2_merge}"
+graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${cache_job}/manifest.json"
+viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${g2_array}/manifest.json"
+g4_smoke="$(sbatch --parsable --dependency="afterok:${g2_merge}" \
+  --export="ALL,GRAF_GRAPH_CACHE_MANIFEST=${graph_manifest},GRAF_VIABILITY_MANIFEST=${viability_manifest},CACHE_BUILD_JOB_ID=${cache_job},G2_VIABILITY_ARRAY_JOB_ID=${g2_array}" \
+  reproductions/06_graf_opsd/g4-smoke.sbatch)"
 echo "g4_smoke_job=${g4_smoke}"
 sbatch --parsable --dependency="afterok:${g4_smoke}" \
-  --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G2_VIABILITY_ARRAY_JOB_ID=${G2_VIABILITY_ARRAY_JOB_ID},G4_SMOKE_JOB_ID=${g4_smoke}" \
+  --export="ALL,CACHE_BUILD_JOB_ID=${cache_job},G2_VIABILITY_ARRAY_JOB_ID=${g2_array},G4_SMOKE_JOB_ID=${g4_smoke}" \
   reproductions/06_graf_opsd/after-g4-smoke.sbatch
