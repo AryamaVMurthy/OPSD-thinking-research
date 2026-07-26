@@ -20,6 +20,7 @@ def _args() -> argparse.Namespace:
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--samples-per-action", required=True, type=int)
     parser.add_argument("--temperature", required=True, type=float)
+    parser.add_argument("--max-completion-tokens", required=True, type=int)
     parser.add_argument("--model", required=True)
     parser.add_argument("--model-revision", required=True)
     parser.add_argument("--seed", required=True, type=int)
@@ -35,6 +36,8 @@ def main() -> None:
         ASSISTANT_ACTION_PREFIX_PROTOCOL, RECOVERY_ACTION_PREFIX_PROTOCOL,
     }:
         raise SystemExit("unsupported forced action-prefix protocol")
+    if args.max_completion_tokens < 1:
+        raise SystemExit("max completion tokens must be positive")
     graph_manifest = validate_graph_cache_manifest(args.graph_manifest)
     graph_path = Path(str(graph_manifest["cache"]))
     if not graph_path.is_absolute():
@@ -58,6 +61,8 @@ def main() -> None:
                 raise SystemExit("viability shard samples-per-action mismatch")
             if float(record.get("temperature", -1)) != args.temperature:
                 raise SystemExit("viability shard temperature mismatch")
+            if int(record.get("max_completion_tokens", -1)) != args.max_completion_tokens:
+                raise SystemExit("viability shard max-completion-tokens mismatch")
             if record.get("forced_prefix_protocol") != args.forced_prefix_protocol:
                 raise SystemExit("viability shard action-prefix protocol mismatch")
             if record.get("model") != args.model or record.get("model_revision") != args.model_revision:
@@ -75,6 +80,7 @@ def main() -> None:
         "examples": len(records),
         "samples_per_action": args.samples_per_action,
         "temperature": args.temperature,
+        "max_completion_tokens": args.max_completion_tokens,
         "forced_prefix_protocol": args.forced_prefix_protocol,
         "model": args.model,
         "model_revision": args.model_revision,

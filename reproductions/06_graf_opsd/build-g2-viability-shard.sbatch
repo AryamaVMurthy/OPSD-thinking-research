@@ -24,6 +24,7 @@ cd "${PROJECT_SOURCE}"
 : "${G2_SHARD_COUNT:=8}"
 : "${VIABILITY_CACHE_LABEL:=g2-viability}"
 : "${GRAF_RECOVERY_CONDITIONED:=0}"
+: "${VIABILITY_MAX_COMPLETION_TOKENS:=4096}"
 if (( SLURM_ARRAY_TASK_ID < 0 || SLURM_ARRAY_TASK_ID >= G2_SHARD_COUNT )); then
   echo "G2 viability task index is outside the declared shard count" >&2
   exit 2
@@ -59,7 +60,7 @@ python3 -m opsd_research.build_graf_viability \
   --graph-manifest "${graph_manifest}" \
   --output "${output}" \
   --start-index "${start_index}" --limit "${limit}" \
-  --samples-per-action 2 --temperature 1.0 \
+  --samples-per-action 2 --temperature 1.0 --max-completion-tokens "${VIABILITY_MAX_COMPLETION_TOKENS}" \
   --model Qwen/Qwen3-4B \
   --model-revision 1cfa9a7208912126459214e8b04321603b3df60c \
   --tensor-parallel-size 1 --seed 42 "${recovery_args[@]}"

@@ -51,6 +51,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", required=True, type=int)
     parser.add_argument("--samples-per-action", required=True, type=int)
     parser.add_argument("--temperature", type=float, default=1.0)
+    parser.add_argument("--max-completion-tokens", type=int, default=4096)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--model-revision", default=DEFAULT_MODEL_REVISION)
     parser.add_argument("--tensor-parallel-size", type=int, default=1)
@@ -66,8 +67,9 @@ def main() -> None:
         or args.start_index < 0
         or args.samples_per_action < 1
         or args.temperature <= 0
+        or args.max_completion_tokens < 1
     ):
-        raise SystemExit("limit, samples-per-action, and temperature must be positive")
+        raise SystemExit("limit, samples-per-action, temperature, and max completion tokens must be positive")
     if args.model != DEFAULT_MODEL or args.model_revision != DEFAULT_MODEL_REVISION:
         raise SystemExit("GRAF viability building is pinned to Qwen3-4B@1cfa9a7")
     if args.output.exists() or (args.manifest is not None and args.manifest.exists()):
@@ -125,7 +127,8 @@ def main() -> None:
     outputs = llm.generate(
         prompts,
         SamplingParams(
-            temperature=args.temperature, top_p=0.95, max_tokens=38912, seed=args.seed
+            temperature=args.temperature, top_p=0.95,
+            max_tokens=args.max_completion_tokens, seed=args.seed
         ),
     )
     successes: dict[tuple[int, str, str], list[bool]] = defaultdict(list)
@@ -157,6 +160,7 @@ def main() -> None:
             "fork_targets": fork_targets,
             "samples_per_action": args.samples_per_action,
             "temperature": args.temperature,
+            "max_completion_tokens": args.max_completion_tokens,
             "forced_prefix_protocol": action_protocol,
             "model": args.model,
             "model_revision": args.model_revision,
@@ -169,6 +173,7 @@ def main() -> None:
         "examples": len(accepted),
         "samples_per_action": args.samples_per_action,
         "temperature": args.temperature,
+        "max_completion_tokens": args.max_completion_tokens,
         "forced_prefix_protocol": action_protocol,
         "model": args.model,
         "model_revision": args.model_revision,
