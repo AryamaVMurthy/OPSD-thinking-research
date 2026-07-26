@@ -6,7 +6,7 @@
 #SBATCH --account=priyesh.shukla
 #SBATCH --partition=u22
 #SBATCH --qos=high
-#SBATCH --nodelist=node10
+#SBATCH --nodelist=node03
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=96G

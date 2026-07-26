@@ -4,10 +4,10 @@
 #SBATCH --account=priyesh.shukla
 #SBATCH --partition=u22
 #SBATCH --qos=high
-#SBATCH --nodelist=node10
-#SBATCH --gres=gpu:8
-#SBATCH --cpus-per-task=64
-#SBATCH --mem=768G
+#SBATCH --nodelist=node03
+#SBATCH --gres=gpu:4
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=350G
 #SBATCH --time=12:00:00
 #SBATCH --output=logs/%x-%j.out
 set -euo pipefail
@@ -28,11 +28,11 @@ export GRAF_CONFIG="${PROJECT_SOURCE}/${GRAF_CANDIDATE_CONFIG}" OPSD_DATASET_REV
 vllm_utilization="${GRAF_VLLM_GPU_MEMORY_UTILIZATION:-0.45}"
 run_name="graf-${GRAF_CANDIDATE_ID}-${GRAF_MAX_STEPS}-${SLURM_JOB_ID}"; output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"; cp "${GRAF_CANDIDATE_CONFIG}" "${output_dir}/config.yaml"; cp "${GRAF_GRAPH_CACHE_MANIFEST}" "${output_dir}/graph-cache-manifest.json"; cp "${GRAF_VIABILITY_MANIFEST}" "${output_dir}/viability-manifest.json"
-printf 'candidate=%s\nmax_steps=%s\nvllm_gpu_memory_utilization=%s\n' "${GRAF_CANDIDATE_ID}" "${GRAF_MAX_STEPS}" "${vllm_utilization}" > "${output_dir}/runtime-overrides.txt"
+printf 'candidate=%s\nmax_steps=%s\nnum_gpus=4\ngradient_accumulation_steps=8\neffective_batch_size=32\nvllm_gpu_memory_utilization=%s\n' "${GRAF_CANDIDATE_ID}" "${GRAF_MAX_STEPS}" "${vllm_utilization}" > "${output_dir}/runtime-overrides.txt"
 record_run_manifest "${output_dir}" runtime-overrides.txt graph-cache-manifest.json viability-manifest.json
 start_gpu_telemetry "${run_name}"; trap stop_gpu_telemetry EXIT
-accelerate launch --config_file third_party/opsd/accelerate.yaml --num_processes 8 --gradient_accumulation_steps 4 --main_process_port "${GRAF_PORT}" \
+accelerate launch --config_file third_party/opsd/accelerate.yaml --num_processes 4 --gradient_accumulation_steps 8 --main_process_port "${GRAF_PORT}" \
   -m opsd_research.launch_graf_opsd --model_name_or_path Qwen/Qwen3-4B --model_revision 1cfa9a7208912126459214e8b04321603b3df60c --student_model_revision 1cfa9a7208912126459214e8b04321603b3df60c \
-  --learning_rate 5e-6 --max_grad_norm 0.1 --per_device_train_batch_size 1 --gradient_checkpointing --gradient_accumulation_steps 4 --output_dir "${TRAIN_ROOT}" --run_config "${run_name}" --num_train_epochs 30 --max_steps "${GRAF_MAX_STEPS}" --max_completion_length "${completion_length}" --save_steps "${GRAF_MAX_STEPS}" --logging_steps 1 \
+  --learning_rate 5e-6 --max_grad_norm 0.1 --per_device_train_batch_size 1 --gradient_checkpointing --gradient_accumulation_steps 8 --output_dir "${TRAIN_ROOT}" --run_config "${run_name}" --num_train_epochs 30 --max_steps "${GRAF_MAX_STEPS}" --max_completion_length "${completion_length}" --save_steps "${GRAF_MAX_STEPS}" --logging_steps 1 \
   --attn_implementation flash_attention_2 --torch_dtype bfloat16 --max_length 20000 --beta 0 --use_vllm --vllm_mode colocate --vllm_gpu_memory_utilization "${vllm_utilization}" --vllm_tensor_parallel_size 1 --use_peft --lora_r 64 --lora_alpha 128 --lora_target_modules q_proj k_proj v_proj o_proj gate_proj up_proj down_proj --temperature 1.1 --top_p 0.95 --top_k 20 --lmbda 1 --fixed_teacher --student_thinking --teacher_thinking --jsd_token_clip 0.05 --seed 42 --data_seed 42 --report_to wandb --wandb_project GRAF-OPSD-autoresearch
 python3 -m opsd_research.summarize_training --training-dir "${output_dir}" --training-log "${PROJECT_SOURCE}/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out" --telemetry "${TELEMETRY_ROOT}/${run_name}-${SLURM_JOB_ID}.csv" --output "${output_dir}/training-summary.json" --max-completion-length "${completion_length}"

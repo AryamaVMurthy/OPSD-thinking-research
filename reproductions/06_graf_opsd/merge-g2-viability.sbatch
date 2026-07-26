@@ -4,7 +4,7 @@
 #SBATCH --account=priyesh.shukla
 #SBATCH --partition=u22
 #SBATCH --qos=high
-#SBATCH --nodelist=node10
+#SBATCH --nodelist=node03
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=00:30:00

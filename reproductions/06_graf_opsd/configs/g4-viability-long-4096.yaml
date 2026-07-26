@@ -10,8 +10,8 @@ teacher_thinking: true
 fixed_teacher: true
 effective_batch_size: 32
 per_device_train_batch_size: 1
-gradient_accumulation_steps: 4
-num_gpus: 8
+gradient_accumulation_steps: 8
+num_gpus: 4
 learning_rate: 5.0e-6
 # This is the single experimental change from G2.  It tests whether the
 # action-routed objective benefits once the on-policy trajectory has enough
