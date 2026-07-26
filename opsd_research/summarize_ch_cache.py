@@ -30,6 +30,7 @@ def summarize_ch_records(records: list[dict[str, Any]]) -> dict[str, Any]:
     formatted_by_attempt = [0] * num_attempts
     output_tokens_by_attempt: list[list[int]] = [[] for _ in range(num_attempts)]
     audit_tokens: list[int] = []
+    teacher_dossier_tokens: list[int] = []
     any_correct = 0
     mixed_correctness = 0
     unique_recoveries = 0
@@ -59,6 +60,10 @@ def summarize_ch_records(records: list[dict[str, Any]]) -> dict[str, Any]:
             )
         answer_diversity.append(len({answer for answer in predictions if answer is not None}))
         audit_tokens.append(int(record.get("audit_output_tokens", 0)))
+        dossier_tokens = int(record.get("teacher_dossier_tokens", 0))
+        if dossier_tokens < 1:
+            raise ValueError("accepted CH record lacks a teacher-dossier token count")
+        teacher_dossier_tokens.append(dossier_tokens)
 
     count = len(accepted)
     rejection_reasons = Counter(
@@ -88,6 +93,11 @@ def summarize_ch_records(records: list[dict[str, Any]]) -> dict[str, Any]:
             mean(values) for values in output_tokens_by_attempt
         ],
         "mean_audit_output_tokens": mean(audit_tokens),
+        "mean_teacher_dossier_tokens": mean(teacher_dossier_tokens),
+        "max_teacher_dossier_tokens": max(teacher_dossier_tokens),
+        "teacher_dossiers_over_12000": sum(
+            tokens > 12_000 for tokens in teacher_dossier_tokens
+        ),
         "total_blind_generation_tokens": total_blind_tokens,
         "total_audit_generation_tokens": total_audit_tokens,
         "total_generation_tokens": total_blind_tokens + total_audit_tokens,

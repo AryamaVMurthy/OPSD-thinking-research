@@ -258,6 +258,12 @@ def main() -> None:
                         "audit_builder_attempt": audit_attempt + 1,
                     }
                 )
+                record["teacher_dossier_tokens"] = len(
+                    tokenizer.encode(
+                        str(record["teacher_dossier"]),
+                        add_special_tokens=False,
+                    )
+                )
                 records[index] = record
                 pending.remove(index)
             except ValueError as error:
