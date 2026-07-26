@@ -213,6 +213,7 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         "top_p": 0.95,
         "top_k": 20,
         "lmbda": 1.0,
+        "beta": 0.0,
         "jsd_token_clip": 0.05,
         "seed": 42,
         "tail_logits_only": True,
@@ -220,11 +221,6 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
     for key, value in expected.items():
         if data.get(key) != value:
             raise ConfigError(f"{source}: GRAF protocol requires {key}={value!r}")
-    beta = data.get("beta")
-    if beta not in {0.0, 0.5, 1.0}:
-        raise ConfigError(
-            f"{source}: beta must be one of 0.0 (forward KL), 0.5 (symmetric JSD), or 1.0 (reverse KL)"
-        )
     if data.get("max_completion_length") not in {1024, 2048, 4096}:
         raise ConfigError(
             f"{source}: max_completion_length must be 1024, 2048, or 4096"

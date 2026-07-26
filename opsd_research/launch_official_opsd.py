@@ -123,7 +123,7 @@ def _install_exact_jsd_chunking() -> None:
 
     import opsd_trainer
 
-    from .jsd import exact_generalized_jsd_vocab_chunked
+    from .jsd import exact_forward_kl_vocab_chunked
 
     def chunked_loss(
         student_logits,
@@ -136,7 +136,7 @@ def _install_exact_jsd_chunking() -> None:
         top_k=None,
         token_clip=None,
     ):
-        return exact_generalized_jsd_vocab_chunked(
+        return exact_forward_kl_vocab_chunked(
             student_logits,
             teacher_logits,
             labels,
@@ -153,7 +153,7 @@ def _install_exact_jsd_chunking() -> None:
     print(
         '{"event":"exact_jsd_chunking_enabled",'
         f'"vocab_chunk_size":{chunk_size},'
-        '"objective":"full_vocab_generalized_jsd"}',
+        '"objective":"full_vocab_forward_kl"}',
         flush=True,
     )
 

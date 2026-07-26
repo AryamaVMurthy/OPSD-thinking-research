@@ -10,7 +10,7 @@ except ImportError:
     F = None
 
 if torch is not None:
-    from opsd_research.jsd import exact_forward_kl_vocab_chunked, exact_generalized_jsd_vocab_chunked
+    from opsd_research.jsd import exact_forward_kl_vocab_chunked
 
 
 def official_beta_zero_loss(
@@ -29,22 +29,6 @@ def official_beta_zero_loss(
         reduction="none",
         log_target=True,
     )
-    if token_clip is not None:
-        divergence = divergence.clamp(max=token_clip)
-    mask = labels != -100
-    return divergence[mask].sum() / mask.sum()
-
-
-def official_generalized_jsd_loss(student_logits, teacher_logits, labels, *, beta, temperature, token_clip):
-    student_log_probs = F.log_softmax(student_logits / temperature, dim=-1)
-    teacher_log_probs = F.log_softmax(teacher_logits / temperature, dim=-1)
-    if beta == 0:
-        divergence = F.kl_div(student_log_probs, teacher_log_probs, reduction="none", log_target=True)
-    elif beta == 1:
-        divergence = F.kl_div(teacher_log_probs, student_log_probs, reduction="none", log_target=True)
-    else:
-        mixture = torch.logaddexp(student_log_probs + torch.log1p(torch.tensor(-beta, dtype=student_logits.dtype)), teacher_log_probs + torch.log(torch.tensor(beta, dtype=student_logits.dtype)))
-        divergence = beta * F.kl_div(mixture, teacher_log_probs, reduction="none", log_target=True) + (1 - beta) * F.kl_div(mixture, student_log_probs, reduction="none", log_target=True)
     if token_clip is not None:
         divergence = divergence.clamp(max=token_clip)
     mask = labels != -100
@@ -103,18 +87,6 @@ class ChunkedJSDTests(unittest.TestCase):
                 top_k=2,
                 chunk_size=2,
             )
-
-    def test_value_and_student_gradient_match_official_symmetric_jsd(self):
-        generator = torch.Generator().manual_seed(19)
-        student_reference = torch.randn(2, 4, 17, generator=generator, dtype=torch.float64, requires_grad=True)
-        student_chunked = student_reference.detach().clone().requires_grad_(True)
-        teacher = torch.randn(2, 4, 17, generator=generator, dtype=torch.float64)
-        labels = torch.tensor([[-100, 1, 2, 3], [-100, -100, 4, 5]])
-        reference = official_generalized_jsd_loss(student_reference, teacher, labels, beta=0.5, temperature=1.1, token_clip=0.05)
-        chunked = exact_generalized_jsd_vocab_chunked(student_chunked, teacher, labels, beta=0.5, temperature=1.1, token_clip=0.05, chunk_size=5)
-        reference.backward(); chunked.backward()
-        torch.testing.assert_close(chunked, reference, rtol=1e-12, atol=1e-12)
-        torch.testing.assert_close(student_chunked.grad, student_reference.grad, rtol=1e-12, atol=1e-12)
 
 
 if __name__ == "__main__":
