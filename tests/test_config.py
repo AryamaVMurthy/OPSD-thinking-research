@@ -31,6 +31,21 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "Base"):
             validate_config(changed)
 
+    def test_math_development_evaluation_has_an_explicit_short_protocol(self):
+        data = load_config(
+            ROOT
+            / "reproductions/06_graf_opsd/configs/qwen3-4b-aime24-dev.yaml"
+        ).data
+        changed = copy.deepcopy(data)
+        changed.update(
+            evaluation_protocol="development",
+            samples_per_problem=4,
+            max_new_tokens=4096,
+            max_model_len=6144,
+        )
+
+        validate_config(changed)
+
     def test_thinking_off_is_rejected(self):
         data = load_config(
             ROOT / "reproductions/03_opsd_thinking_1p7b/configs/train.yaml"

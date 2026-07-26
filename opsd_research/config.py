@@ -91,10 +91,29 @@ def _validate_eval(data: dict[str, Any], source: str) -> None:
     samples = _require(data, "samples_per_problem", source)
     max_tokens = _require(data, "max_new_tokens", source)
     if kind == "math_eval":
-        if samples != 12:
-            raise ConfigError(f"{source}: math evaluation requires 12 samples/problem")
-        if max_tokens != 38912:
-            raise ConfigError(f"{source}: math evaluation requires max_new_tokens=38912")
+        protocol = data.get("evaluation_protocol", "official")
+        if protocol == "official":
+            expected_samples, expected_tokens = 12, 38912
+        elif protocol == "development":
+            expected_samples, expected_tokens = 4, 4096
+            if data.get("max_model_len") != 6144:
+                raise ConfigError(
+                    f"{source}: development math evaluation requires max_model_len=6144"
+                )
+        else:
+            raise ConfigError(
+                f"{source}: evaluation_protocol must be official or development"
+            )
+        if samples != expected_samples:
+            raise ConfigError(
+                f"{source}: {protocol} math evaluation requires "
+                f"{expected_samples} samples/problem"
+            )
+        if max_tokens != expected_tokens:
+            raise ConfigError(
+                f"{source}: {protocol} math evaluation requires "
+                f"max_new_tokens={expected_tokens}"
+            )
         if data.get("temperature") != 1.0 or data.get("top_p") != 0.95:
             raise ConfigError(f"{source}: math evaluation requires temperature=1.0, top_p=0.95")
         if data.get("top_k") != -1:
