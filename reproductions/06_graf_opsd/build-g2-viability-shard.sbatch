@@ -10,7 +10,10 @@
 #SBATCH --nodelist=node03
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=96G
+# Four 4B single-GPU vLLM shards fit simultaneously on node03 (386 GiB RAM).
+# 64 GiB preserves substantial host headroom while avoiding a 96 GiB request
+# that silently reduced the intended four-way GPU parallelism to three shards.
+#SBATCH --mem=64G
 #SBATCH --time=12:00:00
 #SBATCH --output=logs/%x-%A_%a.out
 
