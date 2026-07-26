@@ -4,6 +4,7 @@ from opsd_research.build_graf_cache import (
     MAX_COMPLETION_TOKENS,
     MAX_MODEL_LEN,
     _builder_chat_prompt,
+    _critic_chat_prompt,
     _sanitizer_chat_prompt,
     _bounded_builder_prompt,
     _json_object,
@@ -55,3 +56,13 @@ def test_sanitizer_never_receives_reference_solution() -> None:
     assert "Construct a fresh" in prompt
     assert "Candidate graph" not in prompt
     assert "reference solution" not in prompt.lower()
+
+
+def test_critic_is_privileged_but_requires_answer_masked_json_revision() -> None:
+    prompt = _critic_chat_prompt(
+        _CharacterTokenizer(), "Find x.", "Private reference reasoning.",
+        {"forks": [{"fork_id": "f", "state": "start", "actions": []}]},
+    )
+    assert "Private reference reasoning." in prompt
+    assert "do not copy it into JSON" in prompt
+    assert "Return JSON with only `forks`" in prompt

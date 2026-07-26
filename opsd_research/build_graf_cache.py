@@ -15,6 +15,7 @@ from typing import Any
 
 from .graf_graph import (
     graph_builder_prompt,
+    graph_critic_prompt,
     graph_sanitizer_prompt,
     parse_answer_masked_graph,
 )
@@ -120,6 +121,22 @@ def _sanitizer_chat_prompt(
     return prompt
 
 
+def _critic_chat_prompt(
+    tokenizer: Any, problem: str, reference_solution: str, candidate_graph: dict[str, Any], *, graph_budget: int = 24
+) -> str:
+    prompt = tokenizer.apply_chat_template(
+        [{"role": "user", "content": graph_critic_prompt(
+            problem, reference_solution, candidate_graph, graph_budget=graph_budget
+        )}],
+        tokenize=False, add_generation_prompt=True, enable_thinking=False,
+    )
+    if "</think>" not in prompt:
+        raise RuntimeError("critic chat template did not disable thinking")
+    if len(tokenizer.encode(prompt, add_special_tokens=False)) > MAX_MODEL_LEN - MAX_COMPLETION_TOKENS:
+        raise ValueError("critic chat prompt exceeds its context window")
+    return prompt
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build an immutable GRAF graph cache")
     parser.add_argument("--output", required=True, type=Path)
@@ -133,6 +150,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--max-forks", type=int, default=6)
     parser.add_argument("--max-actions-per-fork", type=int, default=6)
     parser.add_argument("--graph-budget", type=int, default=24)
+    parser.add_argument("--teacher-critique", action="store_true")
     return parser.parse_args()
 
 
@@ -317,6 +335,53 @@ def main() -> None:
             "accepted": False,
             "reject_reason": last_errors.get(index, "prompt could not be rendered"),
         }
+    critique_applied = 0
+    critique_rejected = 0
+    if args.teacher_critique:
+        critic_prompts: list[str] = []
+        critic_indices: list[int] = []
+        for index, record in enumerate(records):
+            if record is None or not record.get("accepted"):
+                continue
+            row = rows[index]
+            try:
+                critic_prompts.append(_critic_chat_prompt(
+                    tokenizer, str(row["question"]), str(row["response"]),
+                    dict(record["graph"]), graph_budget=args.graph_budget,
+                ))
+                critic_indices.append(index)
+            except ValueError as error:
+                record["teacher_critique_error"] = str(error)
+                critique_rejected += 1
+        critic_outputs = llm.generate(
+            critic_prompts,
+            SamplingParams(
+                temperature=0.2, top_p=0.95, max_tokens=MAX_COMPLETION_TOKENS,
+                seed=args.seed + 20_000,
+            ),
+        ) if critic_prompts else []
+        for index, output in zip(critic_indices, critic_outputs, strict=True):
+            record = records[index]
+            if record is None:
+                raise RuntimeError("critic lost an accepted graph record")
+            row = rows[index]
+            try:
+                graph = parse_answer_masked_graph(
+                    _json_object(output.outputs[0].text),
+                    problem=str(row["question"]), reference_solution=str(row["response"]),
+                    max_forks=args.max_forks, max_actions_per_fork=args.max_actions_per_fork,
+                    graph_budget=args.graph_budget,
+                )
+                record["graph"] = json.loads(graph.canonical_json())
+                record["graph_sha256"] = graph.sha256
+                record["teacher_critique_applied"] = True
+                critique_applied += 1
+            except (ValueError, json.JSONDecodeError) as error:
+                # Preserve the independently validated original graph while
+                # recording that no privileged revision was admitted.
+                record["teacher_critique_applied"] = False
+                record["teacher_critique_error"] = str(error)
+                critique_rejected += 1
     for record in records:
         if record is None:
             raise RuntimeError("cache builder lost an example record")
@@ -337,6 +402,9 @@ def main() -> None:
         "max_forks": args.max_forks,
         "max_actions_per_fork": args.max_actions_per_fork,
         "graph_budget": args.graph_budget,
+        "teacher_critique": args.teacher_critique,
+        "teacher_critique_applied": critique_applied,
+        "teacher_critique_rejected": critique_rejected,
     }
     args.manifest.parent.mkdir(parents=True, exist_ok=True)
     args.manifest.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")

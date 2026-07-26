@@ -17,8 +17,16 @@ cd "${PROJECT_SOURCE}"
 
 GRAPH_LIMIT="${GRAPH_LIMIT:-512}"
 GRAPH_ATTEMPTS="${GRAPH_ATTEMPTS:-3}"
+GRAPH_TEACHER_CRITIQUE="${GRAPH_TEACHER_CRITIQUE:-0}"
 if (( GRAPH_LIMIT < 1 || GRAPH_ATTEMPTS < 1 )); then
   echo "GRAPH_LIMIT and GRAPH_ATTEMPTS must be positive" >&2
+  exit 2
+fi
+critique_args=()
+if [[ "${GRAPH_TEACHER_CRITIQUE}" == 1 ]]; then
+  critique_args+=(--teacher-critique)
+elif [[ "${GRAPH_TEACHER_CRITIQUE}" != 0 ]]; then
+  echo "GRAPH_TEACHER_CRITIQUE must be 0 or 1" >&2
   exit 2
 fi
 run_dir="${SCRATCH_ROOT}/graf_cache/g1-${SLURM_JOB_ID}"
@@ -33,7 +41,7 @@ python3 -m opsd_research.build_graf_cache \
   --limit "${GRAPH_LIMIT}" \
   --attempts "${GRAPH_ATTEMPTS}" \
   --tensor-parallel-size 1 \
-  --seed 42
+  --seed 42 "${critique_args[@]}"
 
 sha256sum "${run_dir}/graphs.jsonl" "${run_dir}/manifest.json" \
   "${run_dir}/source-commit.txt" > "${run_dir}/artifact-manifest.sha256"
