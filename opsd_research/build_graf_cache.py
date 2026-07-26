@@ -44,7 +44,9 @@ def _json_object(text: str) -> dict[str, Any]:
     return payload
 
 
-def _bounded_builder_prompt(tokenizer: Any, problem: str, reference_solution: str) -> str:
+def _bounded_builder_prompt(
+    tokenizer: Any, problem: str, reference_solution: str, *, graph_budget: int = 24
+) -> str:
     """Keep a cache-builder request inside its declared context window.
 
     The builder is offline and may inspect the reference, whereas the saved
@@ -55,7 +57,7 @@ def _bounded_builder_prompt(tokenizer: Any, problem: str, reference_solution: st
     max_prompt_tokens = (
         MAX_MODEL_LEN - MAX_COMPLETION_TOKENS - CHAT_TEMPLATE_RESERVE_TOKENS
     )
-    prompt = graph_builder_prompt(problem, reference_solution)
+    prompt = graph_builder_prompt(problem, reference_solution, graph_budget=graph_budget)
     prompt_tokens = tokenizer.encode(prompt, add_special_tokens=False)
     if len(prompt_tokens) <= max_prompt_tokens:
         return prompt
@@ -67,7 +69,9 @@ def _bounded_builder_prompt(tokenizer: Any, problem: str, reference_solution: st
         truncated_reference = tokenizer.decode(
             reference_tokens[:keep], skip_special_tokens=True
         ) + "\n[Reference truncated for the builder context window.]"
-        prompt = graph_builder_prompt(problem, truncated_reference)
+        prompt = graph_builder_prompt(
+            problem, truncated_reference, graph_budget=graph_budget
+        )
         if len(tokenizer.encode(prompt, add_special_tokens=False)) <= max_prompt_tokens:
             return prompt
         if keep == 0:
@@ -75,7 +79,9 @@ def _bounded_builder_prompt(tokenizer: Any, problem: str, reference_solution: st
         keep = max(0, int(keep * 0.9))
 
 
-def _builder_chat_prompt(tokenizer: Any, problem: str, reference_solution: str) -> str:
+def _builder_chat_prompt(
+    tokenizer: Any, problem: str, reference_solution: str, *, graph_budget: int = 24
+) -> str:
     """Render a non-thinking JSON compiler turn for the offline graph builder.
 
     Thinking remains enabled for student rollouts and benchmark evaluation. The
@@ -85,7 +91,7 @@ def _builder_chat_prompt(tokenizer: Any, problem: str, reference_solution: str) 
     accidentally retained in an answer-masked artifact.
     """
     prompt = tokenizer.apply_chat_template(
-        [{"role": "user", "content": _bounded_builder_prompt(tokenizer, problem, reference_solution)}],
+        [{"role": "user", "content": _bounded_builder_prompt(tokenizer, problem, reference_solution, graph_budget=graph_budget)}],
         tokenize=False,
         add_generation_prompt=True,
         enable_thinking=False,
@@ -97,10 +103,12 @@ def _builder_chat_prompt(tokenizer: Any, problem: str, reference_solution: str) 
     return prompt
 
 
-def _sanitizer_chat_prompt(tokenizer: Any, problem: str) -> str:
+def _sanitizer_chat_prompt(
+    tokenizer: Any, problem: str, *, graph_budget: int = 24
+) -> str:
     """Render a reference-free non-thinking JSON rewrite turn."""
     prompt = tokenizer.apply_chat_template(
-        [{"role": "user", "content": graph_sanitizer_prompt(problem)}],
+        [{"role": "user", "content": graph_sanitizer_prompt(problem, graph_budget=graph_budget)}],
         tokenize=False,
         add_generation_prompt=True,
         enable_thinking=False,
@@ -122,13 +130,19 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--model-revision", default=DEFAULT_MODEL_REVISION)
     parser.add_argument("--tensor-parallel-size", type=int, default=1)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--max-forks", type=int, default=6)
+    parser.add_argument("--max-actions-per-fork", type=int, default=6)
+    parser.add_argument("--graph-budget", type=int, default=24)
     return parser.parse_args()
 
 
 def main() -> None:
     args = _parse_args()
-    if args.limit < 1 or args.attempts < 1:
-        raise SystemExit("--limit and --attempts must be positive")
+    if (
+        args.limit < 1 or args.attempts < 1 or args.max_forks < 1
+        or args.max_actions_per_fork < 2 or args.graph_budget < 2
+    ):
+        raise SystemExit("cache limits, graph action limits, and graph budget must be positive")
     if args.model != DEFAULT_MODEL or args.model_revision != DEFAULT_MODEL_REVISION:
         raise SystemExit("GRAF cache building is pinned to Qwen3-4B@1cfa9a7")
     if args.output.exists():
@@ -164,7 +178,8 @@ def main() -> None:
             row = rows[index]
             try:
                 prompts.append(_builder_chat_prompt(
-                    tokenizer, str(row["question"]), str(row["response"])
+                    tokenizer, str(row["question"]), str(row["response"]),
+                    graph_budget=args.graph_budget,
                 ))
                 viable_indices.append(index)
             except ValueError as error:
@@ -199,6 +214,9 @@ def main() -> None:
                     _json_object(output.outputs[0].text),
                     problem=question,
                     reference_solution=response,
+                    max_forks=args.max_forks,
+                    max_actions_per_fork=args.max_actions_per_fork,
+                    graph_budget=args.graph_budget,
                 )
                 record.update({
                     "accepted": True,
@@ -220,6 +238,9 @@ def main() -> None:
                             candidate_graph,
                             problem=question,
                             reference_solution=response,
+                            max_forks=args.max_forks,
+                            max_actions_per_fork=args.max_actions_per_fork,
+                            graph_budget=args.graph_budget,
                             check_reference_fragments=False,
                         )
                         sanitizer_inputs.append((index, candidate_graph))
@@ -231,7 +252,9 @@ def main() -> None:
             row = rows[index]
             try:
                 sanitizer_prompts.append(
-                    _sanitizer_chat_prompt(tokenizer, str(row["question"]))
+                    _sanitizer_chat_prompt(
+                        tokenizer, str(row["question"]), graph_budget=args.graph_budget
+                    )
                 )
                 sanitizer_indices.append(index)
             except ValueError as error:
@@ -254,6 +277,9 @@ def main() -> None:
                     _json_object(output.outputs[0].text),
                     problem=question,
                     reference_solution=response,
+                    max_forks=args.max_forks,
+                    max_actions_per_fork=args.max_actions_per_fork,
+                    graph_budget=args.graph_budget,
                 )
                 records[index] = {
                     "schema_version": 1,
@@ -308,6 +334,9 @@ def main() -> None:
         "training_dataset_revision": TRAINING_DATASET_REVISION,
         "builder_seed": args.seed,
         "builder_attempts": args.attempts,
+        "max_forks": args.max_forks,
+        "max_actions_per_fork": args.max_actions_per_fork,
+        "graph_budget": args.graph_budget,
     }
     args.manifest.parent.mkdir(parents=True, exist_ok=True)
     args.manifest.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")

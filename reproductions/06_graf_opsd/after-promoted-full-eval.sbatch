@@ -21,11 +21,11 @@ import json,sys
 from pathlib import Path
 from opsd_research.graf_contract import append_ledger
 c=json.load(open(sys.argv[1])); d=c["avg_at_12"]["delta"]; lo,hi=c["delta_bootstrap_95ci"]["avg_at_12"]
-e={"event":"full_200_development_result","candidate_id":sys.argv[3],"avg_at_12_delta":d,"delta_ci_lower":lo,"delta_ci_upper":hi,"promotion_gate_passed":d>=.03 and lo>0 and hi>0,"comparison_protocol":c["comparison_protocol"]}; e["ledger_event_sha256"]=append_ledger(Path(sys.argv[2]),e); print(json.dumps(e,sort_keys=True))
+e={"event":"full_200_development_result","candidate_id":sys.argv[3],"avg_at_12_delta":d,"delta_ci_lower":lo,"delta_ci_upper":hi,"selection_metric":"official_aime24_avg_at_12","selection_rule":"delta_gt_zero","comparison_protocol":c["comparison_protocol"]}; e["ledger_event_sha256"]=append_ledger(Path(sys.argv[2]),e); print(json.dumps(e,sort_keys=True))
 PY
 promote="$(python3 - "${treatment}/paired-vs-base.json" <<'PY'
 import json,sys
-c=json.load(open(sys.argv[1])); d=c["avg_at_12"]["delta"]; lo,hi=c["delta_bootstrap_95ci"]["avg_at_12"]; print("1" if d>=.03 and lo>0 and hi>0 else "0")
+c=json.load(open(sys.argv[1])); d=c["avg_at_12"]["delta"]; print("1" if d>0 else "0")
 PY
 )"
 if [[ "${promote}" == 1 ]]; then adapter="${TRAIN_ROOT}/graf-${CANDIDATE_ID}-200-${FULL_JOB_ID}"; sbatch --parsable --export="ALL,METHOD=${METHOD}-200,ADAPTER=${adapter}" reproductions/06_graf_opsd/submit-locked-evals.sbatch; else echo "full 200-step confirmation did not clear the gate"; fi

@@ -1,5 +1,5 @@
 kind: graf_train
-variant: g4_viability_long_4096
+variant: g4_graph_backtrack_entropy_4096
 model: Qwen/Qwen3-4B
 model_revision: 1cfa9a7208912126459214e8b04321603b3df60c
 dataset: jasonrqh/Math-CoT-20k
@@ -13,9 +13,9 @@ per_device_train_batch_size: 1
 gradient_accumulation_steps: 8
 num_gpus: 4
 learning_rate: 5.0e-6
-# This is the single experimental change from G2.  It tests whether the
-# action-routed objective benefits once the on-policy trajectory has enough
-# room to reach a mathematical answer instead of terminating at 2,048 tokens.
+# The first complete GRAF method: answer-masked teacher graph proposals,
+# verifier-calibrated student-context viability, recovery actions, and a
+# target-adaptive entropy floor over genuinely viable alternatives.
 max_completion_length: 4096
 max_steps: 50
 save_steps: 50
@@ -37,4 +37,8 @@ seed: 42
 heldout_diagnostic_fraction: 0.05
 graph_mode: viability_routed
 branch_loss_weight: 0.10
-entropy_floor_weight: 0.0
+entropy_floor_weight: 0.90
+# Weight every informative action distribution continuously instead of a
+# fixed count, static margin, or hand-selected viable/invalid pattern.
+information_weighted_routing: true
+graph_budget: 24

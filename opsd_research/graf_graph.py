@@ -55,7 +55,9 @@ class ReasoningGraph:
         return hashlib.sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
 
-def graph_builder_prompt(problem: str, reference_solution: str) -> str:
+def graph_builder_prompt(
+    problem: str, reference_solution: str, *, graph_budget: int = 24
+) -> str:
     """Prompt an offline builder while making the answer-mask requirement explicit."""
     return f"""Construct an answer-masked reasoning graph for the following math problem.
 
@@ -65,7 +67,10 @@ Problem:
 Verified reference solution (available only to identify concepts and checks):
 {reference_solution}
 
-Return JSON with `forks`. Each fork has `fork_id`, `state`, and 2-3 `actions`.
+Return JSON with `forks`. Each fork has `fork_id`, `state`, and a variable
+number of genuinely distinct `actions`. Use only as many forks/actions as the
+problem warrants, while staying within a total graph budget of {graph_budget}
+action records. Every retained fork must have at least two alternatives.
 Each action has `action_id`, `description`, `status`, `validation_test`, and
 `recovery_action`. Status must be one of: viable, conditionally_viable, risky,
 invalid, dead_end, recoverable, redundant.
@@ -79,7 +84,7 @@ that could apply to a related problem.
 Output only the JSON object—no prose, Markdown, or explanation."""
 
 
-def graph_sanitizer_prompt(problem: str) -> str:
+def graph_sanitizer_prompt(problem: str, *, graph_budget: int = 24) -> str:
     """Request a clean graph without exposing either solution or candidate text.
 
     This is only used after the first candidate has passed answer-leak checks
@@ -93,8 +98,9 @@ Problem:
 {problem}
 
 Construct a fresh answer-masked reasoning graph using only this problem.
-Return JSON with only `forks`; each fork has `fork_id`, `state`, and 2-3
-actions, and each action has `action_id`, `description`, `status`,
+Return JSON with only `forks`; each fork has `fork_id`, `state`, and a
+variable number of distinct actions within a total budget of {graph_budget}.
+Each action has `action_id`, `description`, `status`,
 `validation_test`, and `recovery_action`. Status must be one of: viable,
 conditionally_viable, risky, invalid, dead_end, recoverable, redundant.
 Do not include a final answer, a boxed expression, a numerical intermediate,
@@ -122,8 +128,9 @@ def _all_text(payload: dict[str, Any]) -> list[str]:
 
 
 def parse_answer_masked_graph(
-    payload: dict[str, Any], *, problem: str, reference_solution: str, max_forks: int = 2,
-    check_reference_fragments: bool = True,
+    payload: dict[str, Any], *, problem: str, reference_solution: str,
+    max_forks: int = 6, max_actions_per_fork: int = 6,
+    graph_budget: int = 24, check_reference_fragments: bool = True,
 ) -> ReasoningGraph:
     """Validate a builder payload and reject rather than redact leakage.
 
@@ -134,6 +141,8 @@ def parse_answer_masked_graph(
         raise ValueError("graph requires a nonempty forks list")
     if len(payload["forks"]) > max_forks:
         raise ValueError(f"graph exceeds max_forks={max_forks}")
+    if graph_budget < 2:
+        raise ValueError("graph_budget must permit at least one decision fork")
     answer = extract_last_boxed(reference_solution)
     fragments = _reference_fragments(reference_solution)
     for field in _all_text(payload):
@@ -148,6 +157,7 @@ def parse_answer_masked_graph(
             raise ValueError("graph copies a five-word reference fragment")
     forks: list[GraphFork] = []
     seen_forks: set[str] = set()
+    action_count = 0
     for raw_fork in payload["forks"]:
         fork_id = str(raw_fork.get("fork_id", "")).strip()
         state = str(raw_fork.get("state", "")).strip()
@@ -155,8 +165,16 @@ def parse_answer_masked_graph(
             raise ValueError("graph fork IDs must be unique and nonempty")
         seen_forks.add(fork_id)
         raw_actions = raw_fork.get("actions")
-        if not isinstance(raw_actions, list) or not 2 <= len(raw_actions) <= 3:
-            raise ValueError("each fork requires 2-3 canonical actions")
+        if (
+            not isinstance(raw_actions, list)
+            or not 2 <= len(raw_actions) <= max_actions_per_fork
+        ):
+            raise ValueError(
+                "each fork requires 2 through max_actions_per_fork distinct actions"
+            )
+        action_count += len(raw_actions)
+        if action_count > graph_budget:
+            raise ValueError(f"graph exceeds graph_budget={graph_budget} action records")
         actions: list[GraphAction] = []
         seen_actions: set[str] = set()
         for raw_action in raw_actions:

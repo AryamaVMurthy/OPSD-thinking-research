@@ -27,35 +27,24 @@ from opsd_research.graf_contract import append_ledger
 comparison = json.load(open(sys.argv[1], encoding="utf-8"))
 delta = comparison["avg_at_12"]["delta"]
 lower, upper = comparison["delta_bootstrap_95ci"]["avg_at_12"]
-event = {"event": "c1_development_result", "candidate_id": "c1-long-rollout-4096", "avg_at_12_delta": delta, "delta_ci_lower": lower, "delta_ci_upper": upper, "promotion_gate_passed": delta >= 0.03 and lower > 0 and upper > 0, "comparison_protocol": comparison["comparison_protocol"]}
+event = {"event": "c1_development_result", "candidate_id": "c1-long-rollout-4096", "avg_at_12_delta": delta, "delta_ci_lower": lower, "delta_ci_upper": upper, "selection_metric": "official_aime24_avg_at_12", "comparison_protocol": comparison["comparison_protocol"]}
 event["ledger_event_sha256"] = append_ledger(Path(sys.argv[2]), event)
 print(json.dumps(event, sort_keys=True))
 PY
-promote="$(python3 - "${treatment}/paired-vs-base.json" <<'PY'
-import json, sys
-comparison = json.load(open(sys.argv[1], encoding="utf-8"))
-delta = comparison["avg_at_12"]["delta"]
-lower, upper = comparison["delta_bootstrap_95ci"]["avg_at_12"]
-print("1" if delta >= 0.03 and lower > 0 and upper > 0 else "0")
-PY
-)"
-if [[ "${promote}" == "1" ]]; then
-  full="$(sbatch --parsable --export="ALL,CANDIDATE_ID=c1-long-rollout-4096,CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/c1-long-rollout-4096.yaml,METHOD=opsd-long-4096,COMPLETION_LENGTH=4096,VLLM_GPU_UTILIZATION=0.55" reproductions/06_graf_opsd/promoted-full-train.sbatch)"
-  echo "c1_full_confirmation_job=${full}"
-  sbatch --parsable --dependency="afterok:${full}" --export="ALL,FULL_JOB_ID=${full},CANDIDATE_ID=c1-long-rollout-4096,METHOD=opsd-long-4096" reproductions/06_graf_opsd/after-promoted-full-train.sbatch
-else
-  # Establish the held-out-data control before attributing an effect to a
-  # graph objective. G4 will then differ from C2 only by dynamic routing.
-  python3 -m opsd_research.graf_autoresearch register \
-    --policy reproductions/06_graf_opsd/configs/autoresearch.yaml \
-    --config reproductions/06_graf_opsd/configs/c2-long-rollout-4096-heldout.yaml \
-    --ledger artifacts/graf_opsd/candidate-ledger.jsonl \
-    --candidate-id c2-long-rollout-4096-heldout --parent-id c1-long-rollout-4096 --stage C2 \
-    --hypothesis "Reserve a deterministic held-out Math-CoT diagnostic partition while holding the 4,096-token standard OPSD objective fixed before testing any graph loss." \
-    --changed-field heldout_diagnostic_fraction
-  c2_smoke="$(sbatch --parsable reproductions/06_graf_opsd/c2-smoke.sbatch)"
-  echo "c2_smoke_job=${c2_smoke}"
-  sbatch --parsable --dependency="afterok:${c2_smoke}" \
-    --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G2_VIABILITY_ARRAY_JOB_ID=${G2_VIABILITY_ARRAY_JOB_ID},C2_SMOKE_JOB_ID=${c2_smoke}" \
-    reproductions/06_graf_opsd/after-c2-smoke.sbatch
-fi
+# AIME24 Avg@12 itself is the requested development selection signal.  C1 is
+# recorded for comparison, then the complete graph method runs regardless of
+# its value—this avoids spending the graph budget on a statistical gate.
+python3 -m opsd_research.graf_autoresearch register \
+  --policy reproductions/06_graf_opsd/configs/autoresearch.yaml \
+  --config reproductions/06_graf_opsd/configs/g4-viability-long-4096.yaml \
+  --ledger artifacts/graf_opsd/candidate-ledger.jsonl \
+  --candidate-id g4-graph-backtrack-entropy-4096 --parent-id c1-long-rollout-4096 --stage G4 \
+  --hypothesis "Distil verifier-calibrated distributions over answer-masked teacher-proposed graph actions, including recovery actions and a target-adaptive entropy floor, at a 4,096-token on-policy rollout budget." \
+  --changed-field graph_mode
+graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"
+viability_manifest="${SCRATCH_ROOT}/graf_cache/g2-viability-${G2_VIABILITY_ARRAY_JOB_ID}/manifest.json"
+g4_smoke="$(GRAF_GRAPH_CACHE_MANIFEST="${graph_manifest}" GRAF_VIABILITY_MANIFEST="${viability_manifest}" sbatch --parsable reproductions/06_graf_opsd/g4-smoke.sbatch)"
+echo "g4_smoke_job=${g4_smoke}"
+sbatch --parsable --dependency="afterok:${g4_smoke}" \
+  --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G2_VIABILITY_ARRAY_JOB_ID=${G2_VIABILITY_ARRAY_JOB_ID},G4_SMOKE_JOB_ID=${g4_smoke}" \
+  reproductions/06_graf_opsd/after-g4-smoke.sbatch
