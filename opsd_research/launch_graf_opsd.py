@@ -134,12 +134,17 @@ def main() -> None:
             viability_beta_prior=float(config.get("viability_beta_prior", 0.0)),
             recovery_conditioned=bool(config.get("recovery_conditioned_routing", False)),
         )
+        # An empty fork tuple means the measured viability target was uniform
+        # and consequently supplies no routing gradient.  Excluding those
+        # identities is important: otherwise a batch can silently perform
+        # only the base OPSD update, making the routed objective depend on
+        # shuffle order rather than its measured graph signal.
         routed_targets = {
-            index: forks for index, forks in routed_targets.items()
-            if index in train_index_set
+            index: forks
+            for index, forks in routed_targets.items()
+            if index in train_index_set and forks
         }
-        active_examples = sum(bool(forks) for forks in routed_targets.values())
-        if not routed_targets or not active_examples:
+        if not routed_targets:
             raise SystemExit("viability-routed candidates require at least one active joined target")
         # Train only on identities with measured continuation viability.  This
         # makes every distributed batch exercise the GRAF loss instead of
@@ -152,7 +157,7 @@ def main() -> None:
             '{"event":"graf_viability_routing_enabled",'
             f'"accepted_graph_records":{records},'
             f'"routed_examples":{len(routed_targets)},'
-            f'"active_routed_examples":{active_examples},'
+            f'"active_routed_examples":{len(routed_targets)},'
             f'"fork_threshold":{float(config.get("fork_threshold", 0.0))},'
             f'"fork_information_threshold":{float(config.get("fork_information_threshold", 0.0))},'
             f'"fork_information_quantile":{float(config.get("fork_information_quantile", 0.0))},'
