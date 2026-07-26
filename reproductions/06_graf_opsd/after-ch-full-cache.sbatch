@@ -77,11 +77,21 @@ train="$(
     reproductions/06_graf_opsd/run-ch-candidate.sbatch
 )"
 echo "ch1_full_training_job=${train}"
+full_run_name="ch-ch1-completion-aware-4096-full-200-${train}"
+source_commit="$(git rev-parse HEAD)"
 controller="$(
   sbatch --parsable \
     --dependency="afterok:${train}" \
     --output="${SCRATCH_ROOT}/slurm-after-ch-full-train-%j.out" \
-    --export="ALL,CH_FULL_TRAIN_JOB_ID=${train}" \
+    --export="ALL,CH_FULL_TRAIN_JOB_ID=${train},CH_FULL_RUN_NAME=${full_run_name}" \
     reproductions/06_graf_opsd/after-ch-full-train.sbatch
 )"
 echo "ch1_full_training_controller=${controller}"
+recovery="$(
+  sbatch --parsable \
+    --dependency="afternotok:${train}" \
+    --output="${SCRATCH_ROOT}/slurm-recover-ch-full-train-%j.out" \
+    --export="ALL,CH_FULL_TRAIN_JOB_ID=${train},CH_FULL_RUN_NAME=${full_run_name},CH_DOSSIER_MANIFEST=${manifest},CH_RECOVERY_ATTEMPT=1,CH_EXPECTED_SOURCE_COMMIT=${source_commit}" \
+    reproductions/06_graf_opsd/recover-ch-full-train.sbatch
+)"
+echo "ch1_full_training_recovery_controller=${recovery}"

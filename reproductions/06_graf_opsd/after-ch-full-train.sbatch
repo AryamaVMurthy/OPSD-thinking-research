@@ -17,7 +17,7 @@ cd "${PROJECT_SOURCE}"
 : "${CH_FULL_TRAIN_JOB_ID:?}"
 
 method="ch1-completion-aware-4096-full"
-run_name="ch-${method}-200-${CH_FULL_TRAIN_JOB_ID}"
+run_name="${CH_FULL_RUN_NAME:-ch-${method}-200-${CH_FULL_TRAIN_JOB_ID}}"
 training_dir="${TRAIN_ROOT}/${run_name}"
 summary="${training_dir}/training-summary.json"
 test -f "${summary}"

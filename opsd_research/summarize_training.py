@@ -44,7 +44,19 @@ def _parse_training_log(path: Path) -> tuple[list[dict[str, Any]], list[int]]:
                 raise ValueError(f"unexpected loss record in {path}")
             record = {"step": current_step, **parsed}
             losses.append(record)
-    return losses, rollout_tokens
+    # A resumed run appends to the canonical log and may replay updates after
+    # its last durable checkpoint. Keep the final record for each completed
+    # optimizer step while retaining step-less diagnostics verbatim.
+    by_step: dict[int, dict[str, Any]] = {}
+    without_step: list[dict[str, Any]] = []
+    for record in losses:
+        step = record.get("step")
+        if isinstance(step, int):
+            by_step[step] = record
+        else:
+            without_step.append(record)
+    deduplicated = without_step + [by_step[step] for step in sorted(by_step)]
+    return deduplicated, rollout_tokens
 
 
 def _parse_gpu_telemetry(path: Path) -> list[dict[str, Any]]:

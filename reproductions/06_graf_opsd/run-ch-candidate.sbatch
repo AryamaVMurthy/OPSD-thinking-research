@@ -141,9 +141,20 @@ accelerate launch \
   --wandb_project CH-OPSD-autoresearch \
   2>&1 | tee -a "${canonical_training_log}"
 
+stop_gpu_telemetry
+trap - EXIT
+combined_telemetry="${output_dir}/gpu-telemetry.csv"
+telemetry_files=("${TELEMETRY_ROOT}/${run_name}-"*.csv)
+if (( ${#telemetry_files[@]} == 0 )); then
+  echo "no telemetry files found for ${run_name}" >&2
+  exit 1
+fi
+awk 'FNR == 1 && NR != 1 { } { print }' "${telemetry_files[@]}" \
+  > "${combined_telemetry}"
+
 python3 -m opsd_research.summarize_training \
   --training-dir "${output_dir}" \
   --training-log "${canonical_training_log}" \
-  --telemetry "${TELEMETRY_ROOT}/${run_name}-${SLURM_JOB_ID}.csv" \
+  --telemetry "${combined_telemetry}" \
   --output "${output_dir}/training-summary.json" \
   --max-completion-length "${completion_length}"

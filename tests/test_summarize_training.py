@@ -6,9 +6,28 @@ import unittest
 from pathlib import Path
 
 from opsd_research.summarize_training import summarize
+from opsd_research.summarize_training import _parse_training_log
 
 
 class TrainingSummaryTests(unittest.TestCase):
+    def test_resumed_log_keeps_last_loss_for_replayed_step(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            log = Path(temporary) / "train.log"
+            log.write_text(
+                "\r  25%| | 50/200 [01:00]\n"
+                "{'loss': 0.5, 'grad_norm': 0.2}\n"
+                "\r  25%| | 50/200 [00:01]\n"
+                "{'loss': 0.4, 'grad_norm': 0.1}\n",
+                encoding="utf-8",
+            )
+
+            losses, _ = _parse_training_log(log)
+
+            self.assertEqual(
+                losses,
+                [{"step": 50, "loss": 0.4, "grad_norm": 0.1}],
+            )
+
     def test_summarizes_losses_rollouts_and_checkpoint_integrity(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
