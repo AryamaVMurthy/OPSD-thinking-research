@@ -3,10 +3,18 @@ set -euo pipefail
 
 PROJECT_SOURCE="${PROJECT_SOURCE:-${HOME}/OPSD-thinking-research}"
 NODE_NAME="${SLURMD_NODENAME:-$(hostname -s)}"
-# Each compute host mounts its local scratch at /scratch.  The old layout
-# assumed that /scratch/<node> was user-owned, which is not true on the
-# four-GPU hosts.  Use the user-owned directory at the mount root instead.
-SCRATCH_BASE="${OPSD_SCRATCH_BASE:-/scratch/${USER}}"
+# Four-GPU hosts expose the user-owned directory at /scratch/<user>, while
+# node10 retains the older /scratch/<node>/<user> layout.  Prefer an existing
+# writable node-specific directory, then use the four-GPU layout.  An explicit
+# override remains authoritative for recovery and migration.
+if [[ -n "${OPSD_SCRATCH_BASE:-}" ]]; then
+  SCRATCH_BASE="${OPSD_SCRATCH_BASE}"
+elif [[ -d "/scratch/${NODE_NAME}/${USER}" &&
+        -w "/scratch/${NODE_NAME}/${USER}" ]]; then
+  SCRATCH_BASE="/scratch/${NODE_NAME}/${USER}"
+else
+  SCRATCH_BASE="/scratch/${USER}"
+fi
 SCRATCH_ROOT="${SCRATCH_BASE}/opsd-thinking-research"
 ENV_DIR="${SCRATCH_ROOT}/env"
 SCORE_ENV_DIR="${SCRATCH_ROOT}/score-env"
