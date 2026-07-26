@@ -27,4 +27,6 @@ PY
 graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.json"; viability_manifest="${SCRATCH_ROOT}/graf_cache/g9-recovery-viability-${G9_VIABILITY_ARRAY_JOB_ID}/manifest.json"
 pilot="$(GRAF_GRAPH_CACHE_MANIFEST="${graph_manifest}" GRAF_VIABILITY_MANIFEST="${viability_manifest}" GRAF_CANDIDATE_ID=g9-recovery-conditioned GRAF_CANDIDATE_CONFIG=reproductions/06_graf_opsd/configs/g9-recovery-conditioned.yaml GRAF_MAX_STEPS=50 GRAF_PORT=12983 sbatch --parsable reproductions/06_graf_opsd/run-routed-candidate.sbatch)"
 echo "g9_pilot_job=${pilot}"
+monitor="$(sbatch --parsable --dependency="after:${pilot}" --export="ALL,MONITOR_JOB_ID=${pilot},MONITOR_LOG=${PROJECT_SOURCE}/logs/graf-routed-${pilot}.out,MONITOR_MAX_COMPLETION_LENGTH=4096,MONITOR_REPORT_STEM=${PROJECT_SOURCE}/logs/graf-g9-pilot-${pilot}.live" reproductions/06_graf_opsd/monitor-live-training.sbatch)"
+echo "g9_pilot_monitor_job=${monitor}"
 sbatch --parsable --dependency="afterok:${pilot}" --export="ALL,CACHE_BUILD_JOB_ID=${CACHE_BUILD_JOB_ID},G9_VIABILITY_ARRAY_JOB_ID=${G9_VIABILITY_ARRAY_JOB_ID},G9_PILOT_JOB_ID=${pilot}" reproductions/06_graf_opsd/after-g9-pilot.sbatch
