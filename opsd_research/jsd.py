@@ -127,9 +127,32 @@ def divergence_statistics_vocab_chunked(
             "roundoff_tolerance": tolerance,
         }
 
+    valid_rank = mask.to(torch.int64).cumsum(dim=1) - 1
+    valid_length = mask.sum(dim=1, keepdim=True).clamp_min(1)
+    normalized_bin = (
+        4 * valid_rank // valid_length
+    ).clamp(min=0, max=3)
+    position_quartiles = []
+    for bin_index in range(4):
+        bin_mask = mask & (normalized_bin == bin_index)
+        bin_count = int(bin_mask.sum().item())
+        row: dict[str, float | int] = {
+            "start_fraction": bin_index / 4,
+            "end_fraction": (bin_index + 1) / 4,
+            "token_count": bin_count,
+        }
+        for name, values in per_token.items():
+            selected = values[bin_mask]
+            finite = selected[torch.isfinite(selected)]
+            row[f"{name}_mean"] = (
+                float(finite.mean().item()) if finite.numel() else float("nan")
+            )
+        position_quartiles.append(row)
+
     return {
         "token_count": token_count,
         **{name: summarize(values) for name, values in per_token.items()},
+        "normalized_position_quartiles": position_quartiles,
     }
 
 

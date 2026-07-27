@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import sys
 import types
@@ -342,6 +343,35 @@ class ChunkedJSDTests(unittest.TestCase):
             self.assertEqual(stats[divergence]["p50"], stats[divergence]["mean"])
         self.assertGreater(stats["teacher_entropy"]["mean"], 0.0)
         self.assertGreater(stats["student_entropy"]["mean"], 0.0)
+
+    def test_divergence_statistics_bin_valid_tokens_by_normalized_position(self):
+        student = torch.tensor(
+            [[
+                [2.0, 0.0, -1.0],
+                [1.0, 0.0, -1.0],
+                [0.5, 0.0, -1.0],
+                [0.0, 0.0, -1.0],
+                [-0.5, 0.0, -1.0],
+            ]],
+            dtype=torch.float64,
+        )
+        teacher = torch.flip(student, dims=(-1,))
+        labels = torch.tensor([[1, 1, -100, 1, 1]], dtype=torch.long)
+
+        stats = divergence_statistics_vocab_chunked(
+            student, teacher, labels, chunk_size=2
+        )
+
+        bins = stats["normalized_position_quartiles"]
+        self.assertEqual([row["token_count"] for row in bins], [1, 1, 1, 1])
+        self.assertEqual(
+            [row["start_fraction"] for row in bins],
+            [0.0, 0.25, 0.5, 0.75],
+        )
+        for row in bins:
+            self.assertGreaterEqual(row["js_mean"], 0.0)
+            self.assertTrue(math.isfinite(row["student_entropy_mean"]))
+            self.assertTrue(math.isfinite(row["teacher_entropy_mean"]))
 
     def test_low_precision_roundoff_is_reported_but_not_material(self):
         generator = torch.Generator().manual_seed(0)
