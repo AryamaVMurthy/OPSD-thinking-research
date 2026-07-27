@@ -137,6 +137,41 @@ the problem. A stronger publication study should additionally estimate cosine
 similarity between token and route gradients on a small diagnostic subset;
 doing that on every step would add unnecessary backward passes.
 
+### Two timescales: on-policy prefixes and stale evidence
+
+The current pilot is on-policy with respect to the student trajectory, but its
+blind attempts, forced-continuation outcomes, and fixed self-teacher are
+frozen. This is desirable for a short causal comparison: refreshing evidence
+inside one divergence arm would confound the objective ablation. It is not
+automatically appropriate for a long run. As the adapter changes,
+
+- cached fork states may become unlikely under the current policy;
+- action success rates measured under the initial policy may cease to predict
+  current continuation success; and
+- a fixed self-teacher may become either a stabilizing anchor or a performance
+  ceiling.
+
+A scalable Fluid-G4 algorithm should therefore use two timescales. Student
+rollouts and token updates remain frequent. Evidence refresh is selective and
+slow. For cached item \(i\), define a refresh priority from three measured
+terms: posterior uncertainty in its action ordering, drift between current
+and cached action preferences, and current visitation/recovery frequency.
+Only the highest-priority fraction receives new forced continuations. Updated
+Beta counts retain the policy version of every trial rather than silently
+treating nonstationary trials as exchangeable.
+
+This is a later ablation, not part of the active 12-step arm. The minimum
+long-run comparison is:
+
+1. fixed teacher and fixed evidence;
+2. fixed teacher with selective evidence refresh;
+3. periodically synchronized or EMA teacher with the same refresh schedule.
+
+The refresh interval and budget must be matched in generated tokens. A full
+cache rebuild every epoch is neither required for fluidity nor
+compute-efficient. No refresh experiment is unlocked unless the fixed-cache
+method first has a positive task signal or a measured staleness failure.
+
 ## Why the evidence packet must be fluid
 
 Two or three independent answer-blind attempts reveal recurring errors and
@@ -244,6 +279,10 @@ excluding cache construction would make the efficiency claim misleading.
    before the first substantive mistake. Measure divergence and downstream
    correctness by normalized prefix position and include an out-of-domain
    development set before considering any localization repair.
+9. **Evidence and teacher staleness.** A long-running student can leave cached
+   continuation outcomes and a fixed teacher behind. Record policy version,
+   current/cached action disagreement, revisitation, and recovery drift;
+   selectively refresh only where those measurements justify the cost.
 
 The component attribution order is fixed to avoid spending control compute on
 a method with no task effect:

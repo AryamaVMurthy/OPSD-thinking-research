@@ -215,6 +215,13 @@ receives a 1,600-identity/50-step confirmation. Publication-scale
 suite require a separately reported compute estimate and explicit continuation
 decision.
 
+Before publication-scale training, measure evidence staleness on a fixed
+diagnostic subset. If current action preferences or continuation outcomes have
+drifted materially, compare a token-budget-matched selective-refresh schedule
+against the fixed cache. A fixed-versus-periodically-synchronized teacher
+ablation is required only for the longer run, where teacher lag can become
+material; it is not added to the 12-step screening factorial.
+
 ## Compute-efficient execution amendment
 
 The shortest valid path is:
