@@ -241,6 +241,14 @@ The shortest valid path is:
    and compare a matched reference-only OPSD control, before expanding the
    cache or training longer.
 
+Interpret the context-only control asymmetrically. If it matches full
+Fluid-G4 within paired uncertainty, remove the action forward from the
+compute-efficient method. If it clearly beats full Fluid-G4, test exactly one
+repair: replace the value-only Boltzmann target with a detached
+behavior-prior, mirror-descent target at the same continuation and token
+budget. If full Fluid-G4 wins, retain the simpler registered target. This
+prevents an open-ended action-loss search.
+
 The divergence ablation changes only FKL versus RKL versus JS. Evidence-packet
 components, action target, seeds, token budget, optimizer, and checkpoint are
 held fixed. Packet-component ablations are postponed until there is a positive
