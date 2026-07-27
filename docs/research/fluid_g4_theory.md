@@ -250,7 +250,11 @@ error [@zhao2026rosd]. SSOPD already contrasts multiple on-policy correct and
 wrong attempts and turns the contrast into dense supervision
 [@tan2026ssopd]. SD-Zero already conditions a reviser on an attempt and its
 binary outcome, then distils the reviser back into the generator
-[@he2026sdzero].
+[@he2026sdzero]. OGLS-SD already constructs a correct-minus-incorrect
+teacher-logit direction, applies full-vocabulary steering only to failed
+rollouts, and uses a short positive-tail anchor [@yang2026ogls]. TSD-KD
+already gates token-level JSD by the student-teacher entropy gap and restricts
+preference guidance to an early high-entropy opener [@kim2026tsdkd].
 
 The narrower Fluid-G4 hypothesis is the combination of:
 
@@ -269,6 +273,16 @@ attribution controls show that empirical continuation evidence contributes
 beyond ordinary reflection. If those controls are null, Fluid-G4 should be
 reported as an engineering variant of reflective OPSD, not as a new learning
 principle.
+
+Outcome selection and entropy-gap localization are therefore repairs and
+baselines, not new Fluid-G4 claims. A narrower compute-efficiency hypothesis
+remains testable: compress several answer-blind attempts, a verified
+reference, comparative audit, and uncertain forced-continuation outcomes into
+one free-form teacher packet and obtain useful failed-trajectory supervision
+with one privileged teacher forward. OGLS-SD instead averages multiple
+positive- and negative-context teacher logits for each prefix. The comparison
+must report teacher forward-equivalents and generated tokens as well as
+accuracy; otherwise “compression” is only an implementation description.
 
 ROSD also exposes a serious risk in the current primary arm: full-response
 distillation can overwrite valid prefixes. Fluid-G4 does not add a rigid
@@ -339,6 +353,10 @@ excluding cache construction would make the efficiency claim misleading.
    continuation outcomes and a fixed teacher behind. Record policy version,
    current/cached action disagreement, revisitation, and recovery drift;
    selectively refresh only where those measurements justify the cost.
+10. **Reflection-pattern bias.** A privileged audit can replace useful
+    self-checking language with a confident teacher template. Measure
+    reconsideration markers and correct-to-wrong paired transitions; compare
+    the compressed packet against outcome-contrastive logit steering.
 
 The component attribution order is fixed to avoid spending control compute on
 a method with no task effect:

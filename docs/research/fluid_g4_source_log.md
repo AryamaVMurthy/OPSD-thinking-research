@@ -106,6 +106,47 @@ interpretations and experimental hypotheses are labeled explicitly.
 - Limitation: binary whole-response revision is not empirical comparison of
   several local continuations with calibrated uncertainty.
 
+## `yang2026ogls`
+
+- Status: arXiv preprint, v2 dated 29 May 2026.
+- Verified source: <https://arxiv.org/abs/2605.12400>; the v2 TeX source was
+  inspected directly.
+- Directly supports: privileged reflection can impose response-template bias
+  and suppress useful reconsideration behavior. OGLS-SD averages teacher
+  logits induced by verified positive and negative rollout contexts, adds
+  their contrast to unprivileged teacher logits, applies full-vocabulary
+  steering only to incorrect rollouts, and anchors the last 128 tokens of
+  short correct rollouts with SFT.
+- Relevance: outcome-gating correct versus incorrect on-policy trajectories
+  and positive-tail length regularization are mandatory baselines, not
+  Fluid-G4 novelty. Its reported Qwen3-4B Average@8 improves over OPSD on five
+  benchmarks, including AIME 2024.
+- Limitation: the reported setup uses eight live rollouts per question,
+  8,192-token training generation, clipped forward KL, and only the first
+  1,024 rollout tokens for distribution matching. It does not test one-forward
+  natural-language compression of a cached multi-attempt, verified-reference,
+  forced-continuation evidence packet or exact canonical JS.
+
+## `kim2026tsdkd`
+
+- Status: peer-reviewed ICLR 2026 poster; arXiv 2603.13260.
+- Verified sources:
+  <https://openreview.net/forum?id=2d0c74e15a71b526477e6f43e48929b2167aa2aa>
+  and the arXiv TeX source.
+- Directly supports: full-response teacher matching can overwhelm a student.
+  TSD-KD uses an entropy-gap gate
+  \(\sigma((H(S_t)-H(T_t))/\tau)\) for soft token-selective JSD, restricts
+  indirect preference supervision to an early cumulative-entropy “opener,”
+  and reports that supervising all tokens is worse than focused selection.
+- Relevance: entropy-gap token gating, early-position selection, and
+  student-top-k teacher reranking are established techniques. Any Fluid-G4
+  soft-localization arm must compare against TSD-KD-style gating and cannot
+  claim those components as new.
+- Limitation: TSD-KD studies a larger-teacher/smaller-student setting rather
+  than privileged self-distillation with a shared base model, and it does not
+  use verified multi-attempt free-form audits or empirical forced-continuation
+  uncertainty.
+
 ## Evidence policy
 
 - A source is not counted as evidence for Fluid-G4 quality merely because its
