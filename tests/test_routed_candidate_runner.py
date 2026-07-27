@@ -29,3 +29,11 @@ def test_runner_archives_only_the_manifests_used_by_the_mode() -> None:
     assert 'manifest_inputs+=(graph-cache-manifest.json)' in script
     assert 'manifest_inputs+=(viability-manifest.json)' in script
     assert 'manifest_inputs+=(ch-dossier-manifest.json)' in script
+
+
+def test_runner_uses_the_registered_config_seed() -> None:
+    script = RUNNER.read_text(encoding="utf-8")
+
+    assert 'seed="$(python3 - "${GRAF_CANDIDATE_CONFIG}"' in script
+    assert '--seed "${seed}" --data_seed "${seed}"' in script
+    assert "--seed 42" not in script

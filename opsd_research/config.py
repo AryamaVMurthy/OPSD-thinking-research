@@ -241,12 +241,14 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         "top_k": 20,
         "lmbda": 1.0,
         "beta": 0.0,
-        "seed": 42,
         "tail_logits_only": True,
     }
     for key, value in expected.items():
         if data.get(key) != value:
             raise ConfigError(f"{source}: GRAF protocol requires {key}={value!r}")
+    seed = data.get("seed")
+    if seed not in {42, 43}:
+        raise ConfigError(f"{source}: GRAF seed must be one of [42, 43]")
     token_divergence = data.get("token_divergence")
     if token_divergence is None:
         if data.get("jsd_token_clip") != 0.05:

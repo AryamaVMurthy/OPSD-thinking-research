@@ -321,6 +321,28 @@ class ConfigTests(unittest.TestCase):
             {key: value for key, value in control.items() if key not in mutable},
         )
 
+    def test_fluid_second_seed_changes_only_registered_seed_and_variant(self):
+        root = ROOT / "reproductions/06_graf_opsd/configs"
+        first = load_config(root / "fluid-g4-js-128.yaml").data
+        second = load_config(root / "fluid-g4-js-128-seed43.yaml").data
+        self.assertEqual(first["seed"], 42)
+        self.assertEqual(second["seed"], 43)
+        for config in (first, second):
+            config.pop("variant")
+            config.pop("seed")
+        self.assertEqual(first, second)
+
+    def test_graf_seed_is_limited_to_preregistered_pair(self):
+        data = load_config(
+            ROOT / "reproductions/06_graf_opsd/configs/fluid-g4-js-128.yaml"
+        ).data
+        changed = copy.deepcopy(data)
+        changed["seed"] = 43
+        validate_config(changed)
+        changed["seed"] = 44
+        with self.assertRaisesRegex(ConfigError, "seed must be one of"):
+            validate_config(changed)
+
     def test_recovery_conditioning_requires_routed_mode(self):
         data = load_config(
             ROOT / "reproductions/06_graf_opsd/configs/g7-information-weighted.yaml"

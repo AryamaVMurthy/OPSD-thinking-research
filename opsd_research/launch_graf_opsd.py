@@ -36,6 +36,8 @@ def _validate_invocation() -> dict[str, object]:
         "--model_revision": config["model_revision"],
         "--student_model_revision": config["model_revision"],
         "--max_completion_length": str(config["max_completion_length"]),
+        "--seed": str(config["seed"]),
+        "--data_seed": str(config["seed"]),
     }
     for flag, value in expected.items():
         if _argument(flag) != value:

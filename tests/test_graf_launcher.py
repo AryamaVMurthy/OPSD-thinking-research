@@ -35,6 +35,7 @@ class GrafLauncherTests(unittest.TestCase):
             "--model_revision", "1cfa9a7208912126459214e8b04321603b3df60c",
             "--student_model_revision", "1cfa9a7208912126459214e8b04321603b3df60c",
             "--max_steps", "1", "--max_completion_length", "2048",
+            "--seed", "42", "--data_seed", "42",
             "--student_thinking", "--teacher_thinking", "--fixed_teacher", "--use_peft",
         ]
         environment = {"GRAF_CONFIG": str(CONFIG), "GRAF_SMOKE_MAX_STEPS": "1"}
@@ -96,6 +97,7 @@ class GrafLauncherTests(unittest.TestCase):
             "--model_revision", "1cfa9a7208912126459214e8b04321603b3df60c",
             "--student_model_revision", "1cfa9a7208912126459214e8b04321603b3df60c",
             "--max_steps", "25", "--max_completion_length", "2048",
+            "--seed", "42", "--data_seed", "42",
             "--student_thinking", "--teacher_thinking", "--fixed_teacher", "--use_peft",
         ]
         with tempfile.TemporaryDirectory() as directory:
