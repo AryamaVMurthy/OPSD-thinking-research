@@ -219,8 +219,12 @@ The shortest valid path is:
    auxiliary;
 4. promote at most two arms to 12 steps;
 5. use paired AIME 2024 Average@4 plus a non-AIME held-out set to choose one;
-6. run a matched plain-OPSD control before expanding the cache or training
-   longer.
+6. if and only if the effect is positive, run the matched 124-row JS dossier
+   control (same blind attempts, verified solution, audit, seed, and token
+   budget; no empirical graph outcomes or route loss);
+7. then separate teacher-visible outcome context from the action auxiliary,
+   and compare a matched reference-only OPSD control, before expanding the
+   cache or training longer.
 
 The divergence ablation changes only FKL versus RKL versus JS. Evidence-packet
 components, action target, seeds, token budget, optimizer, and checkpoint are

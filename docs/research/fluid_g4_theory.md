@@ -200,6 +200,20 @@ excluding cache construction would make the efficiency claim misleading.
 7. **Reward hacking by verbosity.** Log rollout length, cap rate, thinking
    closure, answer extraction, correctness per generated token, and wall time.
 
+The component attribution order is fixed to avoid spending control compute on
+a method with no task effect:
+
+1. full Fluid-G4 versus the untouched paired checkpoint;
+2. full Fluid-G4 versus a matched free-form dossier-only control, removing
+   both empirical continuation prose and action loss;
+3. teacher-visible empirical outcomes without action loss versus full
+   Fluid-G4, isolating the sparse auxiliary;
+4. matched reference-only OPSD, isolating the complete hindsight packet.
+
+Every control keeps the same 124 identities, canonical divergence, optimizer,
+rollout seed, and generated-token budget. Only a positive first comparison
+unlocks the more expensive attribution ladder.
+
 ## Promotion hypotheses
 
 - H1: exact canonical objectives remain finite and materially non-negative;
