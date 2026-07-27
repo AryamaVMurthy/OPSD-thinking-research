@@ -46,8 +46,8 @@ class LiveTrainingStatusTests(unittest.TestCase):
                 "{'loss': 0.0028, 'grad_norm': 0.105459, 'epoch': 0.0}\n"
                 '{"event":"exact_forward_kl_loss","value":1.25e-06}\n'
                 '{"event":"exact_forward_kl_loss","value":2.5e-06}\n'
-                '{"event":"graf_branch_loss","active_forks":2.0,"effective_fork_weight":0.5,"branch_kl":0.2,"entropy_floor":0.01,"weighted_loss":0.021}\n'
-                '{"event":"graf_branch_loss","active_forks":0.0,"effective_fork_weight":0.0,"branch_kl":0.0,"entropy_floor":0.0,"weighted_loss":0.0}\n'
+                '{"event":"graf_branch_loss","active_forks":2.0,"effective_fork_weight":0.5,"base_loss":0.01,"branch_kl":0.2,"entropy_floor":0.01,"weighted_loss":0.021,"total_loss":0.031,"branch_to_base_ratio":2.1}\n'
+                '{"event":"graf_branch_loss","active_forks":0.0,"effective_fork_weight":0.0,"base_loss":0.02,"branch_kl":0.0,"entropy_floor":0.0,"weighted_loss":0.0,"total_loss":0.02,"branch_to_base_ratio":0.0}\n'
                 "vLLM generation done - elapsed time: 56.77s, prompts: 1, total tokens: 4096, avg length: 4096.0\n"
                 "vLLM generation done - elapsed time: 40.0s, prompts: 1, total tokens: 2048, avg length: 2048.0\n",
                 encoding="utf-8",
@@ -60,6 +60,10 @@ class LiveTrainingStatusTests(unittest.TestCase):
         self.assertEqual(status["graf_branch"]["active_loss_calls"], 1)
         self.assertEqual(status["graf_branch"]["loss_calls"], 2)
         self.assertEqual(status["graf_branch"]["mean_active_forks_per_loss_call"], 1.0)
+        self.assertEqual(
+            status["graf_branch"]["mean_branch_to_base_ratio_when_active"],
+            2.1,
+        )
         self.assertEqual(status["forward_kl"]["loss_calls"], 2)
         self.assertEqual(status["forward_kl"]["negative_loss_calls"], 0)
         self.assertEqual(status["forward_kl"]["min"], 1.25e-06)
