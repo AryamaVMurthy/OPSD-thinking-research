@@ -100,6 +100,43 @@ Adaptive sampling allocates extra continuations only to overlapping action
 posteriors. A future refresh ablation is justified only if action target
 staleness is measured to be large.
 
+### Auxiliary scale and gradient interference
+
+The implemented objective has the form
+
+\[
+L(\theta)=L_{\mathrm{token}}(\theta)
+ +\lambda\,\frac{1}{|F|}
+ \sum_{f\in F}w_f L_{\mathrm{route},f}(\theta),
+\]
+
+where \(w_f\) is absolute evidence strength. This makes a weak single fork
+weaker than a strong single fork, but it does not guarantee that the auxiliary
+gradient is smaller than the token gradient. A very small token KL and a
+moderately difficult action comparison can make the branch/base loss ratio
+exceed one even when \(\lambda=0.1\).
+
+Loss magnitude is only a proxy for gradient interference. The development
+smoke therefore records branch/base magnitude, total pre-clip gradient norm,
+clip exceedance, and realized adapter update together. If the fluid run shows
+persistent branch dominance, the next registered repair is a detached
+auxiliary trust cap
+
+\[
+\widetilde L_{\mathrm{route}}
+=L_{\mathrm{route}}\min\left(
+1,\frac{\rho\,\mathrm{stopgrad}(L_{\mathrm{token}})}
+{\mathrm{stopgrad}(L_{\mathrm{route}})+\epsilon}
+\right).
+\]
+
+This keeps routing auxiliary in scalar scale without backpropagating through
+the controller. It is not introduced pre-emptively: a fixed coefficient is
+simpler and remains the primary arm unless measured fluid batches demonstrate
+the problem. A stronger publication study should additionally estimate cosine
+similarity between token and route gradients on a small diagnostic subset;
+doing that on every step would add unnecessary backward passes.
+
 ## Why the evidence packet must be fluid
 
 Two or three independent answer-blind attempts reveal recurring errors and
@@ -112,6 +149,31 @@ Fluidity does not mean absence of controls. Storage has provenance and
 checksums; prompts have strict student/teacher separation; generation must fit
 the context window; evidence coverage and leakage are measured. Only the
 teacher's mathematical analysis remains unrestricted prose.
+
+## Applicability beyond contest mathematics
+
+The method is not inherently tied to a fixed answer format. It requires:
+
+1. an observable task input available to the student;
+2. a verifier, trusted reference, or outcome signal available during training;
+3. two or more answer-blind attempts or trajectories;
+4. a teacher capable of turning those trajectories and outcomes into local
+   corrective guidance.
+
+For code, the outcome can be tests; for tool use, an execution trace and task
+success; for formal reasoning, a proof checker. Tasks with subjective targets
+or unreliable verifiers need calibrated human or model preference evidence
+instead of binary completion success. The invariant remains the same:
+privileged evidence conditions the training teacher, never the deployed
+student input.
+
+The extra cost is mostly evidence construction: blind attempts, audit, and a
+small number of forced continuations. That cache is amortized across optimizer
+steps and divergence ablations. Adaptive continuation allocation and sparse
+routing make the marginal training step only one short action-scoring forward
+on branch-active microbatches, while every identity still receives ordinary
+OPSD. Comparisons must report both cache GPU-hours and training GPU-hours;
+excluding cache construction would make the efficiency claim misleading.
 
 ## Main failure modes and measurements
 
