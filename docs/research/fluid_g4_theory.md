@@ -86,6 +86,38 @@ strength and is divided by the number of fork opportunities, not by the sum
 of confidence weights. Thus a low-confidence single fork is genuinely
 attenuated.
 
+The current target is value-only:
+
+\[
+q_V(a\mid s)\propto \exp(\hat v(s,a)/\tau).
+\]
+
+It should not be confused with the fast-success action posterior analyzed by
+SSOPD, which includes the behavior-policy prior,
+\(q_F(a\mid s)\propto\pi(a\mid s)Q_F^\pi(s,a)\)
+[@tan2026ssopd]. Value-only softmax is a stronger policy-improvement step: it
+can give substantial mass to an initially unlikely action based on few
+trials. Beta smoothing and absolute evidence attenuation reduce this risk but
+do not remove it.
+
+If the context-only control matches or beats full Fluid-G4, the first
+action-target repair is a dynamic trust-region target
+
+\[
+q_{\mathrm{MD}}(a\mid s)\propto
+\mathrm{stopgrad}[\pi_\theta(a\mid s)]\,
+\exp(\eta\hat v(s,a)),
+\]
+
+where juxtaposition denotes multiplication, or equivalently
+\(\log q_{\mathrm{MD}}=\log\pi_\theta+\eta\hat v-\log Z\).
+This is a mirror-descent policy-improvement step. The detached current policy
+is already available from action scoring, so it adds no rollout and adapts as
+the student changes. It must be compared at the same forks, continuation
+budget, and branch-loss weight. It is not added unless the existing action
+auxiliary is empirically implicated, because teacher-visible outcome context
+may already carry nearly all useful signal.
+
 This is a contextual-bandit-style auxiliary, not proof that an action is
 globally correct. Its principal risks are:
 

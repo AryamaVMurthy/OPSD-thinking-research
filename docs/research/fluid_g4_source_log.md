@@ -79,10 +79,14 @@ interpretations and experimental hypotheses are labeled explicitly.
 - Directly supports: contrasting correct and wrong samples from one on-policy
   group can provide dense process supervision; the method selects the shortest
   correct and longest wrong responses and applies a prompt-level frontier
-  weight.
+  weight. Its stopping-time analysis defines a fast-success posterior
+  proportional to the behavior policy times action value and relates the
+  frontier coefficient to action-value variance along the trajectory.
 - Relevance: overlaps with the multiple-attempt motivation and makes the
   verified-reference and empirical-continuation contributions subject to
-  explicit controls.
+  explicit controls. It also shows that Fluid-G4's value-only Boltzmann action
+  target is a stronger update than a behavior-prior-regularized posterior,
+  motivating a gated mirror-descent target ablation.
 - Limitation: SSOPD is verifier-only and depends on a mixed group containing a
   correct attempt. It does not study a free-form audit with a reference
   fallback or local forced-continuation posteriors.
