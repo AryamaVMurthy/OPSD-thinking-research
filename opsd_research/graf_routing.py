@@ -115,16 +115,23 @@ def load_routing_targets(
             return target
         raw = fork.get("viability")
         try:
-            trials = int(record["samples_per_action"])
+            default_trials = int(record["samples_per_action"])
             temperature = float(record["temperature"])
         except (KeyError, TypeError, ValueError) as error:
             raise ValueError(
                 "posterior routing requires samples_per_action and temperature in every viability record"
             ) from error
-        if trials < 1 or not math.isfinite(temperature) or temperature <= 0.0:
+        if (
+            default_trials < 1
+            or not math.isfinite(temperature)
+            or temperature <= 0.0
+        ):
             raise ValueError("invalid viability sampling metadata for posterior routing")
         if not isinstance(raw, dict):
             raise ValueError("posterior routing requires per-action viability estimates")
+        samples_by_action = fork.get("samples_by_action", {})
+        if not isinstance(samples_by_action, dict):
+            raise ValueError("samples_by_action must be an action-count mapping")
         scores: list[float] = []
         for action_id in action_ids:
             if action_id not in raw:
@@ -134,6 +141,18 @@ def load_routing_targets(
             value = float(raw[action_id])
             if not 0.0 <= value <= 1.0:
                 raise ValueError(f"invalid viability for action {action_id!r}")
+            try:
+                trials = int(
+                    samples_by_action.get(action_id, default_trials)
+                )
+            except (TypeError, ValueError) as error:
+                raise ValueError(
+                    f"invalid sample count for action {action_id!r}"
+                ) from error
+            if trials < 1:
+                raise ValueError(
+                    f"invalid sample count for action {action_id!r}"
+                )
             posterior_mean = (value * trials + viability_beta_prior) / (
                 trials + 2.0 * viability_beta_prior
             )

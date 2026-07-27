@@ -15,6 +15,11 @@ from .graf_actions import (
     action_continuation,
     recovery_conditioned_description,
 )
+from .adaptive_viability import (
+    ActionEvidence,
+    beta_credible_interval,
+    next_uncertain_action,
+)
 from .generation_common import extract_last_boxed, grade_math
 from .graf_cache import validate_graph_cache_manifest
 from .graf_graph import GraphAction, branch_target
@@ -50,6 +55,15 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--limit", required=True, type=int)
     parser.add_argument("--samples-per-action", required=True, type=int)
+    parser.add_argument(
+        "--adaptive-max-samples-per-action",
+        type=int,
+        help=(
+            "When set above samples-per-action, allocate additional samples "
+            "only to actions whose Beta posterior intervals still overlap."
+        ),
+    )
+    parser.add_argument("--credible-level", type=float, default=0.9)
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--max-completion-tokens", type=int, default=4096)
     parser.add_argument("--model", default=DEFAULT_MODEL)
@@ -80,8 +94,14 @@ def main() -> None:
         or args.samples_per_action < 1
         or args.temperature <= 0
         or args.max_completion_tokens < 1
+        or not 0.0 < args.credible_level < 1.0
     ):
         raise SystemExit("limit, samples-per-action, temperature, and max completion tokens must be positive")
+    adaptive_max = args.adaptive_max_samples_per_action
+    if adaptive_max is not None and adaptive_max < args.samples_per_action:
+        raise SystemExit(
+            "adaptive max samples must be at least samples-per-action"
+        )
     if args.model != DEFAULT_MODEL or args.model_revision != DEFAULT_MODEL_REVISION:
         raise SystemExit("GRAF viability building is pinned to Qwen3-4B@1cfa9a7")
     if args.output.exists() or (args.manifest is not None and args.manifest.exists()):
@@ -110,6 +130,9 @@ def main() -> None:
     )
     requests: list[tuple[int, str, str, str, str]] = []
     prompts: list[str] = []
+    action_requests: dict[
+        tuple[int, str, str], tuple[int, str, str, str, str]
+    ] = {}
     for record in accepted:
         row = rows[int(record["example_index"])]
         graph = record["graph"]
@@ -129,6 +152,13 @@ def main() -> None:
                         int(record["example_index"]), str(fork["fork_id"]),
                         str(action["action_id"]), str(row["response"]), description,
                     ))
+                    action_requests[
+                        (
+                            int(record["example_index"]),
+                            str(fork["fork_id"]),
+                            str(action["action_id"]),
+                        )
+                    ] = requests[-1]
                     prompts.append(forced_action_prompt(
                         tokenizer, str(row["question"]), description
                     ))
@@ -137,33 +167,111 @@ def main() -> None:
         tensor_parallel_size=args.tensor_parallel_size, max_model_len=40960,
         gpu_memory_utilization=0.90, enforce_eager=True, trust_remote_code=True,
     )
-    outputs = llm.generate(
-        prompts,
-        SamplingParams(
+    def sampling_params(seed: int):
+        return SamplingParams(
             temperature=args.temperature, top_p=0.95,
-            max_tokens=args.max_completion_tokens, seed=args.seed
-        ),
-    )
-    successes: dict[tuple[int, str, str], list[bool]] = defaultdict(list)
-    for request, output in zip(requests, outputs, strict=True):
-        index, fork_id, action_id, answer, _ = request
-        successes[(index, fork_id, action_id)].append(
-            grade_math(extract_last_boxed(output.outputs[0].text), answer)
+            max_tokens=args.max_completion_tokens, seed=seed
         )
+
+    outputs = llm.generate(prompts, sampling_params(args.seed))
+    successes: dict[tuple[int, str, str], list[bool]] = defaultdict(list)
+
+    def record_outputs(batch_requests, batch_outputs) -> None:
+        for request, output in zip(batch_requests, batch_outputs, strict=True):
+            index, fork_id, action_id, answer, _ = request
+            successes[(index, fork_id, action_id)].append(
+                grade_math(
+                    extract_last_boxed(output.outputs[0].text), answer
+                )
+            )
+
+    record_outputs(requests, outputs)
+    total_completions = len(requests)
+    if adaptive_max is not None and adaptive_max > args.samples_per_action:
+        fork_actions: dict[
+            tuple[int, str], list[tuple[int, str, str]]
+        ] = defaultdict(list)
+        for key in action_requests:
+            fork_actions[key[:2]].append(key)
+        for round_index in range(
+            adaptive_max - args.samples_per_action
+        ):
+            selected_keys: list[tuple[int, str, str]] = []
+            for keys in fork_actions.values():
+                selected = next_uncertain_action(
+                    [
+                        ActionEvidence(
+                            action_id=key[2],
+                            successes=sum(successes[key]),
+                            trials=len(successes[key]),
+                        )
+                        for key in keys
+                    ],
+                    max_trials=adaptive_max,
+                    credible_level=args.credible_level,
+                )
+                if selected is not None:
+                    selected_keys.append(
+                        next(key for key in keys if key[2] == selected)
+                    )
+            if not selected_keys:
+                break
+            adaptive_requests = [
+                action_requests[key] for key in selected_keys
+            ]
+            adaptive_prompts = [
+                forced_action_prompt(
+                    tokenizer,
+                    str(rows[request[0]]["question"]),
+                    request[4],
+                )
+                for request in adaptive_requests
+            ]
+            adaptive_outputs = llm.generate(
+                adaptive_prompts,
+                sampling_params(args.seed + round_index + 1),
+            )
+            record_outputs(adaptive_requests, adaptive_outputs)
+            total_completions += len(adaptive_requests)
     for record in accepted:
         fork_targets = []
         for raw_fork in record["graph"]["forks"]:
             actions = tuple(GraphAction(**action) for action in raw_fork["actions"])
-            viability = {
-                action.action_id: sum(successes[(int(record["example_index"]), raw_fork["fork_id"], action.action_id)])
-                / args.samples_per_action
+            sampled_actions = [
+                action
                 for action in actions
                 if action.status not in {"invalid", "dead_end"}
+            ]
+            action_samples = {
+                action.action_id: successes[
+                    (
+                        int(record["example_index"]),
+                        raw_fork["fork_id"],
+                        action.action_id,
+                    )
+                ]
+                for action in sampled_actions
+            }
+            viability = {
+                action_id: sum(observations) / len(observations)
+                for action_id, observations in action_samples.items()
             }
             fork_targets.append({
                 "fork_id": raw_fork["fork_id"],
                 "action_ids": [action.action_id for action in actions],
                 "viability": viability,
+                "samples_by_action": {
+                    action_id: len(observations)
+                    for action_id, observations in action_samples.items()
+                },
+                "credible_intervals": {
+                    action_id: beta_credible_interval(
+                        sum(observations),
+                        len(observations),
+                        credible_level=args.credible_level,
+                    )
+                    for action_id, observations in action_samples.items()
+                },
                 "target": branch_target(actions, viability, temperature=args.temperature),
             })
         append_jsonl(args.output, {
@@ -172,6 +280,8 @@ def main() -> None:
             "graph_sha256": record["graph_sha256"],
             "fork_targets": fork_targets,
             "samples_per_action": args.samples_per_action,
+            "adaptive_max_samples_per_action": adaptive_max,
+            "credible_level": args.credible_level,
             "temperature": args.temperature,
             "max_completion_tokens": args.max_completion_tokens,
             "forced_prefix_protocol": action_protocol,
@@ -185,6 +295,9 @@ def main() -> None:
         "viability_cache_sha256": hashlib.sha256(args.output.read_bytes()).hexdigest(),
         "examples": len(accepted),
         "samples_per_action": args.samples_per_action,
+        "adaptive_max_samples_per_action": adaptive_max,
+        "credible_level": args.credible_level,
+        "total_forced_completions": total_completions,
         "temperature": args.temperature,
         "max_completion_tokens": args.max_completion_tokens,
         "forced_prefix_protocol": action_protocol,
