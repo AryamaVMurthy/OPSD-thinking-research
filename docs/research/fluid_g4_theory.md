@@ -397,6 +397,23 @@ old 22-identity fixed cache, the route/base ratio could exceed one because
 every row was route-active and JS has a smaller scalar base. On the real
 coverage-preserving stream, posterior smoothing, absolute information weights,
 and sparse routing kept the maximum global ratio below 0.01 in the paired
-smoke. The conditional trust cap is therefore not activated. Whether this
-small auxiliary improves task quality remains an ablation question; empirical
-outcomes also affect the teacher through natural-language context.
+smoke. In the longer run through six updates, active batches averaged about
+0.10 and one reached 0.9765, but none exceeded base loss and no optimizer
+gradient reached the clipping threshold. The conditional trust cap is
+therefore still not activated. Whether this small auxiliary improves task
+quality remains an ablation question; empirical outcomes also affect the
+teacher through natural-language context.
+
+The reused viability manifest contains exactly two continuations per action;
+the adaptive sampler is implemented for a future cache but did not alter this
+immutable pilot evidence. A deterministic 10,000-draw Beta posterior audit of
+the full 62-graph cache (before the four held-out identities are removed)
+found 168 forks with at least two measured actions. Of these, 142 had uniform
+posterior-mean targets and already supply no route. The remaining 26 had
+median best-action ranking certainty 0.707, with 7/26 below 0.5. Multiplying
+ranking certainty into the current information weight would change its median
+from 0.0437 to 0.0309 on these forks. Thus explicit uncertainty calibration
+would attenuate the auxiliary further, but the audit does not reveal a
+catastrophic hidden target: the active-run auxiliary is already sparse and
+subordinate. This evidence supports leaving the registered pilot unchanged
+and testing uncertainty-calibrated weighting only after component attribution.
