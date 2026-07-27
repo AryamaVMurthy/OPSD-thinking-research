@@ -382,6 +382,38 @@ checker cannot be the sole online training verifier. Before A1 is launched:
 This separates a training signal-quality problem from benchmark reporting and
 prevents parser failures from creating false-negative distillation pressure.
 
+A second canonical audit found that the repository's `math_verify` helper
+accepts only 89/128 reference answers when each target is compared with
+itself. On the 256 cached blind attempts, that helper labels 63 correct while
+the official parser labels 79; they agree on 61 correct attempts, disagree on
+20, and agree on 175 negatives. Neither implementation can be treated as an
+oracle.
+
+This also invalidates a stronger interpretation of the historical action
+cache. Its 790 forced-continuation labels were produced by the same
+`math_verify` helper, and only aggregate success booleans were retained. Raw
+completion text, extracted answer, parser status, and finish reason were not
+stored, so the labels cannot be regraded. The cache remains valid only as an
+immutable pilot artifact; it is not publication-quality empirical outcome
+evidence.
+
+Consequently the post-A0 decision tree is refined:
+
+1. if context-only is positive, replicate with a newly auditable outcome
+   cache before attributing the gain to empirical continuations;
+2. if context-only is negative, run the already-preregistered dossier-only
+   control, which removes empirical continuation prose as well as routing;
+3. if dossier-only recovers, rebuild outcome evidence and do not add a new
+   loss yet;
+4. only if dossier-only also damages quality is verifier-based response
+   protection the next causal repair.
+
+Every new forced continuation record must retain immutable problem/action
+identity, prompt hash, generation seed, raw completion, output token IDs or
+their checksum, finish reason, extracted answer, each verifier's structured
+result, ensemble decision, and policy version. Aggregate Beta counts are
+derived artifacts, never the only stored evidence.
+
 A last-128-token positive-tail SFT anchor for verified-correct short
 trajectories is a separate switch because it changes the objective. It is an
 OGLS-SD baseline, not bundled into the first outcome-gating test. If used, its
