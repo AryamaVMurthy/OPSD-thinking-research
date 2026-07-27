@@ -373,6 +373,22 @@ class ChunkedJSDTests(unittest.TestCase):
             self.assertTrue(math.isfinite(row["student_entropy_mean"]))
             self.assertTrue(math.isfinite(row["teacher_entropy_mean"]))
 
+    def test_empty_position_quartiles_are_json_safe_nulls(self):
+        student = torch.tensor([[[2.0, 0.0, -1.0]]], dtype=torch.float64)
+        teacher = torch.flip(student, dims=(-1,))
+
+        stats = divergence_statistics_vocab_chunked(
+            student, teacher, chunk_size=2
+        )
+
+        bins = stats["normalized_position_quartiles"]
+        self.assertEqual(bins[0]["token_count"], 1)
+        for row in bins[1:]:
+            self.assertEqual(row["token_count"], 0)
+            self.assertIsNone(row["js_mean"])
+            self.assertIsNone(row["student_entropy_mean"])
+            self.assertIsNone(row["teacher_entropy_mean"])
+
     def test_low_precision_roundoff_is_reported_but_not_material(self):
         generator = torch.Generator().manual_seed(0)
         teacher = (5 * torch.randn(1, 8, 8192, generator=generator)).to(

@@ -136,7 +136,7 @@ def divergence_statistics_vocab_chunked(
     for bin_index in range(4):
         bin_mask = mask & (normalized_bin == bin_index)
         bin_count = int(bin_mask.sum().item())
-        row: dict[str, float | int] = {
+        row: dict[str, float | int | None] = {
             "start_fraction": bin_index / 4,
             "end_fraction": (bin_index + 1) / 4,
             "token_count": bin_count,
@@ -145,7 +145,7 @@ def divergence_statistics_vocab_chunked(
             selected = values[bin_mask]
             finite = selected[torch.isfinite(selected)]
             row[f"{name}_mean"] = (
-                float(finite.mean().item()) if finite.numel() else float("nan")
+                float(finite.mean().item()) if finite.numel() else None
             )
         position_quartiles.append(row)
 
