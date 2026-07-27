@@ -8,7 +8,10 @@ except ImportError:
     torch = None
 
 if torch is not None:
-    from opsd_research.tail_logits_loss import _generation_logits
+    from opsd_research.tail_logits_loss import (
+        _aggregate_graf_metrics,
+        _generation_logits,
+    )
 
 try:
     from transformers import Qwen3Config, Qwen3ForCausalLM
@@ -19,6 +22,39 @@ except (ImportError, ModuleNotFoundError):
 
 @unittest.skipIf(torch is None, "torch is available in the pinned Turing environment")
 class TailLogitsTests(unittest.TestCase):
+    def test_graf_telemetry_is_reduced_as_a_global_batch(self):
+        class FakeAccelerator:
+            is_main_process = True
+            num_processes = 2
+
+            @staticmethod
+            def reduce(values, reduction):
+                self.assertEqual(reduction, "sum")
+                return values * 2
+
+        trainer = type(
+            "Trainer", (), {"accelerator": FakeAccelerator()}
+        )()
+        aggregate = _aggregate_graf_metrics(
+            trainer,
+            base_loss=torch.tensor(0.2),
+            branch_loss=torch.tensor(0.01),
+            total_loss=torch.tensor(0.21),
+            metrics={
+                "active_forks": 1.0,
+                "effective_fork_weight": 0.25,
+                "branch_kl": 0.4,
+                "entropy_floor": 0.02,
+            },
+        )
+
+        self.assertAlmostEqual(aggregate["base_loss"], 0.2)
+        self.assertAlmostEqual(aggregate["branch_loss"], 0.01)
+        self.assertEqual(aggregate["active_forks"], 2.0)
+        self.assertEqual(aggregate["effective_fork_weight"], 0.5)
+        self.assertAlmostEqual(aggregate["branch_kl"], 0.4)
+        self.assertAlmostEqual(aggregate["entropy_floor"], 0.02)
+
     def test_drops_only_the_unscored_last_position(self):
         outputs = type(
             "Outputs",

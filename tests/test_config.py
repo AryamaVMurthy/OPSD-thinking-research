@@ -262,6 +262,17 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "branch settings"):
             validate_config(changed)
 
+    def test_fluid_divergence_pair_changes_only_the_token_objective(self):
+        root = ROOT / "reproductions/06_graf_opsd/configs"
+        fkl = load_config(root / "fluid-g4-fkl-128.yaml").data
+        js = load_config(root / "fluid-g4-js-128.yaml").data
+        self.assertEqual(fkl["token_divergence"], "forward_kl")
+        self.assertEqual(js["token_divergence"], "js")
+        for config in (fkl, js):
+            config.pop("variant")
+            config.pop("token_divergence")
+        self.assertEqual(fkl, js)
+
     def test_recovery_conditioning_requires_routed_mode(self):
         data = load_config(
             ROOT / "reproductions/06_graf_opsd/configs/g7-information-weighted.yaml"

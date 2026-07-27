@@ -239,21 +239,29 @@ def compute_loss_with_graf_routing(
         entropy_floor_fraction=self._graf_entropy_floor_fraction,
     )
     total = base_loss + branch_loss
-    base_value = float(base_loss.detach())
-    branch_value = float(branch_loss.detach())
-    total_value = float(total.detach())
+    aggregate = _aggregate_graf_metrics(
+        self,
+        base_loss=base_loss,
+        branch_loss=branch_loss,
+        total_loss=total,
+        metrics=metrics,
+    )
+    base_value = aggregate["base_loss"]
+    branch_value = aggregate["branch_loss"]
+    total_value = aggregate["total_loss"]
     branch_to_base_ratio = abs(branch_value) / max(
         abs(base_value), 1e-12
     )
-    self._graf_last_branch_metrics = metrics
+    self._graf_last_branch_metrics = aggregate
     if self.accelerator.is_main_process:
         print(
             '{"event":"graf_branch_loss",'
-            f'"active_forks":{metrics["active_forks"]},'
-            f'"effective_fork_weight":{metrics.get("effective_fork_weight", metrics["active_forks"]):.8f},'
+            '"metric_scope":"global_batch",'
+            f'"active_forks":{aggregate["active_forks"]},'
+            f'"effective_fork_weight":{aggregate["effective_fork_weight"]:.8f},'
             f'"base_loss":{base_value:.8f},'
-            f'"branch_kl":{metrics["branch_kl"]:.8f},'
-            f'"entropy_floor":{metrics["entropy_floor"]:.8f},'
+            f'"branch_kl":{aggregate["branch_kl"]:.8f},'
+            f'"entropy_floor":{aggregate["entropy_floor"]:.8f},'
             f'"weighted_loss":{branch_value:.8f},'
             f'"total_loss":{total_value:.8f},'
             f'"branch_to_base_ratio":{branch_to_base_ratio:.8f}' + "}",
@@ -263,3 +271,52 @@ def compute_loss_with_graf_routing(
         outputs.loss = total
         return total, outputs
     return total
+
+
+def _aggregate_graf_metrics(
+    self,
+    *,
+    base_loss,
+    branch_loss,
+    total_loss,
+    metrics: dict[str, float],
+) -> dict[str, float]:
+    """Reduce detached telemetry across ranks without changing optimization."""
+    import torch
+
+    evidence_weight = float(
+        metrics.get("effective_fork_weight", metrics["active_forks"])
+    )
+    local = torch.tensor(
+        [
+            float(base_loss.detach()),
+            float(branch_loss.detach()),
+            float(total_loss.detach()),
+            float(metrics["active_forks"]),
+            evidence_weight,
+            float(metrics["branch_kl"]) * evidence_weight,
+            float(metrics["entropy_floor"]) * evidence_weight,
+        ],
+        dtype=torch.float64,
+        device=base_loss.device,
+    )
+    accelerator = self.accelerator
+    if hasattr(accelerator, "reduce"):
+        reduced = accelerator.reduce(local, reduction="sum")
+        world_size = int(getattr(accelerator, "num_processes", 1))
+    else:
+        reduced = local
+        world_size = 1
+    if world_size < 1:
+        raise RuntimeError("accelerator num_processes must be positive")
+    values = reduced.detach().cpu().tolist()
+    total_weight = values[4]
+    return {
+        "base_loss": values[0] / world_size,
+        "branch_loss": values[1] / world_size,
+        "total_loss": values[2] / world_size,
+        "active_forks": values[3],
+        "effective_fork_weight": total_weight,
+        "branch_kl": values[5] / total_weight if total_weight else 0.0,
+        "entropy_floor": values[6] / total_weight if total_weight else 0.0,
+    }
