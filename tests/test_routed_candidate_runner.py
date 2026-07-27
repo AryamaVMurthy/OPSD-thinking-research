@@ -1,0 +1,31 @@
+from pathlib import Path
+
+
+RUNNER = Path("reproductions/06_graf_opsd/run-routed-candidate.sbatch")
+
+
+def test_runner_selects_manifests_after_reading_graph_mode() -> None:
+    script = RUNNER.read_text(encoding="utf-8")
+
+    graph_mode_offset = script.index('graph_mode="$(python3')
+    unconditional_graph_offset = script.find(
+        ': "${GRAF_GRAPH_CACHE_MANIFEST:?}" "${GRAF_VIABILITY_MANIFEST:?}"'
+    )
+
+    assert unconditional_graph_offset == -1
+    assert graph_mode_offset < script.index(
+        'graph_modes_requiring_graph=('
+    )
+    assert '"context_dossier"' in script
+    assert 'manifest_inputs=(runtime-overrides.txt)' in script
+
+
+def test_runner_archives_only_the_manifests_used_by_the_mode() -> None:
+    script = RUNNER.read_text(encoding="utf-8")
+
+    assert 'if [[ "${requires_graph}" == 1 ]]; then' in script
+    assert 'if [[ "${requires_viability}" == 1 ]]; then' in script
+    assert 'if [[ "${requires_dossier}" == 1 ]]; then' in script
+    assert 'manifest_inputs+=(graph-cache-manifest.json)' in script
+    assert 'manifest_inputs+=(viability-manifest.json)' in script
+    assert 'manifest_inputs+=(ch-dossier-manifest.json)' in script

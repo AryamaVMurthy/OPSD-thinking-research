@@ -14,7 +14,6 @@ set -euo pipefail
 module load u22/cuda/12.4
 source "${HOME}/OPSD-thinking-research/infra/turing/common.sh"
 cd "${PROJECT_SOURCE}"
-: "${GRAF_GRAPH_CACHE_MANIFEST:?}" "${GRAF_VIABILITY_MANIFEST:?}"
 : "${GRAF_CANDIDATE_ID:?}" "${GRAF_CANDIDATE_CONFIG:?}" "${GRAF_MAX_STEPS:?}" "${GRAF_PORT:?}"
 python3 -m opsd_research.cli validate-config "${GRAF_CANDIDATE_CONFIG}"
 completion_length="$(python3 - "${GRAF_CANDIDATE_CONFIG}" <<'PY'
@@ -41,9 +40,36 @@ import sys
 print(load_config(sys.argv[1]).data.get("max_sequence_length", 20000))
 PY
 )"
-if [[ "${graph_mode}" == "fluid_viability_routed" ||
-      "${graph_mode}" == "fluid_context_dossier" ]]; then
-  : "${CH_DOSSIER_MANIFEST:?fluid teacher context requires CH_DOSSIER_MANIFEST}"
+graph_modes_requiring_graph=(
+  "scaffold_graph" "fork_mask" "viability_routed"
+  "fluid_viability_routed" "fluid_context_dossier"
+)
+graph_modes_requiring_viability=(
+  "viability_routed" "fluid_viability_routed" "fluid_context_dossier"
+)
+graph_modes_requiring_dossier=(
+  "context_dossier" "fluid_context_dossier" "fluid_viability_routed"
+)
+requires_graph=0
+requires_viability=0
+requires_dossier=0
+for mode in "${graph_modes_requiring_graph[@]}"; do
+  [[ "${graph_mode}" == "${mode}" ]] && requires_graph=1
+done
+for mode in "${graph_modes_requiring_viability[@]}"; do
+  [[ "${graph_mode}" == "${mode}" ]] && requires_viability=1
+done
+for mode in "${graph_modes_requiring_dossier[@]}"; do
+  [[ "${graph_mode}" == "${mode}" ]] && requires_dossier=1
+done
+if [[ "${requires_graph}" == 1 ]]; then
+  : "${GRAF_GRAPH_CACHE_MANIFEST:?graph mode requires GRAF_GRAPH_CACHE_MANIFEST}"
+fi
+if [[ "${requires_viability}" == 1 ]]; then
+  : "${GRAF_VIABILITY_MANIFEST:?graph mode requires GRAF_VIABILITY_MANIFEST}"
+fi
+if [[ "${requires_dossier}" == 1 ]]; then
+  : "${CH_DOSSIER_MANIFEST:?teacher context requires CH_DOSSIER_MANIFEST}"
 fi
 if [[ "${GRAF_MAX_STEPS}" == 1 || "${GRAF_MAX_STEPS}" == 5 ]]; then
   export GRAF_SMOKE_MAX_STEPS="${GRAF_MAX_STEPS}"
@@ -68,10 +94,18 @@ fi
 # branch into an unrelated OOM experiment.
 vllm_utilization="${GRAF_VLLM_GPU_MEMORY_UTILIZATION:-0.35}"
 run_name="graf-${GRAF_CANDIDATE_ID}-${GRAF_MAX_STEPS}-${SLURM_JOB_ID}"; output_dir="${TRAIN_ROOT}/${run_name}"
-mkdir -p "${output_dir}"; cp "${GRAF_CANDIDATE_CONFIG}" "${output_dir}/config.yaml"; cp "${GRAF_GRAPH_CACHE_MANIFEST}" "${output_dir}/graph-cache-manifest.json"; cp "${GRAF_VIABILITY_MANIFEST}" "${output_dir}/viability-manifest.json"
-manifest_inputs=(runtime-overrides.txt graph-cache-manifest.json viability-manifest.json)
-if [[ "${graph_mode}" == "fluid_viability_routed" ||
-      "${graph_mode}" == "fluid_context_dossier" ]]; then
+mkdir -p "${output_dir}"
+cp "${GRAF_CANDIDATE_CONFIG}" "${output_dir}/config.yaml"
+manifest_inputs=(runtime-overrides.txt)
+if [[ "${requires_graph}" == 1 ]]; then
+  cp "${GRAF_GRAPH_CACHE_MANIFEST}" "${output_dir}/graph-cache-manifest.json"
+  manifest_inputs+=(graph-cache-manifest.json)
+fi
+if [[ "${requires_viability}" == 1 ]]; then
+  cp "${GRAF_VIABILITY_MANIFEST}" "${output_dir}/viability-manifest.json"
+  manifest_inputs+=(viability-manifest.json)
+fi
+if [[ "${requires_dossier}" == 1 ]]; then
   cp "${CH_DOSSIER_MANIFEST}" "${output_dir}/ch-dossier-manifest.json"
   manifest_inputs+=(ch-dossier-manifest.json)
 fi
