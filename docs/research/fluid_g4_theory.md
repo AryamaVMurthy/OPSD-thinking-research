@@ -228,3 +228,35 @@ unlocks the more expensive attribution ladder.
 
 Failure of H3 rejects the implementation. Failure of H4 rejects the method in
 its tested form. One positive AIME sample average is not sufficient evidence.
+
+## Observed stability evidence
+
+The fixed-cache comparison is now complete. Exact FKL and RKL each passed one
+optimizer update. Ordinary exact JS exhausted a 46,068 MiB card before its
+first backward, but the mathematically equivalent analytic
+vocabulary-recomputed backward completed. This distinguishes an autograd
+retention failure from a failure of the JS objective.
+
+At five matched fixed-cache updates:
+
+- FKL used at most 43,939 MiB, crossed the 0.1 pre-clip norm at 3/5 updates,
+  and ended with update/parameter ratio \(9.66\times10^{-5}\);
+- recomputed JS used at most 38,165 MiB, crossed at 1/5 updates, and ended at
+  \(9.18\times10^{-5}\);
+- both had finite losses, zero material divergence negatives, and comparable
+  wall time.
+
+The stronger comparison used the actual 124-row fluid stream with identical
+rollouts. FKL produced loss 0.2198 and pre-clip norm 0.2955. JS produced loss
+0.0324 and norm 0.02539 at the same wall time and approximately 38.1 GiB peak
+memory. This is an 11.6-fold gradient-norm reduction, so JS—not its lower raw
+loss scale alone—won the preregistered stability gate.
+
+Globally reduced routing telemetry also resolves an apparent conflict. On the
+old 22-identity fixed cache, the route/base ratio could exceed one because
+every row was route-active and JS has a smaller scalar base. On the real
+coverage-preserving stream, posterior smoothing, absolute information weights,
+and sparse routing kept the maximum global ratio below 0.01 in the paired
+smoke. The conditional trust cap is therefore not activated. Whether this
+small auxiliary improves task quality remains an ablation question; empirical
+outcomes also affect the teacher through natural-language context.
