@@ -16,6 +16,7 @@ except ImportError:
 if torch is not None:
     from opsd_research import launch_official_opsd
     from opsd_research.jsd import (
+        canonical_negative_tolerance,
         divergence_statistics_vocab_chunked,
         exact_divergence_vocab_chunked,
         exact_forward_kl_vocab_chunked,
@@ -212,9 +213,38 @@ class ChunkedJSDTests(unittest.TestCase):
             self.assertAlmostEqual(stats[divergence]["mean"], float(expected), places=12)
             self.assertEqual(stats[divergence]["nonfinite_count"], 0)
             self.assertEqual(stats[divergence]["negative_count"], 0)
+            self.assertEqual(stats[divergence]["roundoff_negative_count"], 0)
+            self.assertEqual(stats[divergence]["material_negative_count"], 0)
             self.assertEqual(stats[divergence]["p50"], stats[divergence]["mean"])
         self.assertGreater(stats["teacher_entropy"]["mean"], 0.0)
         self.assertGreater(stats["student_entropy"]["mean"], 0.0)
+
+    def test_low_precision_roundoff_is_reported_but_not_material(self):
+        generator = torch.Generator().manual_seed(0)
+        teacher = (5 * torch.randn(1, 8, 8192, generator=generator)).to(
+            torch.bfloat16
+        )
+        student = (
+            teacher.float()
+            + 0.01 * torch.randn(1, 8, 8192, generator=generator)
+        ).to(torch.bfloat16)
+
+        stats = divergence_statistics_vocab_chunked(
+            student, teacher, chunk_size=2048
+        )
+
+        self.assertLess(stats["forward_kl"]["min"], -1e-7)
+        self.assertGreater(stats["forward_kl"]["negative_count"], 0)
+        self.assertGreater(stats["forward_kl"]["roundoff_negative_count"], 0)
+        self.assertEqual(stats["forward_kl"]["material_negative_count"], 0)
+        self.assertGreaterEqual(
+            stats["forward_kl"]["roundoff_tolerance"],
+            abs(stats["forward_kl"]["min"]),
+        )
+        self.assertAlmostEqual(
+            canonical_negative_tolerance(torch.float32),
+            64 * torch.finfo(torch.float32).eps,
+        )
 
     def test_value_and_student_gradient_match_official_forward_kl(self):
         generator = torch.Generator().manual_seed(7)
