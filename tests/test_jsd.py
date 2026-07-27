@@ -20,6 +20,7 @@ if torch is not None:
         divergence_statistics_vocab_chunked,
         exact_divergence_vocab_chunked,
         exact_forward_kl_vocab_chunked,
+        recomputed_divergence_vocab_chunked,
     )
 
 
@@ -139,6 +140,101 @@ class ChunkedJSDTests(unittest.TestCase):
             student_chunked.grad, student_reference.grad, rtol=1e-12, atol=1e-12
         )
 
+    def test_recomputed_backward_matches_autograd_for_all_objectives(self):
+        generator = torch.Generator().manual_seed(29)
+        teacher = torch.randn(
+            2, 3, 23, generator=generator, dtype=torch.float64
+        )
+        labels = torch.tensor(
+            [[1, -100, 2], [3, 4, -100]], dtype=torch.long
+        )
+        for divergence in ("forward_kl", "reverse_kl", "js"):
+            with self.subTest(divergence=divergence):
+                student_reference = torch.randn(
+                    2,
+                    3,
+                    23,
+                    generator=generator,
+                    dtype=torch.float64,
+                    requires_grad=True,
+                )
+                student_recomputed = (
+                    student_reference.detach().clone().requires_grad_(True)
+                )
+                reference = exact_divergence_vocab_chunked(
+                    student_reference,
+                    teacher,
+                    labels,
+                    divergence=divergence,
+                    temperature=1.1,
+                    chunk_size=7,
+                )
+                observed = recomputed_divergence_vocab_chunked(
+                    student_recomputed,
+                    teacher,
+                    labels,
+                    divergence=divergence,
+                    temperature=1.1,
+                    chunk_size=7,
+                )
+                reference.backward()
+                observed.backward()
+
+                torch.testing.assert_close(
+                    observed, reference, rtol=1e-12, atol=1e-12
+                )
+                torch.testing.assert_close(
+                    student_recomputed.grad,
+                    student_reference.grad,
+                    rtol=1e-11,
+                    atol=1e-12,
+                )
+
+    def test_recomputed_js_saves_fewer_forward_tensors(self):
+        generator = torch.Generator().manual_seed(31)
+        teacher = torch.randn(1, 4, 257, generator=generator)
+        labels = torch.ones(1, 4, dtype=torch.long)
+
+        def saved_bytes(function):
+            saved = []
+
+            def pack(tensor):
+                saved.append(tensor.numel() * tensor.element_size())
+                return tensor
+
+            student = torch.randn(
+                1, 4, 257, generator=generator, requires_grad=True
+            )
+            with torch.autograd.graph.saved_tensors_hooks(
+                pack, lambda tensor: tensor
+            ):
+                loss = function(student, teacher, labels)
+            loss.backward()
+            return sum(saved)
+
+        ordinary = saved_bytes(
+            lambda student, fixed_teacher, fixed_labels:
+            exact_divergence_vocab_chunked(
+                student,
+                fixed_teacher,
+                fixed_labels,
+                divergence="js",
+                chunk_size=64,
+            )
+        )
+        recomputed = saved_bytes(
+            lambda student, fixed_teacher, fixed_labels:
+            recomputed_divergence_vocab_chunked(
+                student,
+                fixed_teacher,
+                fixed_labels,
+                divergence="js",
+                chunk_size=64,
+            )
+        )
+
+        self.assertLess(recomputed, ordinary)
+
     def test_canonical_objectives_are_zero_at_equality_in_low_precision(self):
         logits = torch.tensor(
             [[[2.0, -1.0, 0.25], [0.5, 1.5, -3.0]]], dtype=torch.bfloat16
@@ -165,6 +261,7 @@ class ChunkedJSDTests(unittest.TestCase):
         environment = {
             "OPSD_EXACT_JSD_VOCAB_CHUNK_SIZE": "2",
             "OPSD_TOKEN_DIVERGENCE": "js",
+            "OPSD_RECOMPUTE_DIVERGENCE_BACKWARD": "1",
         }
         with mock.patch.dict(sys.modules, {"opsd_trainer": fake_module}), mock.patch.dict(
             os.environ, environment, clear=False
@@ -173,6 +270,7 @@ class ChunkedJSDTests(unittest.TestCase):
         self.assertEqual(FakeTrainer._opsd_token_divergence, "js")
         self.assertEqual(FakeTrainer._opsd_divergence_diagnostics_interval, 1)
         self.assertEqual(FakeTrainer._opsd_vocab_chunk_size, 2)
+        self.assertIs(FakeTrainer._opsd_divergence_recompute, True)
 
         student = torch.tensor([[[2.0, 0.0, -1.0]]], dtype=torch.float64)
         teacher = torch.tensor([[[-1.0, 0.0, 2.0]]], dtype=torch.float64)

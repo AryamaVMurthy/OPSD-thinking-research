@@ -208,6 +208,172 @@ def exact_divergence_vocab_chunked(
     return total / denominator
 
 
+class _RecomputedDivergence(torch.autograd.Function):
+    """Store only logits/mask; reconstruct vocabulary intermediates backward."""
+
+    @staticmethod
+    def forward(
+        ctx,
+        student_logits,
+        teacher_logits,
+        labels,
+        has_labels,
+        divergence,
+        temperature,
+        chunk_size,
+    ):
+        ctx.has_labels = bool(has_labels)
+        ctx.divergence = str(divergence)
+        ctx.temperature = float(temperature)
+        ctx.chunk_size = int(chunk_size)
+        mask = (
+            labels != -100
+            if ctx.has_labels
+            else torch.ones(
+                student_logits.shape[:2],
+                dtype=torch.bool,
+                device=student_logits.device,
+            )
+        )
+        ctx.save_for_backward(student_logits, teacher_logits, mask)
+        return exact_divergence_vocab_chunked(
+            student_logits,
+            teacher_logits,
+            labels if ctx.has_labels else None,
+            divergence=ctx.divergence,
+            temperature=ctx.temperature,
+            chunk_size=ctx.chunk_size,
+        )
+
+    @staticmethod
+    def backward(ctx, output_gradient):
+        student_logits, teacher_logits, mask = ctx.saved_tensors
+        work_dtype = (
+            torch.float64
+            if student_logits.dtype == torch.float64
+            else torch.float32
+        )
+        temperature = ctx.temperature
+        student_scaled = student_logits.to(work_dtype) / temperature
+        teacher_scaled = teacher_logits.to(work_dtype) / temperature
+        student_log_normalizer = torch.logsumexp(
+            student_scaled, dim=-1, keepdim=True
+        )
+        teacher_log_normalizer = torch.logsumexp(
+            teacher_scaled, dim=-1, keepdim=True
+        )
+        denominator = (
+            int(mask.sum().item())
+            if ctx.has_labels
+            else student_logits.shape[0]
+        )
+        vocabulary_size = student_logits.shape[-1]
+        center = None
+        if ctx.divergence in {"reverse_kl", "js"}:
+            center = student_scaled.new_zeros(student_logits.shape[:2])
+            for start in range(0, vocabulary_size, ctx.chunk_size):
+                stop = min(start + ctx.chunk_size, vocabulary_size)
+                student_log_probs = (
+                    student_scaled[..., start:stop]
+                    - student_log_normalizer
+                )
+                teacher_log_probs = (
+                    teacher_scaled[..., start:stop]
+                    - teacher_log_normalizer
+                )
+                if ctx.divergence == "reverse_kl":
+                    log_ratio = student_log_probs - teacher_log_probs
+                else:
+                    mixture_log_probs = torch.logaddexp(
+                        student_log_probs, teacher_log_probs
+                    ) - student_log_probs.new_tensor(2.0).log()
+                    log_ratio = student_log_probs - mixture_log_probs
+                center += (
+                    torch.exp(student_log_probs) * log_ratio
+                ).sum(dim=-1)
+
+        student_gradient = torch.empty_like(student_logits)
+        mask_scale = mask.to(work_dtype).unsqueeze(-1)
+        upstream = output_gradient.to(work_dtype)
+        scale = upstream / (denominator * temperature)
+        for start in range(0, vocabulary_size, ctx.chunk_size):
+            stop = min(start + ctx.chunk_size, vocabulary_size)
+            student_log_probs = (
+                student_scaled[..., start:stop] - student_log_normalizer
+            )
+            teacher_log_probs = (
+                teacher_scaled[..., start:stop] - teacher_log_normalizer
+            )
+            student_probs = torch.exp(student_log_probs)
+            if ctx.divergence == "forward_kl":
+                gradient = student_probs - torch.exp(teacher_log_probs)
+            elif ctx.divergence == "reverse_kl":
+                gradient = student_probs * (
+                    student_log_probs
+                    - teacher_log_probs
+                    - center.unsqueeze(-1)
+                )
+            else:
+                mixture_log_probs = torch.logaddexp(
+                    student_log_probs, teacher_log_probs
+                ) - student_log_probs.new_tensor(2.0).log()
+                gradient = 0.5 * student_probs * (
+                    student_log_probs
+                    - mixture_log_probs
+                    - center.unsqueeze(-1)
+                )
+            student_gradient[..., start:stop] = (
+                gradient * mask_scale * scale
+            ).to(student_logits.dtype)
+        return student_gradient, None, None, None, None, None, None
+
+
+def recomputed_divergence_vocab_chunked(
+    student_logits: torch.Tensor,
+    teacher_logits: torch.Tensor,
+    labels: torch.Tensor | None = None,
+    *,
+    divergence: str = "forward_kl",
+    temperature: float = 1.0,
+    reduction: str = "batchmean",
+    chunk_size: int,
+) -> torch.Tensor:
+    """Canonical loss with analytic, recomputed student-logit gradients.
+
+    The forward value is identical to ``exact_divergence_vocab_chunked``.
+    Backward reconstructs probabilities a vocabulary chunk at a time instead
+    of retaining every FKL/RKL/JS intermediate from the forward graph.
+    """
+    if reduction != "batchmean":
+        raise ValueError(
+            "recomputed chunked OPSD loss currently requires batchmean reduction"
+        )
+    if not student_logits.requires_grad:
+        return exact_divergence_vocab_chunked(
+            student_logits,
+            teacher_logits,
+            labels,
+            divergence=divergence,
+            temperature=temperature,
+            reduction=reduction,
+            chunk_size=chunk_size,
+        )
+    labels_tensor = (
+        labels
+        if labels is not None
+        else torch.empty(0, dtype=torch.long, device=student_logits.device)
+    )
+    return _RecomputedDivergence.apply(
+        student_logits,
+        teacher_logits,
+        labels_tensor,
+        labels is not None,
+        divergence,
+        temperature,
+        chunk_size,
+    )
+
+
 def exact_forward_kl_vocab_chunked(
     student_logits: torch.Tensor,
     teacher_logits: torch.Tensor,
