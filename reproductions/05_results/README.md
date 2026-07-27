@@ -18,3 +18,7 @@ Implementation findings from the live OPSD run are recorded in
 
 Accepted post-training results are recorded in
 [`opsd_evaluation_progress.md`](opsd_evaluation_progress.md).
+
+The completed GRAF / dynamic contrastive-hindsight OPSD development study,
+including its negative CH1 promotion result and GPU-efficiency audit, is in
+[`graf_ch_autoresearch_report.md`](graf_ch_autoresearch_report.md).

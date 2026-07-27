@@ -1,8 +1,10 @@
 # GRAF / dynamic contrastive-hindsight OPSD autoresearch
 
-Status: active. This report records only completed, checksum-verified results.
-CH1 pilot training and paired evaluation are complete; CH1 did not clear its
-paper-scale promotion gate.
+Status: completed development phase, stopped at the preregistered promotion
+gate on 2026-07-27. This report records only completed, checksum-verified
+results. No tested GRAF/CH candidate cleared the gate for paper-scale training,
+so the 6,912-row cache, 200-step run, and locked AIME25/AIME26 evaluations were
+not launched.
 
 ## Scientific question
 
@@ -169,14 +171,16 @@ There were seven improved and seven degraded paired samples. Changes were
 localized rather than uniform: CH1 gained two samples on each of AIME I:8 and
 II:11, but lost three on I:13. Only one degraded sample was evaluation-length
 truncated, so the neutral result cannot be attributed to the evaluation cap.
-CH1 does not advance to the 6,912-row/200-step paper-scale run.
+CH1 did not advance directly to the 6,912-row/200-step paper-scale run. Its
+exactly neutral result admitted only the single preregistered same-method
+diversity/dose confirmation below.
 
 ## CH1 diversity/dose confirmation
 
-The single allowed same-method confirmation is in progress. It changes only
-the number of unique training identities and optimizer steps; the CH1
-free-form dossier method, fixed teacher, loss, sampling, and evaluation gate
-remain unchanged.
+The single allowed same-method confirmation is complete. It changed only the
+number of unique training identities and optimizer steps; the CH1 free-form
+dossier method, fixed teacher, loss, sampling, and evaluation gate remained
+unchanged.
 
 Eight-GPU cache job 16473 completed in 25:15. All artifacts passed their
 SHA-256 manifest.
@@ -207,21 +211,59 @@ optimizer step:
 
 Job 16491 preserves the effective batch of 32, 4,096-token completion limit,
 28,672-token context, exact full-vocabulary forward KL, and all 1,600
-first-pass identities. At step 25, all losses and gradient norms were finite;
-the rolling step time was 179.57 seconds and the step-25 loss / gradient norm
-were -0.0052 / 0.01931. The 2.8 GiB checkpoint contains the LoRA adapter,
-trainer and scheduler state, eight RNG states, eight DeepSpeed optimizer
-shards, and the model state. The repository's resume validator selected it as
-the latest valid checkpoint.
-The confirmation remains gated on 50 finite steps and a positive paired
-full-context AIME24 delta.
+first-pass identities. It completed 50/50 finite steps in 2:31:53 with exit
+code 0, exactly one epoch over the 1,600 identities. Final trainer state has
+50 log rows; checkpoint 50 is 2.8 GiB and contains the LoRA adapter, trainer
+and scheduler state, eight RNG states, eight DeepSpeed optimizer shards, and
+the model state. The final rollout dump covers checkpoint 50, and all 200
+recorded rollouts across the retained five-step dumps are nonempty.
 
-## Efficiency and scale plan
+| Confirmation-training metric | Value |
+|---|---:|
+| GPUs / optimizer steps | 8 / 50 |
+| Wall time / mean step time | 2:31:53 / 180.0 s |
+| Mean / final logged loss | -0.004466 / -0.0072 |
+| Final gradient norm | 0.01960 |
+| Root adapter SHA-256 | `d36284b7a411f32cb11da33c50957897f4107c2fe97ce274f534e27e2ab8f540` |
+| Final generation-dump SHA-256 | `71ebe2f6e00ce445641aaff3cba4e815112a588ef92b203c066ae64fc98ef2d0` |
+
+Paired full-context evaluation 16495 completed on four A100s in 39:34. All
+120 expected `(problem, sample)` pairs were present, pairing was verified, the
+official grader emitted no warnings, and no response hit the evaluation
+length cutoff.
+
+| Paired AIME24 metric | Untouched | CH1 step 50 | Delta | Paired 95% CI |
+|---|---:|---:|---:|---:|
+| Avg@4 | 0.775000 | 0.716667 | -0.058333 | [-0.125000, +0.008333] |
+| Majority@4 | 0.800000 | 0.833333 | +0.033333 | [-0.066667, +0.133333] |
+| Pass@4 | 0.866667 | 0.833333 | -0.033333 | [-0.100000, 0.000000] |
+
+At the paired-sample level, 5 answers improved, 12 degraded, 81 stayed
+correct, and 22 stayed wrong. The negative Avg@4 result is not a truncation or
+verbosity artifact: mean output length fell from 14,645.7 untouched tokens to
+13,078.1 CH1 tokens, while cutoff rate remained zero. Mean tokens for correct
+responses fell from 12,351.1 to 10,089.8; mean tokens for wrong responses fell
+from 22,549.0 to 20,636.8. The learned policy therefore lost sample-level
+accuracy despite completing its answers.
+
+Controller 16496 applied the observed-delta gate, recorded
+`stop-ch-development-no-positive-confirmation`, and submitted no paper-scale
+job.
+
+## Efficiency and conditional scale plan
 
 Four-GPU CH1 pilot steps took approximately 8:10 on average. The GPUs generated
 at about 72 tokens/second each and averaged approximately 95% utilization;
 microbatch 2 is not memory-safe with the observed 40+ GiB footprint on 46 GiB
 cards.
+
+The stable eight-A100 configuration reduced mean optimizer-step time to
+approximately 3:00, a 2.76x throughput improvement over the four-GPU pilot
+while preserving effective batch 32. Its production settings are vLLM memory
+utilization 0.32 plus expandable CUDA allocator segments. The successful
+confirmation main path consumed approximately 26.3 GPU-hours: 3.4 for cache
+generation, 20.3 for training, and 2.6 for evaluation. Failed pre-step memory
+probes are excluded from that total.
 
 The publication-scale cache contains the first 6,912 pinned Math-CoT-20k
 identities. The fixed 5% content-hash diagnostic partition leaves exactly
@@ -237,38 +279,41 @@ All 6,912 raw problem/reference contexts were audited before generation:
 | Conservative complete teacher-prompt maximum | 26,946 |
 | Projected prompts above 28,672 | 0 |
 
-Preferred full allocation is node10's eight GPUs with data parallelism 8 and
-gradient accumulation 4. This preserves effective batch 32 while roughly
-halving step wall time versus four GPUs. The chain includes checkpoints at
-50/100/150/200, automatic resume from complete checkpoints, up to three
-source-pinned recovery attempts, append-only canonical logs, and combined
-telemetry.
+Had CH1 cleared its gate, the preferred full allocation was node10's eight
+GPUs with data parallelism 8 and gradient accumulation 4. The prepared chain
+includes checkpoints at 50/100/150/200, automatic resume from complete
+checkpoints, up to three source-pinned recovery attempts, append-only
+canonical logs, and combined telemetry. It was intentionally not started
+after the negative confirmation.
 
 ## Promotion and final evaluation gates
 
-1. CH1 pilot must have positive paired full-context AIME24 Avg@4 delta versus
-   untouched. Its observed delta was exactly zero, so no paper-scale CH1 job
-   is launched.
-2. A positive pilot launches a fresh 6,912-row cache and 200-step training run.
-3. Full CH1 and untouched models are evaluated sequentially on official
-   12-sample AIME24.
-4. Locked AIME25/AIME26 remain untouched unless full AIME24 delta is positive.
-5. A positive paper claim requires the paired confidence-interval lower bound
-   to exceed zero on both locked benchmarks. Otherwise the method is reported
-   as a development result.
+1. The 12-step CH1 pilot had exactly zero paired Avg@4 delta. This admitted
+   one same-method diversity/dose confirmation, not a parameter sweep.
+2. The 50-step confirmation had -0.058333 paired Avg@4 delta. It therefore
+   failed the observed-delta promotion gate and ended CH development.
+3. The fresh 6,912-row cache and 200-step paper-scale training run were not
+   launched.
+4. Official Avg@12 paper-scale AIME24 and locked AIME25/AIME26 remain
+   untouched.
+5. Any future method family must be preregistered as a new experiment rather
+   than selected post hoc from CH checkpoints.
 
 ## Current conclusion
 
-G4 is slightly positive but uncertain and trained on too few identities. CH0
-is slightly negative and severely truncated. CH1 fixes the principal measured
-completion failure while preserving 100% cache coverage and free-form
-reasoning, but its paired accuracy effect is exactly neutral and its Pass@4 is
-lower. No tested method currently supports a publication-scale positive
-claim.
+G4 is slightly positive but uncertain and trained on only 22 identities. CH0
+is slightly negative and severely rollout-truncated. CH1 fixes the measured
+completion failure while retaining every valid example and preserving
+free-form dossiers, but increasing exposure from 12 to 50 steps changed its
+paired Avg@4 effect from 0.000000 to -0.058333. No tested method supports a
+publication-scale positive claim.
 
-The only justified continuation is a single diversity/dose confirmation of
-the unchanged CH1 method, not a parameter sweep: use enough cached identities
-for 50 effective-batch-32 steps without early recycling, run on eight GPUs,
-and apply the same paired AIME24 gate. A nonpositive confirmation ends CH
-development; a positive confirmation may enter the already prepared
-6,912-row/200-step chain.
+The bounded autoresearch phase is therefore a valid negative result. It shows
+that longer blind attempts improve dossier coverage, and that eight-A100
+training can be made stable and 2.76x faster, but neither improvement implies
+better downstream reasoning. Further CH checkpoint selection would violate
+the bounded gate and risk development-set overfitting. The next scientifically
+distinct study, if separately authorized, should retain the dynamic natural
+language dossier and complete coverage while testing an objective with direct
+outcome grounding (for example an OPSD-plus-GRPO control), beginning with a
+small preregistered pilot rather than the prepared paper-scale CH run.

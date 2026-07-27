@@ -26,7 +26,7 @@ def render(comparison: dict[str, Any], *, candidate_id: str) -> str:
     if any(name not in metric for name in required) or len(interval) != 2:
         raise ValueError("malformed paired comparison")
     delta = float(metric["delta"])
-    decision = "promote to full confirmation" if delta > 0 else "advance to next candidate"
+    decision = "promote to full confirmation" if delta > 0 else "do not promote"
     evaluation_protocol = comparison.get(
         "evaluation_protocol",
         "official" if comparison["samples_per_problem"] == 12 else "development",

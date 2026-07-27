@@ -36,3 +36,28 @@ class GrafDevelopmentReportTests(unittest.TestCase):
 
         self.assertIn("Paired development result", report)
         self.assertNotIn("Official paired result", report)
+
+    def test_nonpositive_delta_is_reported_as_not_promoted(self):
+        comparison = {
+            "model": "Qwen/Qwen3-4B", "benchmark": "aime24",
+            "comparison_protocol": "paired-problem-cluster-bootstrap-v1",
+            "evaluation_protocol": "development",
+            "num_problems": 30, "samples_per_problem": 4,
+            "avg_at_4": {
+                "baseline": .775,
+                "treatment": .7166666667,
+                "delta": -.0583333333,
+            },
+            "delta_bootstrap_95ci": {
+                "avg_at_4": [-.125, .0083333333],
+            },
+            "paired_sample_changes": {
+                "improved": 5, "degraded": 12,
+                "both_correct": 81, "both_wrong": 22,
+            },
+        }
+
+        report = render(comparison, candidate_id="ch1-confirmation")
+
+        self.assertIn("do not promote", report)
+        self.assertNotIn("advance to next candidate", report)
