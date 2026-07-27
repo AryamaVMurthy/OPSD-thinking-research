@@ -243,20 +243,35 @@ def main() -> None:
                 source_indices=routed_targets.keys(),
             )
         print(
-            '{"event":"graf_viability_routing_enabled",'
-            f'"base_opsd_records":{records},'
-            f'"routed_examples":{len(routed_targets)},'
-            f'"active_routed_examples":{len(routed_targets)},'
-            f'"coverage_preserving":{str(fluid_mode).lower()},'
-            f'"student_answer_context":false,'
-            f'"teacher_reference_context":{str(fluid_mode).lower()},'
-            f'"teacher_empirical_continuation_context":{str(fluid_mode).lower()},'
-            f'"fork_threshold":{float(config.get("fork_threshold", 0.0))},'
-            f'"fork_information_threshold":{float(config.get("fork_information_threshold", 0.0))},'
-            f'"fork_information_quantile":{float(config.get("fork_information_quantile", 0.0))},'
-            f'"information_weighted_routing":{bool(config.get("information_weighted_routing", False))},'
-            f'"viability_beta_prior":{float(config.get("viability_beta_prior", 0.0))},'
-            f'"recovery_conditioned_routing":{bool(config.get("recovery_conditioned_routing", False))}' + "}",
+            json.dumps(
+                {
+                    "event": "graf_viability_routing_enabled",
+                    "base_opsd_records": records,
+                    "routed_examples": len(routed_targets),
+                    "active_routed_examples": len(routed_targets),
+                    "coverage_preserving": fluid_mode,
+                    "student_answer_context": False,
+                    "teacher_reference_context": fluid_mode,
+                    "teacher_empirical_continuation_context": fluid_mode,
+                    "fork_threshold": float(config.get("fork_threshold", 0.0)),
+                    "fork_information_threshold": float(
+                        config.get("fork_information_threshold", 0.0)
+                    ),
+                    "fork_information_quantile": float(
+                        config.get("fork_information_quantile", 0.0)
+                    ),
+                    "information_weighted_routing": bool(
+                        config.get("information_weighted_routing", False)
+                    ),
+                    "viability_beta_prior": float(
+                        config.get("viability_beta_prior", 0.0)
+                    ),
+                    "recovery_conditioned_routing": bool(
+                        config.get("recovery_conditioned_routing", False)
+                    ),
+                },
+                separators=(",", ":"),
+            ),
             flush=True,
         )
     else:
