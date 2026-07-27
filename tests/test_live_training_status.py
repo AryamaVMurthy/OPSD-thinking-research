@@ -22,7 +22,7 @@ class LiveTrainingStatusTests(unittest.TestCase):
                 '"update_norm":0.02,"update_to_parameter_ratio":0.005}\n',
                 encoding="utf-8",
             )
-            status = summarize_log(log, 4096)
+            status = summarize_log(log, 4096, max_grad_norm=0.1)
 
         canonical = status["canonical_divergence"]
         self.assertEqual(canonical["objective"], "js")
@@ -36,6 +36,7 @@ class LiveTrainingStatusTests(unittest.TestCase):
         )
         self.assertIn("Canonical js telemetry", render_markdown(status))
         self.assertIn("Adapter update norm", render_markdown(status))
+        self.assertIn("student / teacher entropy (gap)", render_markdown(status))
 
     def test_summarizes_partial_training_log(self) -> None:
         with TemporaryDirectory() as directory:
@@ -52,7 +53,7 @@ class LiveTrainingStatusTests(unittest.TestCase):
                 "vLLM generation done - elapsed time: 40.0s, prompts: 1, total tokens: 2048, avg length: 2048.0\n",
                 encoding="utf-8",
             )
-            status = summarize_log(log, 4096)
+            status = summarize_log(log, 4096, max_grad_norm=0.1)
         self.assertEqual(status["observed_optimizer_steps"], 1)
         self.assertEqual(status["rollouts"]["calls"], 2)
         self.assertEqual(status["rollouts"]["capped_calls"], 1)
@@ -64,11 +65,27 @@ class LiveTrainingStatusTests(unittest.TestCase):
             status["graf_branch"]["mean_branch_to_base_ratio_when_active"],
             2.1,
         )
+        self.assertEqual(
+            status["graf_branch"]["mean_effective_fork_weight_when_active"],
+            0.5,
+        )
+        self.assertEqual(
+            status["graf_branch"]["max_branch_to_base_ratio_when_active"],
+            2.1,
+        )
+        self.assertEqual(
+            status["graf_branch"]["branch_dominant_call_rate"],
+            1.0,
+        )
         self.assertEqual(status["forward_kl"]["loss_calls"], 2)
         self.assertEqual(status["forward_kl"]["negative_loss_calls"], 0)
         self.assertEqual(status["forward_kl"]["min"], 1.25e-06)
+        self.assertEqual(status["gradient_norm"]["measurements"], 1)
+        self.assertEqual(status["gradient_norm"]["clip_exceedances"], 1)
+        self.assertEqual(status["gradient_norm"]["clip_exceedance_rate"], 1.0)
         report = render_markdown(status)
         self.assertIn("`50.0%` (1/2)", report)
         self.assertIn("0.002800", report)
         self.assertIn("Branch-active loss calls: `50.0%` (1/2)", report)
         self.assertIn("Negative loss calls: `0`", report)
+        self.assertIn("Pre-clip threshold exceedance: `100.0%` (1/1)", report)

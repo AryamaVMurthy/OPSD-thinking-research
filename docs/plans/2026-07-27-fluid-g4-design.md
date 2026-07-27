@@ -6,7 +6,9 @@ Status: approved for bounded development on 2026-07-27.
 
 Turn the positive but underpowered G4 pilot into a numerically correct,
 coverage-preserving, free-form reasoning method. The development campaign is
-capped at 60 A100 GPU-hours before a new scale decision. The legacy automatic
+capped at 60 allocated GPU-hours before a new scale decision. Development is
+currently running on four RTX 6000 Ada GPUs, so accounting must name those
+devices and must not relabel their hours as A100-hours. The legacy automatic
 controller job 16394 remains held.
 
 The method must preserve these invariants:
@@ -167,22 +169,26 @@ Use the immutable G4 cache only for controlled plumbing/stability comparisons:
 
 A smoke cannot establish task quality. Reject only for incorrect loss,
 non-finite gradients, excessive memory, or a throughput regression above 15%
-without a compensating correctness reason. Budget: 8--12 A100 GPU-hours.
+without a compensating correctness reason. Budget: 8--12 allocated GPU-hours.
 
 ### Stage C: fluid-cache pilot
 
-Build 256--512 source identities with variable natural proposals and adaptive
-viability sampling. Require at least 95% complete evidence-packet coverage and
-retain 100% of otherwise eligible identities in the base OPSD stream. Cache
-budget: at most 3 A100 GPU-hours.
+First reuse the checksum-verified 128-packet cache for an engineering smoke and
+short promotion pilot. It already contains the required free-form blind
+attempts, verified reference, audit, and measured continuations, so rebuilding
+it would spend compute without changing the hypothesis. Expand to 256--512
+source identities only after the 128-packet run passes its numerical and
+matched-quality gates. Require at least 95% complete evidence-packet coverage
+and retain 100% of otherwise eligible identities in the base OPSD stream.
+Expanded-cache budget: at most 3 allocated GPU-hours.
 
 ### Stage D: successive-halving training
 
 Train the divergence winner and runner-up for 12--25 steps with identical data,
 rollout seeds, and maximum generated-token budgets. Use two training seeds for
 the final development comparison. Evaluate paired AIME 2024 Average@4 and one
-non-AIME held-out mathematical set. Budget: 25--40 A100 GPU-hours including
-development evaluation.
+non-AIME held-out mathematical set. Budget: 25--40 allocated GPU-hours including
+development evaluation, measured on the named hardware.
 
 Promote only if:
 
@@ -200,6 +206,39 @@ receives a 1,600-identity/50-step confirmation. Publication-scale
 6,000+-identity, 200-step, multi-seed training and the full locked benchmark
 suite require a separately reported compute estimate and explicit continuation
 decision.
+
+## Compute-efficient execution amendment
+
+The shortest valid path is:
+
+1. use one optimizer step only to reject broken FKL/RKL/JS implementations;
+2. run five steps only for the two implementations that pass correctness,
+   memory, and throughput gates;
+3. run one fluid-FKL engineering step on all 124 training-eligible dossier
+   identities, with the 22 informative identities receiving the sparse
+   auxiliary;
+4. promote at most two arms to 12 steps;
+5. use paired AIME 2024 Average@4 plus a non-AIME held-out set to choose one;
+6. run a matched plain-OPSD control before expanding the cache or training
+   longer.
+
+The divergence ablation changes only FKL versus RKL versus JS. Evidence-packet
+components, action target, seeds, token budget, optimizer, and checkpoint are
+held fixed. Packet-component ablations are postponed until there is a positive
+fluid result; otherwise they cannot explain an effect that does not exist.
+
+Early stopping is asymmetric. Numerical invalidity, OOM, missing coverage,
+leakage, or a material throughput regression rejects immediately. A noisy loss
+increase over one to five updates does not reject by itself; the decision uses
+finite gradients, pre-clip exceedance rate, realized adapter-update norm,
+student/teacher entropy gap, branch/base balance, cap rate, and paired task
+quality.
+
+As of the amendment, exact FKL and RKL each passed one update. Ordinary JS
+exceeded memory before its first update, which rejects that implementation but
+not JS; a mathematically equivalent recomputed-backward JS is the only repair
+arm. The five-step FKL stability run is the current reference. No three-way
+long pilot will be run merely for completeness.
 
 ## Experiment ledger
 

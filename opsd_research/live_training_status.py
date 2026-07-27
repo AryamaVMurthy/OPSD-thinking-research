@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import math
 import re
 from pathlib import Path
 from typing import Any
@@ -22,7 +23,8 @@ _PROGRESS = re.compile(r"(?P<step>\d+)/(?:\d+)\s+\[[^\]]*s/it\]")
 
 def _finite_number(value: object) -> float | None:
     if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return float(value)
+        number = float(value)
+        return number if math.isfinite(number) else None
     return None
 
 
@@ -37,9 +39,18 @@ def _json_event(line: str, marker: str) -> dict[str, Any] | None:
     return event if isinstance(event, dict) else None
 
 
-def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
+def summarize_log(
+    path: Path,
+    max_completion_length: int,
+    *,
+    max_grad_norm: float | None = None,
+) -> dict[str, Any]:
     if max_completion_length <= 0:
         raise ValueError("max_completion_length must be positive")
+    if max_grad_norm is not None and (
+        not math.isfinite(max_grad_norm) or max_grad_norm <= 0.0
+    ):
+        raise ValueError("max_grad_norm must be a finite positive number")
     text = path.read_text(encoding="utf-8", errors="replace")
     rollouts = []
     losses = []
@@ -99,6 +110,9 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
                     event = None
                 if isinstance(event, dict):
                     active = _finite_number(event.get("active_forks"))
+                    evidence_weight = _finite_number(
+                        event.get("effective_fork_weight")
+                    )
                     branch_kl = _finite_number(event.get("branch_kl"))
                     entropy_floor = _finite_number(event.get("entropy_floor"))
                     weighted_loss = _finite_number(event.get("weighted_loss"))
@@ -110,6 +124,7 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
                     if None not in (active, branch_kl, entropy_floor, weighted_loss):
                         branch_events.append({
                             "active_forks": active,
+                            "effective_fork_weight": evidence_weight,
                             "branch_kl": branch_kl,
                             "entropy_floor": entropy_floor,
                             "weighted_loss": weighted_loss,
@@ -142,11 +157,39 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
         else ("mixed" if canonical_objectives else None)
     )
     canonical_numbers = [value for _, value in canonical_values]
+    gradient_values = [
+        row["grad_norm"]
+        for row in losses
+        if row["grad_norm"] is not None
+    ]
+    clip_exceedances = (
+        sum(value > max_grad_norm for value in gradient_values)
+        if max_grad_norm is not None
+        else None
+    )
     return {
         "schema_version": 1,
         "log": str(path),
         "observed_optimizer_steps": observed_step,
         "loss_history": losses,
+        "gradient_norm": {
+            # Transformers reports the total norm before clipping.
+            "measurements": len(gradient_values),
+            "mean": (
+                sum(gradient_values) / len(gradient_values)
+                if gradient_values
+                else None
+            ),
+            "min": min(gradient_values) if gradient_values else None,
+            "max": max(gradient_values) if gradient_values else None,
+            "max_grad_norm": max_grad_norm,
+            "clip_exceedances": clip_exceedances,
+            "clip_exceedance_rate": (
+                clip_exceedances / len(gradient_values)
+                if clip_exceedances is not None and gradient_values
+                else None
+            ),
+        },
         "rollouts": {
             "calls": len(rollouts),
             "token_total": token_total,
@@ -166,6 +209,22 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
                 sum(row["active_forks"] for row in branch_events) / len(branch_events)
                 if branch_events else None
             ),
+            "mean_effective_fork_weight_when_active": (
+                sum(
+                    row["effective_fork_weight"]
+                    for row in branch_active
+                    if row["effective_fork_weight"] is not None
+                )
+                / sum(
+                    row["effective_fork_weight"] is not None
+                    for row in branch_active
+                )
+                if any(
+                    row["effective_fork_weight"] is not None
+                    for row in branch_active
+                )
+                else None
+            ),
             "mean_branch_kl_when_active": (
                 sum(row["branch_kl"] for row in branch_active) / len(branch_active)
                 if branch_active else None
@@ -181,6 +240,34 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
             "mean_branch_to_base_ratio_when_active": (
                 sum(
                     row["branch_to_base_ratio"]
+                    for row in branch_active
+                    if row["branch_to_base_ratio"] is not None
+                )
+                / sum(
+                    row["branch_to_base_ratio"] is not None
+                    for row in branch_active
+                )
+                if any(
+                    row["branch_to_base_ratio"] is not None
+                    for row in branch_active
+                )
+                else None
+            ),
+            "max_branch_to_base_ratio_when_active": (
+                max(
+                    row["branch_to_base_ratio"]
+                    for row in branch_active
+                    if row["branch_to_base_ratio"] is not None
+                )
+                if any(
+                    row["branch_to_base_ratio"] is not None
+                    for row in branch_active
+                )
+                else None
+            ),
+            "branch_dominant_call_rate": (
+                sum(
+                    row["branch_to_base_ratio"] > 1.0
                     for row in branch_active
                     if row["branch_to_base_ratio"] is not None
                 )
@@ -261,6 +348,21 @@ def render_markdown(status: dict[str, Any]) -> str:
                     f"`{objective_stats.get('p90')}` / "
                     f"`{objective_stats.get('p99')}`"
                 )
+            student_entropy = latest.get("student_entropy")
+            teacher_entropy = latest.get("teacher_entropy")
+            if (
+                isinstance(student_entropy, dict)
+                and isinstance(teacher_entropy, dict)
+                and _finite_number(student_entropy.get("mean")) is not None
+                and _finite_number(teacher_entropy.get("mean")) is not None
+            ):
+                student_mean = float(student_entropy["mean"])
+                teacher_mean = float(teacher_entropy["mean"])
+                lines.append(
+                    "- Latest mean student / teacher entropy (gap): "
+                    f"`{student_mean:.6f}` / `{teacher_mean:.6f}` "
+                    f"(`{student_mean - teacher_mean:+.6f}`)"
+                )
     if adapter["events"]:
         latest_adapter = adapter["latest"]
         lines.extend(
@@ -300,7 +402,39 @@ def render_markdown(status: dict[str, Any]) -> str:
                 "- Mean |branch| / |base| loss ratio (active calls): "
                 f"`{branch['mean_branch_to_base_ratio_when_active']:.4f}`"
             )
+        if branch["mean_effective_fork_weight_when_active"] is not None:
+            lines.append(
+                "- Mean absolute evidence weight (active calls): "
+                f"`{branch['mean_effective_fork_weight_when_active']:.4f}`"
+            )
+        if branch["branch_dominant_call_rate"] is not None:
+            lines.append(
+                "- Branch-dominant active calls (|branch| > |base|): "
+                f"`{100 * branch['branch_dominant_call_rate']:.1f}%`; "
+                "maximum ratio "
+                f"`{branch['max_branch_to_base_ratio_when_active']:.4f}`"
+            )
     losses = status["loss_history"]
+    gradients = status["gradient_norm"]
+    if gradients["measurements"]:
+        lines.extend(
+            [
+                "",
+                "## Gradient stability",
+                "",
+                "- Mean / min / max pre-clip norm: "
+                f"`{gradients['mean']:.6f}` / "
+                f"`{gradients['min']:.6f}` / "
+                f"`{gradients['max']:.6f}`",
+            ]
+        )
+        if gradients["clip_exceedance_rate"] is not None:
+            lines.append(
+                "- Pre-clip threshold exceedance: "
+                f"`{100 * gradients['clip_exceedance_rate']:.1f}%` "
+                f"({gradients['clip_exceedances']}/"
+                f"{gradients['measurements']})"
+            )
     if losses:
         lines.extend(["", "## Optimizer metrics", "", "| Update | Loss | Gradient norm |", "|---:|---:|---:|"])
         for index, event in enumerate(losses, start=1):
@@ -315,10 +449,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--training-log", required=True, type=Path)
     parser.add_argument("--max-completion-length", required=True, type=int)
+    parser.add_argument(
+        "--max-grad-norm",
+        type=float,
+        help="configured clipping threshold; enables pre-clip exceedance reporting",
+    )
     parser.add_argument("--output-json", type=Path)
     parser.add_argument("--output-markdown", type=Path)
     args = parser.parse_args()
-    status = summarize_log(args.training_log, args.max_completion_length)
+    status = summarize_log(
+        args.training_log,
+        args.max_completion_length,
+        max_grad_norm=args.max_grad_norm,
+    )
     if args.output_json:
         args.output_json.parent.mkdir(parents=True, exist_ok=True)
         args.output_json.write_text(json.dumps(status, indent=2, sort_keys=True) + "\n", encoding="utf-8")
