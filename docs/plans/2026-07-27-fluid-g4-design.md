@@ -278,3 +278,101 @@ decision. Failed branches are preserved.
 The authoritative baseline is completed G4 job 16356 plus its checksum-verified
 evaluations. No new GPU run begins until the CPU objective implementation,
 tests, config validation, source commit, and artifact paths are recorded.
+
+## Revised causal ladder after the first quality result
+
+The registered 12-step Fluid-G4/JS arm was stable but failed its AIME-2024
+development gate: Average@4 changed from 77.50% to 74.17%, and Pass@4 changed
+from 86.67% to 80.00%. Seven of eight degraded paired samples came from
+problems the base model solved 4/4. The full method is therefore rejected; its
+stable loss is not evidence of useful learning.
+
+The shortest causal ladder is now:
+
+| Gate | One factor changed | Maximum work before a task signal | Decision |
+|---|---|---:|---|
+| A0 | Remove action scoring and route loss, retain the complete empirical teacher packet | 12 steps + paired AIME-2024 Average@4 | Attribute damage to the route auxiliary or to full-response teacher matching |
+| A1 | Add verifier-based outcome protection to the better context formulation | 5 steps, then 12 only if stable | Reject if it does not recover correct-to-wrong transitions and paired accuracy |
+| A2 | Change the distillation horizon from all 4,096 tokens to the first 1,024 tokens | 5 steps, then one paired screen only if A1 is positive | Test whether long-horizon imitation causes search/verbosity damage |
+| A3 | Replace uniform token weights with a soft entropy/disagreement gate | one 5-step arm; paired screen only if A2 leaves a measured localization problem | Compare against TSD-KD-style selection; do not claim gating itself as novel |
+| A4 | Hold the winning method fixed and change JS to exact FKL or exact RKL | 5 steps per alternative; promote at most one | Complete the divergence ablation without a three-way long factorial |
+| A5 | Repeat the winner with seed 43 and evaluate AIME-2024 plus HMMT-Feb-2025 | two matched 12-step runs/evaluations | Require directionally consistent task movement and no systematic Pass@k or transfer loss |
+| A6 | Expand identities and train 50 steps | only after A5 | Measure scaling, cache staleness, and correct trajectories per GPU-hour |
+
+Job 16627 is A0. Its configuration differs from full Fluid-G4 only by
+disabling action routing. The dependent controller validates all 12 updates
+and automatically compares the same paired evaluation with both the immutable
+base and full Fluid-G4. AIME 2025/2026 remain locked.
+
+### Outcome-protected fluid objective
+
+If A0 remains below the base, A1 uses a task-level verifier score
+\(r(y)\in[0,1]\) and a continuous protection weight \(w_\mathrm{fail}(y)\).
+Incorrect, incomplete, or low-confidence trajectories receive privileged
+teacher distillation. Verified-correct trajectories are protected from
+full-response imitation; a short positive tail may receive ordinary
+student-target SFT as a separately logged anchor. This is an established
+outcome-selection repair, not the novelty claim.
+
+The teacher packet remains unrestricted prose. It may contain independent
+answer-blind attempts, a verified reference, comparative audit, and empirical
+continuation outcomes, but the student never sees those fields. The training
+interface accepts a general scalar verifier rather than an AIME-specific
+answer rule, making the same objective applicable to tests for code, proof
+checking, or execution success for tool use. JSON remains provenance storage,
+not a required reasoning format.
+
+For a student token \(t\), the candidate objective is
+
+\[
+L_t =
+w_\mathrm{fail}(y)\,
+w_\mathrm{position}(t,y)\,
+D\!\left(T_t(\cdot\mid x,z,y_{<t}),S_t(\cdot\mid x,y_{<t})\right),
+\]
+
+with \(D\) fixed to exact JS for the first repair. Outcome selection,
+distillation horizon, token localization, and divergence are changed in
+separate gates. This prevents a positive result from being uninterpretable.
+
+### Stability and mechanism acceptance criteria
+
+Every promoted screen must report, over the entire run rather than only the
+last batch:
+
+- loss, pre-clip gradient norm, clip rate, learning rate, adapter parameter
+  norm, update norm, and update/parameter ratio;
+- exact FKL, RKL, and JS token statistics, non-finite/material-negative
+  counts, student/teacher entropy, and normalized position quartiles;
+- rollout length distribution, 4,096-token cap rate, thinking closure,
+  extracted-answer rate, correctness, and correct answers per generated
+  million tokens;
+- paired correct-to-wrong and wrong-to-correct transitions, stratified by base
+  0/4 through 4/4 performance;
+- teacher answer consistency, evidence coverage, identity repeats, sampling
+  concentration, and—when enabled—route/base loss balance;
+- wall time, generated tokens, peak memory, utilization, cache cost, training
+  GPU-hours, evaluation GPU-hours, and teacher-forward equivalents.
+
+Immediate rejection conditions are leakage, missing coverage, non-finite
+optimization, materially negative canonical divergence, OOM, or a persistent
+unexplained throughput regression above 15%. Task rejection is based on paired
+accuracy and transition structure, not on a smooth training loss.
+
+### Compute envelope on the current four-GPU node
+
+Observed Fluid-G4 costs provide the planning unit:
+
+- 12-step training: 6.61 allocated RTX 6000 Ada GPU-hours;
+- paired AIME-2024 Average@4 evaluation: 2.05 allocated GPU-hours;
+- one complete train-and-screen arm: about 8.7 allocated GPU-hours;
+- one five-step numerical screen: about 2.8 allocated GPU-hours.
+
+Consequently A1 first spends about 2.8 GPU-hours, not 8.7. Only a stable A1
+spends the additional 12-step screen. A2 and A3 are conditional, not queued as
+a grid. FKL and RKL together cost about 5.6 GPU-hours at five steps; at most
+one receives a task evaluation. This ordering limits the remaining
+method-selection campaign to roughly 20--35 allocated GPU-hours if early
+gates work, while negative gates stop much earlier. Evidence already cached is
+reused and reported as sunk compute; it is not silently excluded from the
+final efficiency table.
