@@ -47,6 +47,7 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
     forward_kl_values = []
     canonical_values: list[tuple[str, float]] = []
     canonical_diagnostics: list[dict[str, Any]] = []
+    adapter_stability: list[dict[str, Any]] = []
     observed_step = 0
     for match in _ROLLOUT.finditer(text):
         rollouts.append({
@@ -72,6 +73,11 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
         )
         if diagnostic_event is not None:
             canonical_diagnostics.append(diagnostic_event)
+        adapter_event = _json_event(
+            line, '{"event":"adapter_stability"'
+        )
+        if adapter_event is not None:
+            adapter_stability.append(adapter_event)
         kl_start = line.find('{"event":"exact_forward_kl_loss"')
         if kl_start >= 0:
             kl_end = line.find("}", kl_start)
@@ -188,6 +194,11 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
             "diagnostic_calls": len(canonical_diagnostics),
             "latest": canonical_diagnostics[-1] if canonical_diagnostics else None,
         },
+        "adapter_stability": {
+            "events": len(adapter_stability),
+            "history": adapter_stability,
+            "latest": adapter_stability[-1] if adapter_stability else None,
+        },
     }
 
 
@@ -205,6 +216,7 @@ def render_markdown(status: dict[str, Any]) -> str:
     branch = status["graf_branch"]
     forward_kl = status["forward_kl"]
     canonical = status["canonical_divergence"]
+    adapter = status["adapter_stability"]
     if canonical["loss_calls"]:
         lines.extend([
             "",
@@ -225,6 +237,20 @@ def render_markdown(status: dict[str, Any]) -> str:
                     f"`{objective_stats.get('p90')}` / "
                     f"`{objective_stats.get('p99')}`"
                 )
+    if adapter["events"]:
+        latest_adapter = adapter["latest"]
+        lines.extend(
+            [
+                "",
+                "## Adapter stability",
+                "",
+                f"- Measurements: `{adapter['events']}`",
+                f"- Adapter parameter norm: `{latest_adapter['parameter_norm']:.8g}`",
+                f"- Adapter update norm: `{latest_adapter['update_norm']:.8g}`",
+                "- Update / parameter norm: "
+                f"`{latest_adapter['update_to_parameter_ratio']:.8g}`",
+            ]
+        )
     if forward_kl["loss_calls"]:
         lines.extend([
             "",

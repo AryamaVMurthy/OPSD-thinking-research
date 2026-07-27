@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import runpy
 import sys
 from pathlib import Path
@@ -288,6 +289,80 @@ def _install_nonreentrant_gradient_checkpointing() -> None:
     print(
         '{"event":"graf_nonreentrant_gradient_checkpointing_enabled",'
         '"use_reentrant":false}',
+        flush=True,
+    )
+
+
+def _install_adapter_stability_callback() -> None:
+    """Log realized LoRA parameter updates at a low configured frequency."""
+    raw_interval = os.environ.get("OPSD_ADAPTER_STABILITY_INTERVAL")
+    if raw_interval is None:
+        return
+    try:
+        interval = int(raw_interval)
+    except ValueError as error:
+        raise SystemExit(
+            "OPSD_ADAPTER_STABILITY_INTERVAL must be a positive integer"
+        ) from error
+    if interval < 1:
+        raise SystemExit(
+            "OPSD_ADAPTER_STABILITY_INTERVAL must be a positive integer"
+        )
+
+    import opsd_trainer
+    from transformers import TrainerCallback
+
+    from .stability import TrainableParameterSnapshot
+
+    class AdapterStabilityCallback(TrainerCallback):
+        def __init__(self):
+            self.snapshot = None
+
+        def on_train_begin(
+            self, args, state, control, model=None, **kwargs
+        ):
+            if state.is_world_process_zero:
+                self.snapshot = TrainableParameterSnapshot.capture(model)
+            return control
+
+        def on_step_end(self, args, state, control, model=None, **kwargs):
+            if (
+                self.snapshot is not None
+                and state.global_step % interval == 0
+            ):
+                metrics = self.snapshot.measure(model)
+                print(
+                    json.dumps(
+                        {
+                            "event": "adapter_stability",
+                            "step": state.global_step,
+                            **metrics,
+                        },
+                        separators=(",", ":"),
+                    ),
+                    flush=True,
+                )
+            return control
+
+    original_init = opsd_trainer.OPSDTrainer.__init__
+    if getattr(original_init, "_adapter_stability_wrapper", False):
+        return
+
+    def init_with_adapter_stability(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        self.add_callback(AdapterStabilityCallback())
+
+    init_with_adapter_stability._adapter_stability_wrapper = True
+    opsd_trainer.OPSDTrainer.__init__ = init_with_adapter_stability
+    print(
+        json.dumps(
+            {
+                "event": "adapter_stability_enabled",
+                "interval": interval,
+                "snapshot_device": "cpu",
+            },
+            separators=(",", ":"),
+        ),
         flush=True,
     )
 

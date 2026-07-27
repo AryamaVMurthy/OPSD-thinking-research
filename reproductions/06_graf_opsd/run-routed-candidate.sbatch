@@ -54,7 +54,8 @@ vllm_utilization="${GRAF_VLLM_GPU_MEMORY_UTILIZATION:-0.35}"
 run_name="graf-${GRAF_CANDIDATE_ID}-${GRAF_MAX_STEPS}-${SLURM_JOB_ID}"; output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"; cp "${GRAF_CANDIDATE_CONFIG}" "${output_dir}/config.yaml"; cp "${GRAF_GRAPH_CACHE_MANIFEST}" "${output_dir}/graph-cache-manifest.json"; cp "${GRAF_VIABILITY_MANIFEST}" "${output_dir}/viability-manifest.json"
 export OPSD_TRAINING_PARTITION_MANIFEST="${output_dir}/training-partition.json"
-printf 'candidate=%s\nmax_steps=%s\nnum_gpus=4\ngradient_accumulation_steps=8\neffective_batch_size=32\nvllm_gpu_memory_utilization=%s\ntoken_divergence=%s\njsd_token_clip=%s\ndivergence_diagnostics_interval=%s\n' "${GRAF_CANDIDATE_ID}" "${GRAF_MAX_STEPS}" "${vllm_utilization}" "${token_divergence}" "${jsd_token_clip}" "${OPSD_DIVERGENCE_DIAGNOSTICS_INTERVAL}" > "${output_dir}/runtime-overrides.txt"
+export OPSD_ADAPTER_STABILITY_INTERVAL=1
+printf 'candidate=%s\nmax_steps=%s\nnum_gpus=4\ngradient_accumulation_steps=8\neffective_batch_size=32\nvllm_gpu_memory_utilization=%s\ntoken_divergence=%s\njsd_token_clip=%s\ndivergence_diagnostics_interval=%s\nadapter_stability_interval=%s\n' "${GRAF_CANDIDATE_ID}" "${GRAF_MAX_STEPS}" "${vllm_utilization}" "${token_divergence}" "${jsd_token_clip}" "${OPSD_DIVERGENCE_DIAGNOSTICS_INTERVAL}" "${OPSD_ADAPTER_STABILITY_INTERVAL}" > "${output_dir}/runtime-overrides.txt"
 record_run_manifest "${output_dir}" runtime-overrides.txt graph-cache-manifest.json viability-manifest.json
 start_gpu_telemetry "${run_name}"; trap stop_gpu_telemetry EXIT
 accelerate launch --config_file third_party/opsd/accelerate.yaml --num_processes 4 --gradient_accumulation_steps 8 --main_process_port "${GRAF_PORT}" \

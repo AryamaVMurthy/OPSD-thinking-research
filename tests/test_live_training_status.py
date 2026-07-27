@@ -16,7 +16,10 @@ class LiveTrainingStatusTests(unittest.TestCase):
                 '"forward_kl":{"mean":0.3,"min":0.1,"p50":0.2,"p90":0.5,"p99":0.6,"max":0.7,"nonfinite_count":0,"negative_count":0},'
                 '"reverse_kl":{"mean":0.4,"min":0.1,"p50":0.3,"p90":0.6,"p99":0.7,"max":0.8,"nonfinite_count":0,"negative_count":0},'
                 '"js":{"mean":0.1,"min":0.02,"p50":0.08,"p90":0.2,"p99":0.25,"max":0.3,"nonfinite_count":0,"negative_count":0},'
-                '"student_entropy":{"mean":2.0},"teacher_entropy":{"mean":1.8}}\n',
+                '"student_entropy":{"mean":2.0},"teacher_entropy":{"mean":1.8}}\n'
+                '{"event":"adapter_stability","step":1,'
+                '"trainable_parameters":100,"parameter_norm":4.0,'
+                '"update_norm":0.02,"update_to_parameter_ratio":0.005}\n',
                 encoding="utf-8",
             )
             status = summarize_log(log, 4096)
@@ -27,7 +30,12 @@ class LiveTrainingStatusTests(unittest.TestCase):
         self.assertAlmostEqual(canonical["mean"], 0.1)
         self.assertEqual(canonical["diagnostic_calls"], 1)
         self.assertEqual(canonical["latest"]["js"]["p99"], 0.25)
+        self.assertEqual(status["adapter_stability"]["events"], 1)
+        self.assertEqual(
+            status["adapter_stability"]["latest"]["update_norm"], 0.02
+        )
         self.assertIn("Canonical js telemetry", render_markdown(status))
+        self.assertIn("Adapter update norm", render_markdown(status))
 
     def test_summarizes_partial_training_log(self) -> None:
         with TemporaryDirectory() as directory:

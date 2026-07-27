@@ -60,6 +60,36 @@ class GrafLauncherTests(unittest.TestCase):
                 {"preserve_rng_state": False, "use_reentrant": False},
             )
 
+    def test_adapter_stability_callback_is_installed_only_when_enabled(self):
+        class FakeTrainer:
+            def __init__(self):
+                self.callbacks = []
+
+            def add_callback(self, callback):
+                self.callbacks.append(callback)
+
+        fake_opsd = types.SimpleNamespace(OPSDTrainer=FakeTrainer)
+        fake_transformers = types.SimpleNamespace(TrainerCallback=object)
+        fake_stability = types.SimpleNamespace(
+            TrainableParameterSnapshot=object
+        )
+        with mock.patch.dict(
+            sys.modules,
+            {
+                "opsd_trainer": fake_opsd,
+                "transformers": fake_transformers,
+                "opsd_research.stability": fake_stability,
+            },
+        ), mock.patch.dict(
+            os.environ,
+            {"OPSD_ADAPTER_STABILITY_INTERVAL": "1"},
+            clear=False,
+        ):
+            launch_official_opsd._install_adapter_stability_callback()
+            trainer = FakeTrainer()
+
+        self.assertEqual(len(trainer.callbacks), 1)
+
     def test_context_dossier_requires_its_teacher_only_manifest(self):
         arguments = [
             "launch_graf_opsd", "--model_name_or_path", "Qwen/Qwen3-4B",
