@@ -362,6 +362,26 @@ acceptance; for tool use, execution success. This introduces no additional
 teacher forward. Verifier latency, unavailable/error rate, active response
 fraction, and global normalization factor are logged every optimizer update.
 
+The 128-row cache audit found that the separately stored answer exists for all
+128 identities and never uses the dossier builder's fallback text. However,
+the pinned MathArena checker accepts only 124/128 answers when each canonical
+answer is compared with itself. Its four failures cover an inequality, the
+scalar zero, a three-element list, and an equation. Therefore the official
+checker cannot be the sole online training verifier. Before A1 is launched:
+
+- every target must pass a canonical self-check;
+- an independently implemented math-equivalence checker plus normalized exact
+  answer match must be evaluated as fallbacks;
+- disagreement or checker exception must yield `unavailable`, never
+  `incorrect`;
+- outcome weighting must report coverage by verifier route and retain
+  ordinary base OPSD for unavailable rows;
+- the paired benchmark continues to use the official MathArena sidecar,
+  independently of the training verifier.
+
+This separates a training signal-quality problem from benchmark reporting and
+prevents parser failures from creating false-negative distillation pressure.
+
 A last-128-token positive-tail SFT anchor for verified-correct short
 trajectories is a separate switch because it changes the objective. It is an
 OGLS-SD baseline, not bundled into the first outcome-gating test. If used, its
