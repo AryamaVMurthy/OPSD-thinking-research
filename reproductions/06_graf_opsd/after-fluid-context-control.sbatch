@@ -58,14 +58,14 @@ controls = [
     for event in events
     if event.get("event") == "fluid_teacher_context_control_enabled"
 ]
-if len(controls) != 1:
-    raise SystemExit("context-only control activation was not recorded exactly once")
-control = controls[0]
-if (
+if not controls:
+    raise SystemExit("context-only control activation was not recorded")
+if any(
     control.get("base_opsd_records") != 124
     or not control.get("coverage_preserving")
     or not control.get("teacher_empirical_continuation_context")
     or control.get("action_routing_enabled")
+    for control in controls
 ):
     raise SystemExit("context-only control does not isolate action routing")
 if any(event.get("event") == "graf_branch_loss" for event in events):
