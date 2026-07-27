@@ -41,8 +41,9 @@ import sys
 print(load_config(sys.argv[1]).data.get("max_sequence_length", 20000))
 PY
 )"
-if [[ "${graph_mode}" == "fluid_viability_routed" ]]; then
-  : "${CH_DOSSIER_MANIFEST:?fluid routing requires CH_DOSSIER_MANIFEST}"
+if [[ "${graph_mode}" == "fluid_viability_routed" ||
+      "${graph_mode}" == "fluid_context_dossier" ]]; then
+  : "${CH_DOSSIER_MANIFEST:?fluid teacher context requires CH_DOSSIER_MANIFEST}"
 fi
 if [[ "${GRAF_MAX_STEPS}" == 1 || "${GRAF_MAX_STEPS}" == 5 ]]; then
   export GRAF_SMOKE_MAX_STEPS="${GRAF_MAX_STEPS}"
@@ -69,7 +70,8 @@ vllm_utilization="${GRAF_VLLM_GPU_MEMORY_UTILIZATION:-0.35}"
 run_name="graf-${GRAF_CANDIDATE_ID}-${GRAF_MAX_STEPS}-${SLURM_JOB_ID}"; output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"; cp "${GRAF_CANDIDATE_CONFIG}" "${output_dir}/config.yaml"; cp "${GRAF_GRAPH_CACHE_MANIFEST}" "${output_dir}/graph-cache-manifest.json"; cp "${GRAF_VIABILITY_MANIFEST}" "${output_dir}/viability-manifest.json"
 manifest_inputs=(runtime-overrides.txt graph-cache-manifest.json viability-manifest.json)
-if [[ "${graph_mode}" == "fluid_viability_routed" ]]; then
+if [[ "${graph_mode}" == "fluid_viability_routed" ||
+      "${graph_mode}" == "fluid_context_dossier" ]]; then
   cp "${CH_DOSSIER_MANIFEST}" "${output_dir}/ch-dossier-manifest.json"
   manifest_inputs+=(ch-dossier-manifest.json)
 fi

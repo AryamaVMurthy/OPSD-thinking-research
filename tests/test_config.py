@@ -297,6 +297,30 @@ class ConfigTests(unittest.TestCase):
             {key: value for key, value in control.items() if key not in mutable},
         )
 
+    def test_fluid_context_control_removes_only_the_action_loss(self):
+        root = ROOT / "reproductions/06_graf_opsd/configs"
+        treatment = load_config(root / "fluid-g4-js-128.yaml").data
+        control = load_config(
+            root / "fluid-g4-js-context-control-128.yaml"
+        ).data
+        self.assertEqual(control["graph_mode"], "fluid_context_dossier")
+        self.assertEqual(control["branch_loss_weight"], 0.0)
+        self.assertEqual(control["entropy_floor_weight"], 0.0)
+        self.assertFalse(control["information_weighted_routing"])
+        self.assertEqual(control["viability_beta_prior"], 0.0)
+        mutable = {
+            "variant",
+            "graph_mode",
+            "branch_loss_weight",
+            "entropy_floor_weight",
+            "information_weighted_routing",
+            "viability_beta_prior",
+        }
+        self.assertEqual(
+            {key: value for key, value in treatment.items() if key not in mutable},
+            {key: value for key, value in control.items() if key not in mutable},
+        )
+
     def test_recovery_conditioning_requires_routed_mode(self):
         data = load_config(
             ROOT / "reproductions/06_graf_opsd/configs/g7-information-weighted.yaml"

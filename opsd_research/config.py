@@ -338,6 +338,7 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         "fork_mask",
         "viability_routed",
         "fluid_viability_routed",
+        "fluid_context_dossier",
         "context_dossier",
     }:
         raise ConfigError(f"{source}: unsupported graph_mode")

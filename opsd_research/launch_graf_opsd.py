@@ -55,6 +55,7 @@ def _validate_invocation() -> dict[str, object]:
             raise SystemExit(f"required flag is missing: {flag}")
     if config["graph_mode"] in {
         "context_dossier",
+        "fluid_context_dossier",
         "fluid_viability_routed",
     }:
         manifest = os.environ.get("CH_DOSSIER_MANIFEST")
@@ -151,6 +152,46 @@ def main() -> None:
             f'"accepted_dossier_records":{records},'
             '"student_answer_context":false,'
             '"teacher_reference_context":true}',
+            flush=True,
+        )
+    elif config["graph_mode"] == "fluid_context_dossier":
+        from .ch_dossier_dataset import (
+            install_fluid_dossier_dataset_redirect,
+        )
+        from .fluid_teacher_context import fluid_teacher_contexts
+
+        raw_viability_manifest = os.environ.get("GRAF_VIABILITY_MANIFEST")
+        if not raw_viability_manifest:
+            raise SystemExit(
+                "fluid context control requires GRAF_VIABILITY_MANIFEST"
+            )
+        teacher_contexts = fluid_teacher_contexts(
+            os.environ["CH_DOSSIER_MANIFEST"],
+            os.environ["GRAF_GRAPH_CACHE_MANIFEST"],
+            raw_viability_manifest,
+        )
+        eligible = sorted(set(teacher_contexts).intersection(train_index_set))
+        selected_contexts = {
+            index: teacher_contexts[index] for index in eligible
+        }
+        records = install_fluid_dossier_dataset_redirect(
+            os.environ["CH_DOSSIER_MANIFEST"],
+            source_indices=eligible,
+            teacher_contexts=selected_contexts,
+        )
+        print(
+            json.dumps(
+                {
+                    "event": "fluid_teacher_context_control_enabled",
+                    "base_opsd_records": records,
+                    "coverage_preserving": True,
+                    "student_answer_context": False,
+                    "teacher_reference_context": True,
+                    "teacher_empirical_continuation_context": True,
+                    "action_routing_enabled": False,
+                },
+                separators=(",", ":"),
+            ),
             flush=True,
         )
     elif config["graph_mode"] == "scaffold_graph":
