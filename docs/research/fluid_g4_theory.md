@@ -100,6 +100,30 @@ can give substantial mass to an initially unlikely action based on few
 trials. Beta smoothing and absolute evidence attenuation reduce this risk but
 do not remove it.
 
+The implemented information weight is also not a complete epistemic
+confidence measure. It is the KL of the posterior-mean action target from
+uniform, normalized by its maximum. Beta smoothing makes small samples less
+extreme, and adaptive sampling spends extra trials on overlapping intervals,
+but two forks with identical posterior means and different trial counts can
+still receive the same weight.
+
+If the action auxiliary is retained at scale, the uncertainty-calibrated
+alternative is
+
+\[
+w_f =
+\frac{\mathrm{KL}(q_V\|U)}{\log K}
+\left(1-\frac{H(P(\arg\max_a v_a))}{\log K}\right),
+\]
+
+where juxtaposition denotes multiplication. The second factor is ranking
+certainty under independent Beta
+posteriors: it vanishes when every measured action is equally likely to be
+best and approaches one when the ranking is stable. It can be estimated
+deterministically at cache-load time and requires no GPU rollout. Structurally
+invalid actions remain separately masked rather than being interpreted as
+uncertain measured actions.
+
 If the context-only control matches or beats full Fluid-G4, the first
 action-target repair is a dynamic trust-region target
 
