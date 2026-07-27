@@ -1,7 +1,8 @@
 # GRAF / dynamic contrastive-hindsight OPSD autoresearch
 
 Status: active. This report records only completed, checksum-verified results.
-CH1 pilot training and its paired evaluation are still pending.
+CH1 pilot training and paired evaluation are complete; CH1 did not clear its
+paper-scale promotion gate.
 
 ## Scientific question
 
@@ -126,7 +127,7 @@ CH0 is not promoted. The change was concentrated in a few problems rather
 than a broad collapse, but its near-universal rollout truncation prevents it
 from being the final method.
 
-## CH1 training status
+## CH1 training and evaluation
 
 CH1 cache 16444 is immutable and checksum-verified. A one-step engineering
 smoke completed generation, backward, and optimization without OOM:
@@ -138,16 +139,44 @@ smoke completed generation, backward, and optimization without OOM:
 | Peak observed memory | ~40.7 / 46.1 GiB per GPU |
 | GPU utilization | ~96–97% |
 
-Pilot 16460 is the clean 12-step token-matched run. Its paired full-context
-AIME24 evaluation is dependency-gated by controller 16461. Results will be
-added only after adapter, rollout, checksum, scorer, and paired-comparison
-validation.
+Pilot 16460 completed 12/12 finite steps in 1:39:16. The final root adapter
+and checkpoint-12 adapter have identical SHA-256
+`f858993e2a52c73af8e6dffe2d650bba64e246754e8c666968b2cf988675234e`.
+The final summary verifies checkpoint and rollout coverage through step 12.
+
+| Pilot metric | Value |
+|---|---:|
+| Final loss | -0.0014 |
+| Final gradient norm | 0.01854 |
+| Observed nonempty rollouts | 93 / 93 |
+| Generation calls at 4,096-token cap | 311 / 372 |
+| Mean GPU utilization | 94.45–94.95% |
+
+Full-context evaluation 16465 completed in 30:21, and every artifact passed
+its checksum manifest. Only 1/120 responses reached the 38,912-token
+evaluation limit.
+
+| Paired AIME24 Avg@4 | Value |
+|---|---:|
+| Untouched | 0.775000 |
+| CH1 | 0.775000 |
+| Paired delta | 0.000000 |
+| Paired bootstrap 95% CI | [-0.083333, +0.075000] |
+| Majority delta | 0.000000 |
+| Pass delta | -0.033333 |
+
+There were seven improved and seven degraded paired samples. Changes were
+localized rather than uniform: CH1 gained two samples on each of AIME I:8 and
+II:11, but lost three on I:13. Only one degraded sample was evaluation-length
+truncated, so the neutral result cannot be attributed to the evaluation cap.
+CH1 does not advance to the 6,912-row/200-step paper-scale run.
 
 ## Efficiency and scale plan
 
-Four-GPU CH1 pilot steps take approximately 8:27. The GPUs generate at about
-72 tokens/second each and remain approximately 96% utilized; microbatch 2 is
-not memory-safe with the observed 40+ GiB footprint on 46 GiB cards.
+Four-GPU CH1 pilot steps took approximately 8:10 on average. The GPUs generated
+at about 72 tokens/second each and averaged approximately 95% utilization;
+microbatch 2 is not memory-safe with the observed 40+ GiB footprint on 46 GiB
+cards.
 
 The publication-scale cache contains the first 6,912 pinned Math-CoT-20k
 identities. The fixed 5% content-hash diagnostic partition leaves exactly
@@ -173,7 +202,8 @@ telemetry.
 ## Promotion and final evaluation gates
 
 1. CH1 pilot must have positive paired full-context AIME24 Avg@4 delta versus
-   untouched. Otherwise no paper-scale CH1 job is launched.
+   untouched. Its observed delta was exactly zero, so no paper-scale CH1 job
+   is launched.
 2. A positive pilot launches a fresh 6,912-row cache and 200-step training run.
 3. Full CH1 and untouched models are evaluated sequentially on official
    12-sample AIME24.
@@ -186,5 +216,14 @@ telemetry.
 
 G4 is slightly positive but uncertain and trained on too few identities. CH0
 is slightly negative and severely truncated. CH1 fixes the principal measured
-failure mode while preserving 100% cache coverage and free-form reasoning.
-Its paired result is still required before any claim or full-scale launch.
+completion failure while preserving 100% cache coverage and free-form
+reasoning, but its paired accuracy effect is exactly neutral and its Pass@4 is
+lower. No tested method currently supports a publication-scale positive
+claim.
+
+The only justified continuation is a single diversity/dose confirmation of
+the unchanged CH1 method, not a parameter sweep: use enough cached identities
+for 50 effective-batch-32 steps without early recycling, run on eight GPUs,
+and apply the same paired AIME24 gate. A nonpositive confirmation ends CH
+development; a positive confirmation may enter the already prepared
+6,912-row/200-step chain.
