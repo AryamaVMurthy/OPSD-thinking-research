@@ -39,6 +39,64 @@ def _json_event(line: str, marker: str) -> dict[str, Any] | None:
     return event if isinstance(event, dict) else None
 
 
+def _aggregate_position_quartiles(
+    diagnostics: list[dict[str, Any]],
+) -> list[dict[str, float | int]]:
+    metric_names = (
+        "forward_kl_mean",
+        "reverse_kl_mean",
+        "js_mean",
+        "student_entropy_mean",
+        "teacher_entropy_mean",
+    )
+    bins: dict[tuple[float, float], dict[str, Any]] = {}
+    for diagnostic in diagnostics:
+        quartiles = diagnostic.get("normalized_position_quartiles")
+        if not isinstance(quartiles, list):
+            continue
+        for quartile in quartiles:
+            if not isinstance(quartile, dict):
+                continue
+            start = _finite_number(quartile.get("start_fraction"))
+            end = _finite_number(quartile.get("end_fraction"))
+            token_count = _finite_number(quartile.get("token_count"))
+            if (
+                start is None
+                or end is None
+                or token_count is None
+                or token_count <= 0.0
+            ):
+                continue
+            bucket = bins.setdefault(
+                (start, end),
+                {
+                    "token_count": 0,
+                    "weighted_sums": {name: 0.0 for name in metric_names},
+                    "metric_tokens": {name: 0.0 for name in metric_names},
+                },
+            )
+            bucket["token_count"] += int(token_count)
+            for name in metric_names:
+                value = _finite_number(quartile.get(name))
+                if value is not None:
+                    bucket["weighted_sums"][name] += value * token_count
+                    bucket["metric_tokens"][name] += token_count
+
+    result: list[dict[str, float | int]] = []
+    for (start, end), bucket in sorted(bins.items()):
+        row: dict[str, float | int] = {
+            "start_fraction": start,
+            "end_fraction": end,
+            "token_count": bucket["token_count"],
+        }
+        for name in metric_names:
+            denominator = bucket["metric_tokens"][name]
+            if denominator:
+                row[name] = bucket["weighted_sums"][name] / denominator
+        result.append(row)
+    return result
+
+
 def summarize_log(
     path: Path,
     max_completion_length: int,
@@ -157,6 +215,7 @@ def summarize_log(
         else ("mixed" if canonical_objectives else None)
     )
     canonical_numbers = [value for _, value in canonical_values]
+    position_quartiles = _aggregate_position_quartiles(canonical_diagnostics)
     gradient_values = [
         row["grad_norm"]
         for row in losses
@@ -304,6 +363,7 @@ def summarize_log(
             "negative_loss_calls": sum(value < -1e-7 for value in canonical_numbers),
             "diagnostic_calls": len(canonical_diagnostics),
             "latest": canonical_diagnostics[-1] if canonical_diagnostics else None,
+            "position_quartiles": position_quartiles,
         },
         "adapter_stability": {
             "events": len(adapter_stability),
@@ -363,6 +423,41 @@ def render_markdown(status: dict[str, Any]) -> str:
                     f"`{student_mean:.6f}` / `{teacher_mean:.6f}` "
                     f"(`{student_mean - teacher_mean:+.6f}`)"
                 )
+    position_quartiles = canonical["position_quartiles"]
+    if position_quartiles:
+        lines.extend(
+            [
+                "",
+                "## Position-resolved divergence",
+                "",
+                "| Position | Tokens | FKL | RKL | JS | Student H | Teacher H |",
+                "|:--|--:|--:|--:|--:|--:|--:|",
+            ]
+        )
+        for row in position_quartiles:
+            position = (
+                f"{100 * row['start_fraction']:.0f}–"
+                f"{100 * row['end_fraction']:.0f}%"
+            )
+            metrics = [
+                (
+                    f"{row[name]:.6f}"
+                    if _finite_number(row.get(name)) is not None
+                    else "n/a"
+                )
+                for name in (
+                    "forward_kl_mean",
+                    "reverse_kl_mean",
+                    "js_mean",
+                    "student_entropy_mean",
+                    "teacher_entropy_mean",
+                )
+            ]
+            lines.append(
+                f"| {position} | {row['token_count']} | "
+                + " | ".join(metrics)
+                + " |"
+            )
     if adapter["events"]:
         latest_adapter = adapter["latest"]
         lines.extend(

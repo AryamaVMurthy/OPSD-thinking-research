@@ -6,6 +6,39 @@ from opsd_research.live_training_status import render_markdown, summarize_log
 
 
 class LiveTrainingStatusTests(unittest.TestCase):
+    def test_aggregates_position_quartiles_across_diagnostic_snapshots(self) -> None:
+        with TemporaryDirectory() as directory:
+            log = Path(directory) / "position.log"
+            log.write_text(
+                '{"event":"divergence_diagnostics","objective":"js",'
+                '"normalized_position_quartiles":['
+                '{"start_fraction":0.0,"end_fraction":0.25,"token_count":2,'
+                '"forward_kl_mean":0.2,"reverse_kl_mean":0.1,"js_mean":0.05,'
+                '"student_entropy_mean":1.0,"teacher_entropy_mean":0.8}]}\n'
+                '{"event":"divergence_diagnostics","objective":"js",'
+                '"normalized_position_quartiles":['
+                '{"start_fraction":0.0,"end_fraction":0.25,"token_count":6,'
+                '"forward_kl_mean":0.6,"reverse_kl_mean":0.3,"js_mean":0.15,'
+                '"student_entropy_mean":2.0,"teacher_entropy_mean":1.6}]}\n',
+                encoding="utf-8",
+            )
+            status = summarize_log(log, 4096)
+
+        quartiles = status["canonical_divergence"]["position_quartiles"]
+        self.assertEqual(len(quartiles), 1)
+        self.assertEqual(quartiles[0]["token_count"], 8)
+        self.assertAlmostEqual(quartiles[0]["forward_kl_mean"], 0.5)
+        self.assertAlmostEqual(quartiles[0]["reverse_kl_mean"], 0.25)
+        self.assertAlmostEqual(quartiles[0]["js_mean"], 0.125)
+        self.assertAlmostEqual(quartiles[0]["student_entropy_mean"], 1.75)
+        self.assertAlmostEqual(quartiles[0]["teacher_entropy_mean"], 1.4)
+        report = render_markdown(status)
+        self.assertIn("Position-resolved divergence", report)
+        self.assertIn(
+            "| 0–25% | 8 | 0.500000 | 0.250000 | 0.125000 | 1.750000 | 1.400000 |",
+            report,
+        )
+
     def test_summarizes_canonical_divergence_and_stability_diagnostics(self) -> None:
         with TemporaryDirectory() as directory:
             log = Path(directory) / "canonical.log"
