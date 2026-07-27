@@ -124,13 +124,25 @@ def _install_exact_jsd_chunking() -> None:
 
     import opsd_trainer
 
-    from .jsd import exact_divergence_vocab_chunked, exact_forward_kl_vocab_chunked
+    from .jsd import (
+        exact_divergence_vocab_chunked,
+        exact_forward_kl_vocab_chunked,
+        recomputed_divergence_vocab_chunked,
+    )
 
     divergence = os.environ.get("OPSD_TOKEN_DIVERGENCE")
     if divergence is not None and divergence not in {"forward_kl", "reverse_kl", "js"}:
         raise SystemExit(
             "OPSD_TOKEN_DIVERGENCE must be forward_kl, reverse_kl, or js"
         )
+    raw_recompute = os.environ.get(
+        "OPSD_RECOMPUTE_DIVERGENCE_BACKWARD", "0"
+    )
+    if raw_recompute not in {"0", "1"}:
+        raise SystemExit(
+            "OPSD_RECOMPUTE_DIVERGENCE_BACKWARD must be 0 or 1"
+        )
+    recompute = raw_recompute == "1"
     raw_diagnostic_interval = os.environ.get(
         "OPSD_DIVERGENCE_DIAGNOSTICS_INTERVAL", "1"
     )
@@ -161,7 +173,12 @@ def _install_exact_jsd_chunking() -> None:
                 raise ValueError("exact chunked OPSD loss requires logits, not probabilities")
             if top_k not in (None, 0):
                 raise ValueError("exact chunked OPSD loss is incompatible with top-k loss")
-            return exact_divergence_vocab_chunked(
+            divergence_function = (
+                recomputed_divergence_vocab_chunked
+                if recompute
+                else exact_divergence_vocab_chunked
+            )
+            return divergence_function(
                 student_logits,
                 teacher_logits,
                 labels,
@@ -186,6 +203,7 @@ def _install_exact_jsd_chunking() -> None:
     opsd_trainer.OPSDTrainer.generalized_jsd_loss = staticmethod(chunked_loss)
     opsd_trainer.OPSDTrainer._opsd_token_divergence = divergence
     opsd_trainer.OPSDTrainer._opsd_vocab_chunk_size = chunk_size
+    opsd_trainer.OPSDTrainer._opsd_divergence_recompute = recompute
     opsd_trainer.OPSDTrainer._opsd_divergence_diagnostics_interval = (
         diagnostic_interval
     )
@@ -194,6 +212,7 @@ def _install_exact_jsd_chunking() -> None:
         '{"event":"exact_jsd_chunking_enabled",'
         f'"vocab_chunk_size":{chunk_size},'
         f'"objective":"full_vocab_{objective}",'
+        f'"recomputed_backward":{str(recompute).lower()},'
         f'"upstream_token_clip_ignored":{str(divergence is not None).lower()}' + "}",
         flush=True,
     )
