@@ -239,15 +239,24 @@ def compute_loss_with_graf_routing(
         entropy_floor_fraction=self._graf_entropy_floor_fraction,
     )
     total = base_loss + branch_loss
+    base_value = float(base_loss.detach())
+    branch_value = float(branch_loss.detach())
+    total_value = float(total.detach())
+    branch_to_base_ratio = abs(branch_value) / max(
+        abs(base_value), 1e-12
+    )
     self._graf_last_branch_metrics = metrics
     if self.accelerator.is_main_process:
         print(
             '{"event":"graf_branch_loss",'
             f'"active_forks":{metrics["active_forks"]},'
             f'"effective_fork_weight":{metrics.get("effective_fork_weight", metrics["active_forks"]):.8f},'
+            f'"base_loss":{base_value:.8f},'
             f'"branch_kl":{metrics["branch_kl"]:.8f},'
             f'"entropy_floor":{metrics["entropy_floor"]:.8f},'
-            f'"weighted_loss":{float(branch_loss.detach()):.8f}' + "}",
+            f'"weighted_loss":{branch_value:.8f},'
+            f'"total_loss":{total_value:.8f},'
+            f'"branch_to_base_ratio":{branch_to_base_ratio:.8f}' + "}",
             flush=True,
         )
     if return_outputs:

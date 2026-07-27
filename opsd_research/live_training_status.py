@@ -102,12 +102,20 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
                     branch_kl = _finite_number(event.get("branch_kl"))
                     entropy_floor = _finite_number(event.get("entropy_floor"))
                     weighted_loss = _finite_number(event.get("weighted_loss"))
+                    base_loss = _finite_number(event.get("base_loss"))
+                    total_loss = _finite_number(event.get("total_loss"))
+                    balance = _finite_number(
+                        event.get("branch_to_base_ratio")
+                    )
                     if None not in (active, branch_kl, entropy_floor, weighted_loss):
                         branch_events.append({
                             "active_forks": active,
                             "branch_kl": branch_kl,
                             "entropy_floor": entropy_floor,
                             "weighted_loss": weighted_loss,
+                            "base_loss": base_loss,
+                            "total_loss": total_loss,
+                            "branch_to_base_ratio": balance,
                         })
         start = line.find("{'loss':")
         if start < 0:
@@ -169,6 +177,22 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
             "mean_weighted_loss_when_active": (
                 sum(row["weighted_loss"] for row in branch_active) / len(branch_active)
                 if branch_active else None
+            ),
+            "mean_branch_to_base_ratio_when_active": (
+                sum(
+                    row["branch_to_base_ratio"]
+                    for row in branch_active
+                    if row["branch_to_base_ratio"] is not None
+                )
+                / sum(
+                    row["branch_to_base_ratio"] is not None
+                    for row in branch_active
+                )
+                if any(
+                    row["branch_to_base_ratio"] is not None
+                    for row in branch_active
+                )
+                else None
             ),
         },
         "forward_kl": {
@@ -271,6 +295,11 @@ def render_markdown(status: dict[str, Any]) -> str:
             f"- Mean entropy-floor term (active loss calls): `{branch['mean_entropy_floor_when_active']:.6f}`",
             f"- Mean weighted routing loss (active loss calls): `{branch['mean_weighted_loss_when_active']:.6f}`",
         ])
+        if branch["mean_branch_to_base_ratio_when_active"] is not None:
+            lines.append(
+                "- Mean |branch| / |base| loss ratio (active calls): "
+                f"`{branch['mean_branch_to_base_ratio_when_active']:.4f}`"
+            )
     losses = status["loss_history"]
     if losses:
         lines.extend(["", "## Optimizer metrics", "", "| Update | Loss | Gradient norm |", "|---:|---:|---:|"])
