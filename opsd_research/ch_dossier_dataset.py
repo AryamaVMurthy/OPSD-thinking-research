@@ -28,6 +28,7 @@ def install_fluid_dossier_dataset_redirect(
     manifest_path: str | Path,
     *,
     source_indices: Collection[int] | None = None,
+    teacher_contexts: dict[int, str] | None = None,
 ) -> int:
     """Keep all dossier rows in base OPSD while enabling sparse GRAF joins.
 
@@ -40,6 +41,7 @@ def install_fluid_dossier_dataset_redirect(
         manifest_path,
         source_indices=source_indices,
         include_graf_source_index=True,
+        teacher_contexts=teacher_contexts,
     )
 
 
@@ -48,10 +50,24 @@ def _install_dossier_dataset_redirect(
     *,
     source_indices: Collection[int] | None,
     include_graf_source_index: bool,
+    teacher_contexts: dict[int, str] | None = None,
 ) -> int:
     dossiers = select_teacher_dossiers(
         accepted_teacher_dossiers(manifest_path), source_indices
     )
+    if teacher_contexts is not None:
+        normalized_contexts = {
+            int(index): str(context).strip()
+            for index, context in teacher_contexts.items()
+        }
+        if (
+            set(normalized_contexts) != set(dossiers)
+            or any(not context for context in normalized_contexts.values())
+        ):
+            raise ValueError(
+                "fluid teacher contexts must cover every selected dossier"
+            )
+        dossiers = normalized_contexts
     import datasets
 
     original_load_dataset = datasets.load_dataset

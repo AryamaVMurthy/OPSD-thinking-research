@@ -200,14 +200,18 @@ def main() -> None:
             if index in train_index_set and forks
         }
         fluid_mode = config["graph_mode"] == "fluid_viability_routed"
+        teacher_contexts = None
         if fluid_mode:
-            from .ch_dossier import accepted_teacher_dossiers
+            from .fluid_teacher_context import fluid_teacher_contexts
 
-            dossier_indices = set(
-                accepted_teacher_dossiers(
-                    os.environ["CH_DOSSIER_MANIFEST"]
-                )
-            ).intersection(train_index_set)
+            teacher_contexts = fluid_teacher_contexts(
+                os.environ["CH_DOSSIER_MANIFEST"],
+                os.environ["GRAF_GRAPH_CACHE_MANIFEST"],
+                raw_viability_manifest,
+            )
+            dossier_indices = set(teacher_contexts).intersection(
+                train_index_set
+            )
             routed_targets = {
                 index: forks
                 for index, forks in routed_targets.items()
@@ -226,6 +230,10 @@ def main() -> None:
             records = install_fluid_dossier_dataset_redirect(
                 os.environ["CH_DOSSIER_MANIFEST"],
                 source_indices=sorted(dossier_indices),
+                teacher_contexts={
+                    index: teacher_contexts[index]
+                    for index in dossier_indices
+                },
             )
         else:
             # Historical fixed-cache ablations intentionally train only on
@@ -242,6 +250,7 @@ def main() -> None:
             f'"coverage_preserving":{str(fluid_mode).lower()},'
             f'"student_answer_context":false,'
             f'"teacher_reference_context":{str(fluid_mode).lower()},'
+            f'"teacher_empirical_continuation_context":{str(fluid_mode).lower()},'
             f'"fork_threshold":{float(config.get("fork_threshold", 0.0))},'
             f'"fork_information_threshold":{float(config.get("fork_information_threshold", 0.0))},'
             f'"fork_information_quantile":{float(config.get("fork_information_quantile", 0.0))},'

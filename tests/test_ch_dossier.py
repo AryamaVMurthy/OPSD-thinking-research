@@ -243,17 +243,76 @@ def test_fluid_redirect_preserves_every_dossier_identity_for_base_opsd(
         },
     )
 
-    assert install_fluid_dossier_dataset_redirect(manifest) == 2
+    assert (
+        install_fluid_dossier_dataset_redirect(
+            manifest,
+            teacher_contexts={
+                0: "ENRICHED TEACHER ZERO",
+                1: "ENRICHED TEACHER ONE",
+            },
+        )
+        == 2
+    )
     rows = fake_datasets.load_dataset(OFFICIAL_HARDCODED_DATASET)["train"]
     assert rows == [
         {
             "problem": "PUBLIC ZERO",
-            "solution": "teacher-only-0",
+            "solution": "ENRICHED TEACHER ZERO",
             "graf_source_index": 0,
         },
         {
             "problem": "PUBLIC ONE",
-            "solution": "teacher-only-1",
+            "solution": "ENRICHED TEACHER ONE",
             "graf_source_index": 1,
         },
     ]
+
+
+def test_fluid_redirect_rejects_partial_teacher_contexts(
+    tmp_path: Path,
+) -> None:
+    cache = tmp_path / "dossiers.jsonl"
+    cache.write_text(
+        "".join(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "accepted": True,
+                    "example_index": index,
+                    "teacher_dossier": f"teacher-only-{index}",
+                    "blind_attempt_count": 2,
+                }
+            )
+            + "\n"
+            for index in (0, 1)
+        ),
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "cache": str(cache),
+                "cache_sha256": hashlib.sha256(cache.read_bytes()).hexdigest(),
+                "requested_examples": 2,
+                "accepted_examples": 2,
+                "rejected_examples": 0,
+                "blind_attempts_per_problem": 2,
+                "audit_format": "natural_language_v1",
+                "schema_based_selection": False,
+                "student_answer_context": False,
+                "teacher_reference_context": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="fluid teacher contexts must cover every selected dossier",
+    ):
+        install_fluid_dossier_dataset_redirect(
+            manifest,
+            teacher_contexts={0: "ONLY ZERO"},
+        )
