@@ -47,7 +47,7 @@ git rev-parse HEAD > "${CH_RUN_DIR}/source-commit.txt"
   printf 'blind_max_tokens=%s\n' "${CH_BLIND_MAX_TOKENS}"
   printf 'audit_max_tokens=%s\n' "${CH_AUDIT_MAX_TOKENS}"
   printf 'max_model_len=%s\n' "${CH_MAX_MODEL_LEN}"
-  printf 'parallelism=four-independent-vllm-replicas\n'
+  printf 'parallelism=%s-independent-vllm-replicas\n' "${SLURM_NTASKS}"
 } > "${CH_RUN_DIR}/runtime-parameters.txt"
 
 start_gpu_telemetry "ch-cache-${CH_LIMIT}"

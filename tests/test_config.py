@@ -105,6 +105,22 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "max_completion_length"):
             validate_config(changed)
 
+    def test_ch1_diversity_confirmation_preserves_method_and_batch_contract(self):
+        data = load_config(
+            ROOT
+            / "reproductions/06_graf_opsd/configs/"
+            "ch1-completion-aware-4096-diversity-confirmation.yaml"
+        ).data
+
+        self.assertEqual(data["graph_mode"], "context_dossier")
+        self.assertEqual(data["max_completion_length"], 4096)
+        self.assertEqual(data["max_sequence_length"], 28672)
+        self.assertEqual(data["max_steps"], 50)
+        self.assertEqual(data["save_steps"], 25)
+        self.assertEqual(data["num_gpus"], 8)
+        self.assertEqual(data["gradient_accumulation_steps"], 4)
+        self.assertEqual(data["effective_batch_size"], 32)
+
     def test_viability_routed_candidate_requires_a_real_branch_loss(self):
         data = load_config(
             ROOT / "reproductions/06_graf_opsd/configs/g2-viability-routed.yaml"

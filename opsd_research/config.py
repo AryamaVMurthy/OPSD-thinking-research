@@ -255,11 +255,20 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
     if data.get("max_steps") not in {5, 12, 25, 50, 200}:
         raise ConfigError(f"{source}: max_steps must be 5, 12, 25, 50, or 200")
     save_steps = data.get("save_steps")
-    if save_steps != data.get("max_steps") and not (
+    checkpointed_confirmation = (
+        data.get("max_steps") == 50 and save_steps == 25
+    )
+    checkpointed_full_run = (
         data.get("max_steps") == 200 and save_steps == 50
+    )
+    if (
+        save_steps != data.get("max_steps")
+        and not checkpointed_confirmation
+        and not checkpointed_full_run
     ):
         raise ConfigError(
             f"{source}: pilots save only at the final step; "
+            "50-step confirmations may save every 25 steps and "
             "200-step confirmations may save every 50 steps"
         )
     max_sequence_length = data.get("max_sequence_length", 28672)
