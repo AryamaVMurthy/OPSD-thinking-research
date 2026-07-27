@@ -55,6 +55,12 @@ import sys
 print(load_config(sys.argv[1]).data.get("max_sequence_length", 28672))
 PY
 )"
+configured_vllm_utilization="$(python3 - "${CH_CANDIDATE_CONFIG}" <<'PY'
+from opsd_research.config import load_config
+import sys
+print(load_config(sys.argv[1]).data.get("vllm_gpu_memory_utilization", 0.35))
+PY
+)"
 if [[ "${CH_MAX_STEPS}" == 1 || "${CH_MAX_STEPS}" == 5 ]]; then
   export GRAF_SMOKE_MAX_STEPS="${CH_MAX_STEPS}"
   effective_save_steps="${CH_MAX_STEPS}"
@@ -75,16 +81,18 @@ export CH_DOSSIER_MANIFEST
 export OPSD_DATASET_REVISION=1435fb21d4fecc8ad4966a26f22a874cf2b527f1
 export OPSD_EXACT_JSD_VOCAB_CHUNK_SIZE=4096
 export OPSD_TAIL_LOGITS_ONLY=1
-vllm_utilization="${CH_VLLM_GPU_MEMORY_UTILIZATION:-0.35}"
+export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
+vllm_utilization="${CH_VLLM_GPU_MEMORY_UTILIZATION:-${configured_vllm_utilization}}"
 run_name="${CH_RUN_NAME:-ch-${CH_CANDIDATE_ID}-${CH_MAX_STEPS}-${SLURM_JOB_ID}}"
 output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"
 cp "${CH_CANDIDATE_CONFIG}" "${output_dir}/config.yaml"
 cp "${CH_DOSSIER_MANIFEST}" "${output_dir}/ch-dossier-manifest.json"
 export OPSD_TRAINING_PARTITION_MANIFEST="${output_dir}/training-partition.json"
-printf 'candidate=%s\nmax_steps=%s\nnum_gpus=%s\ngradient_accumulation_steps=%s\neffective_batch_size=32\nvllm_gpu_memory_utilization=%s\n' \
+printf 'candidate=%s\nmax_steps=%s\nnum_gpus=%s\ngradient_accumulation_steps=%s\neffective_batch_size=32\nvllm_gpu_memory_utilization=%s\npytorch_cuda_alloc_conf=%s\n' \
   "${CH_CANDIDATE_ID}" "${CH_MAX_STEPS}" "${configured_gpus}" \
   "${configured_accumulation}" "${vllm_utilization}" \
+  "${PYTORCH_CUDA_ALLOC_CONF}" \
   > "${output_dir}/runtime-overrides.txt"
 record_run_manifest \
   "${output_dir}" \

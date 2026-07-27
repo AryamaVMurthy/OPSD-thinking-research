@@ -15,6 +15,7 @@ num_gpus: 8
 learning_rate: 5.0e-6
 max_completion_length: 4096
 max_sequence_length: 28672
+vllm_gpu_memory_utilization: 0.32
 max_steps: 200
 save_steps: 50
 rollouts_per_prompt: 1

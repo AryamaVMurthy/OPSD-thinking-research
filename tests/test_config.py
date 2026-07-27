@@ -120,6 +120,27 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(data["num_gpus"], 8)
         self.assertEqual(data["gradient_accumulation_steps"], 4)
         self.assertEqual(data["effective_batch_size"], 32)
+        self.assertEqual(data["vllm_gpu_memory_utilization"], 0.32)
+
+        full = load_config(
+            ROOT
+            / "reproductions/06_graf_opsd/configs/"
+            "ch1-completion-aware-4096-full.yaml"
+        ).data
+        self.assertEqual(full["vllm_gpu_memory_utilization"], 0.32)
+
+    def test_graf_vllm_memory_fraction_must_be_a_probability(self):
+        data = load_config(
+            ROOT
+            / "reproductions/06_graf_opsd/configs/"
+            "ch1-completion-aware-4096-diversity-confirmation.yaml"
+        ).data
+        changed = copy.deepcopy(data)
+        changed["vllm_gpu_memory_utilization"] = 1.1
+        with self.assertRaisesRegex(
+            ConfigError, "vllm_gpu_memory_utilization"
+        ):
+            validate_config(changed)
 
     def test_viability_routed_candidate_requires_a_real_branch_loss(self):
         data = load_config(

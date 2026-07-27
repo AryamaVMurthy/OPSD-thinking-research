@@ -280,6 +280,15 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         raise ConfigError(
             f"{source}: max_sequence_length must cover max_completion_length"
         )
+    vllm_memory_fraction = data.get("vllm_gpu_memory_utilization")
+    if vllm_memory_fraction is not None and (
+        not isinstance(vllm_memory_fraction, (int, float))
+        or isinstance(vllm_memory_fraction, bool)
+        or not 0.0 < float(vllm_memory_fraction) <= 1.0
+    ):
+        raise ConfigError(
+            f"{source}: vllm_gpu_memory_utilization must be in (0, 1]"
+        )
     heldout_fraction = data.get("heldout_diagnostic_fraction", 0.0)
     if (
         not isinstance(heldout_fraction, (int, float))
