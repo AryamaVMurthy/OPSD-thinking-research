@@ -335,6 +335,39 @@ with \(D\) fixed to exact JS for the first repair. Outcome selection,
 distillation horizon, token localization, and divergence are changed in
 separate gates. This prevents a positive result from being uninterpretable.
 
+The implementation contract is deliberately task-general:
+
+1. each training row carries a verifier target in a separate, teacher-hidden
+   metadata field derived from the immutable source/cache record; it is never
+   recovered by parsing the free-form dossier;
+2. after the live student rollout, a verifier returns a score in \([0,1]\),
+   confidence, and an auditable status such as verified, contradicted,
+   incomplete, or unavailable;
+3. only the scalar score and confidence affect the loss; the status is
+   telemetry and must not become a required model-output schema;
+4. response weights are synchronized across data-parallel ranks and
+   normalized by their detached global mean, with an explicit zero-active
+   path, so the learning rate does not fluctuate merely because one rank
+   sampled a correct response;
+5. padding, horizon, and position masks are applied before the token
+   denominator is computed. A batch with no active tokens returns a
+   differentiable zero rather than dividing by zero;
+6. the exact same response weights and active-token denominator are used by
+   FKL, RKL, and JS.
+
+For the current math study, the target is the cache's separately stored
+`reference_answer` and the verifier is the pinned MathArena-equivalence
+checker. For code it can be a test pass fraction; for proofs, checker
+acceptance; for tool use, execution success. This introduces no additional
+teacher forward. Verifier latency, unavailable/error rate, active response
+fraction, and global normalization factor are logged every optimizer update.
+
+A last-128-token positive-tail SFT anchor for verified-correct short
+trajectories is a separate switch because it changes the objective. It is an
+OGLS-SD baseline, not bundled into the first outcome-gating test. If used, its
+coefficient, active-token count, and gradient contribution are reported
+separately from distillation.
+
 ### Stability and mechanism acceptance criteria
 
 Every promoted screen must report, over the entire run rather than only the
