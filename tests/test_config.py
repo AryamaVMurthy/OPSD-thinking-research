@@ -59,6 +59,17 @@ class ConfigTests(unittest.TestCase):
 
         validate_config(changed)
 
+    def test_hmmt_non_aime_screen_is_full_context_and_not_locked(self):
+        data = load_config(
+            ROOT
+            / "reproductions/06_graf_opsd/configs/"
+            "qwen3-4b-hmmt25-full-context-screen.yaml"
+        ).data
+        self.assertEqual(data["dataset"], "hmmt25")
+        self.assertEqual(data["evaluation_protocol"], "development_full_context")
+        self.assertEqual(data["samples_per_problem"], 4)
+        self.assertNotIn(data["dataset"], {"aime25", "aime26"})
+
     def test_thinking_off_is_rejected(self):
         data = load_config(
             ROOT / "reproductions/03_opsd_thinking_1p7b/configs/train.yaml"
