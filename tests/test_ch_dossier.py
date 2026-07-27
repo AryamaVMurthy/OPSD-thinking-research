@@ -9,6 +9,7 @@ import pytest
 from opsd_research.ch_dossier_dataset import (
     OFFICIAL_HARDCODED_DATASET,
     install_ch_dossier_dataset_redirect,
+    install_fluid_dossier_dataset_redirect,
 )
 from opsd_research.ch_dossier import (
     accepted_teacher_dossiers,
@@ -166,3 +167,93 @@ def test_dataset_redirect_keeps_privileged_context_out_of_student_problem(
         "problem": "PUBLIC PROBLEM",
         "solution": "SECRET REFERENCE AND AUDIT",
     }
+
+
+def test_fluid_redirect_preserves_every_dossier_identity_for_base_opsd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache = tmp_path / "dossiers.jsonl"
+    records = [
+        {
+            "schema_version": 1,
+            "accepted": True,
+            "example_index": index,
+            "teacher_dossier": f"teacher-only-{index}",
+            "blind_attempt_count": 3,
+        }
+        for index in (0, 1)
+    ]
+    cache.write_text(
+        "".join(json.dumps(record) + "\n" for record in records),
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "cache": str(cache),
+                "cache_sha256": hashlib.sha256(cache.read_bytes()).hexdigest(),
+                "requested_examples": 2,
+                "accepted_examples": 2,
+                "rejected_examples": 0,
+                "blind_attempts_per_problem": 3,
+                "audit_format": "natural_language_v1",
+                "schema_based_selection": False,
+                "student_answer_context": False,
+                "teacher_reference_context": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class FakeDataset(list):
+        @property
+        def column_names(self):
+            return list(self[0]) if self else []
+
+        def select(self, indices):
+            return FakeDataset([dict(self[index]) for index in indices])
+
+        def add_column(self, name, values):
+            return FakeDataset(
+                [
+                    {**row, name: value}
+                    for row, value in zip(self, values, strict=True)
+                ]
+            )
+
+        def map(self, function, **_kwargs):
+            return FakeDataset([function(row) for row in self])
+
+    fake_datasets = types.SimpleNamespace(
+        load_dataset=lambda *_args, **_kwargs: "original",
+        DatasetDict=dict,
+    )
+    monkeypatch.setitem(sys.modules, "datasets", fake_datasets)
+    monkeypatch.setattr(
+        "opsd_research.training_data.load_math_cot_20k",
+        lambda **_kwargs: {
+            "train": FakeDataset(
+                [
+                    {"question": "PUBLIC ZERO", "response": "reference zero"},
+                    {"question": "PUBLIC ONE", "response": "reference one"},
+                ]
+            )
+        },
+    )
+
+    assert install_fluid_dossier_dataset_redirect(manifest) == 2
+    rows = fake_datasets.load_dataset(OFFICIAL_HARDCODED_DATASET)["train"]
+    assert rows == [
+        {
+            "problem": "PUBLIC ZERO",
+            "solution": "teacher-only-0",
+            "graf_source_index": 0,
+        },
+        {
+            "problem": "PUBLIC ONE",
+            "solution": "teacher-only-1",
+            "graf_source_index": 1,
+        },
+    ]

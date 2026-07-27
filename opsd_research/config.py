@@ -337,6 +337,7 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         "scaffold_graph",
         "fork_mask",
         "viability_routed",
+        "fluid_viability_routed",
         "context_dossier",
     }:
         raise ConfigError(f"{source}: unsupported graph_mode")
@@ -396,9 +397,14 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         raise ConfigError(
             f"{source}: information_weighted_routing cannot be combined with an information cutoff"
         )
-    if data.get("graph_mode") == "viability_routed":
+    if data.get("graph_mode") in {
+        "viability_routed",
+        "fluid_viability_routed",
+    }:
         if float(data["branch_loss_weight"]) <= 0:
-            raise ConfigError(f"{source}: viability_routed requires branch_loss_weight > 0")
+            raise ConfigError(
+                f"{source}: routed modes require branch_loss_weight > 0"
+            )
         if float(data["entropy_floor_weight"]) > 1:
             raise ConfigError(f"{source}: entropy_floor_weight is an entropy fraction in [0, 1]")
     elif (

@@ -53,11 +53,14 @@ def _validate_invocation() -> dict[str, object]:
     for flag in ("--student_thinking", "--teacher_thinking", "--fixed_teacher", "--use_peft"):
         if flag not in sys.argv:
             raise SystemExit(f"required flag is missing: {flag}")
-    if config["graph_mode"] == "context_dossier":
+    if config["graph_mode"] in {
+        "context_dossier",
+        "fluid_viability_routed",
+    }:
         manifest = os.environ.get("CH_DOSSIER_MANIFEST")
         if not manifest:
             raise SystemExit(
-                "context-dossier candidates require CH_DOSSIER_MANIFEST"
+                "dossier candidates require CH_DOSSIER_MANIFEST"
             )
         from .ch_dossier import accepted_teacher_dossiers
 
@@ -67,7 +70,10 @@ def _validate_invocation() -> dict[str, object]:
             raise SystemExit(f"invalid CH dossier cache: {error}") from error
     # GRAF-Lite routing is enabled only after a graph-cache manifest exists.
     # C0 uses the same reliable upstream objective with a longer rollout.
-    elif config["graph_mode"] != "disabled":
+    if config["graph_mode"] not in {
+        "disabled",
+        "context_dossier",
+    }:
         manifest = os.environ.get("GRAF_GRAPH_CACHE_MANIFEST")
         if not manifest:
             raise SystemExit("graph-routed candidates require GRAF_GRAPH_CACHE_MANIFEST")
@@ -163,7 +169,10 @@ def main() -> None:
             f'"accepted_graph_records":{records}}}',
             flush=True,
         )
-    elif config["graph_mode"] == "viability_routed":
+    elif config["graph_mode"] in {
+        "viability_routed",
+        "fluid_viability_routed",
+    }:
         from .graf_routing import load_routing_targets
         from .graf_scaffold_dataset import install_graph_scaffold_dataset_redirect
 
@@ -190,20 +199,49 @@ def main() -> None:
             for index, forks in routed_targets.items()
             if index in train_index_set and forks
         }
+        fluid_mode = config["graph_mode"] == "fluid_viability_routed"
+        if fluid_mode:
+            from .ch_dossier import accepted_teacher_dossiers
+
+            dossier_indices = set(
+                accepted_teacher_dossiers(
+                    os.environ["CH_DOSSIER_MANIFEST"]
+                )
+            ).intersection(train_index_set)
+            routed_targets = {
+                index: forks
+                for index, forks in routed_targets.items()
+                if index in dossier_indices
+            }
         if not routed_targets:
             raise SystemExit("viability-routed candidates require at least one active joined target")
-        # Train only on identities with measured continuation viability.  This
-        # makes every distributed batch exercise the GRAF loss instead of
-        # silently reducing it to a shuffle-dependent sparse regularizer.
-        records = install_graph_scaffold_dataset_redirect(
-            os.environ["GRAF_GRAPH_CACHE_MANIFEST"],
-            source_indices=routed_targets.keys(),
-        )
+        if fluid_mode:
+            from .ch_dossier_dataset import (
+                install_fluid_dossier_dataset_redirect,
+            )
+
+            # Coverage is defined by the natural teacher dossiers, not by
+            # whether a graph fork happened to be informative. Every dossier
+            # identity retains base OPSD; routing is a sparse auxiliary.
+            records = install_fluid_dossier_dataset_redirect(
+                os.environ["CH_DOSSIER_MANIFEST"],
+                source_indices=sorted(dossier_indices),
+            )
+        else:
+            # Historical fixed-cache ablations intentionally train only on
+            # identities with measured continuation viability.
+            records = install_graph_scaffold_dataset_redirect(
+                os.environ["GRAF_GRAPH_CACHE_MANIFEST"],
+                source_indices=routed_targets.keys(),
+            )
         print(
             '{"event":"graf_viability_routing_enabled",'
-            f'"accepted_graph_records":{records},'
+            f'"base_opsd_records":{records},'
             f'"routed_examples":{len(routed_targets)},'
             f'"active_routed_examples":{len(routed_targets)},'
+            f'"coverage_preserving":{str(fluid_mode).lower()},'
+            f'"student_answer_context":false,'
+            f'"teacher_reference_context":{str(fluid_mode).lower()},'
             f'"fork_threshold":{float(config.get("fork_threshold", 0.0))},'
             f'"fork_information_threshold":{float(config.get("fork_information_threshold", 0.0))},'
             f'"fork_information_quantile":{float(config.get("fork_information_quantile", 0.0))},'

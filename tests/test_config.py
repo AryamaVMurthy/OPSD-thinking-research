@@ -170,6 +170,21 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "branch_loss_weight"):
             validate_config(changed)
 
+    def test_fluid_routing_keeps_the_routed_loss_contract(self):
+        data = load_config(
+            ROOT
+            / "reproductions/06_graf_opsd/configs/"
+            "g4-viability-long-4096.yaml"
+        ).data
+        changed = copy.deepcopy(data)
+        changed["graph_mode"] = "fluid_viability_routed"
+        changed["token_divergence"] = "forward_kl"
+        changed["jsd_token_clip"] = None
+        validate_config(changed)
+        changed["branch_loss_weight"] = 0.0
+        with self.assertRaisesRegex(ConfigError, "branch_loss_weight"):
+            validate_config(changed)
+
     def test_teacher_graph_critique_must_be_boolean(self):
         data = load_config(
             ROOT / "reproductions/06_graf_opsd/configs/g10-teacher-critique.yaml"
