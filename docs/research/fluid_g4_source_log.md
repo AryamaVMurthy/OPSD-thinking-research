@@ -63,14 +63,16 @@ interpretations and experimental hypotheses are labeled explicitly.
 - Directly supports: reflection-conditioned self-teaching, JS token
   divergence, and suffix-only distillation localized by a quoted first error;
   the paper reports that full-response OPSD can overwrite valid prefixes and
-  harm out-of-domain performance.
+  harm out-of-domain performance. Its reported exact-quote match rate stays
+  around 0.5, so hard localization itself has substantial coverage failure.
 - Relevance: establishes that reflection plus OPSD and JS are not by
   themselves novel, and motivates a non-AIME transfer check and
   position-resolved diagnostics.
 - Limitation: ROSD requires a structured exact error quote and, for wrong
   rollouts, an on-policy correct rollout. It does not test uncertain forced
   continuations, posterior-weighted action supervision, or a
-  coverage-preserving free-form packet.
+  coverage-preserving free-form packet. Its unmatched quotes fall back to
+  full-response distillation rather than supplying a fluid soft mask.
 
 ## `tan2026ssopd`
 
