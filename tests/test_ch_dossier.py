@@ -48,6 +48,8 @@ def test_only_hash_verified_accepted_dossiers_are_loaded(tmp_path: Path) -> None
                 "accepted_examples": 1,
                 "rejected_examples": 1,
                 "blind_attempts_per_problem": 3,
+                "audit_format": "natural_language_v1",
+                "schema_based_selection": False,
                 "student_answer_context": False,
                 "teacher_reference_context": True,
             }
@@ -58,6 +60,45 @@ def test_only_hash_verified_accepted_dossiers_are_loaded(tmp_path: Path) -> None
     assert accepted_teacher_dossiers(manifest) == {
         11: "privileged corrected context"
     }
+
+
+def test_teacher_dossier_loader_rejects_schema_selected_cache(tmp_path: Path) -> None:
+    cache = tmp_path / "dossiers.jsonl"
+    cache.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "accepted": True,
+                "example_index": 3,
+                "teacher_dossier": "free-form natural audit",
+                "blind_attempt_count": 3,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "cache": "dossiers.jsonl",
+                "cache_sha256": hashlib.sha256(cache.read_bytes()).hexdigest(),
+                "requested_examples": 1,
+                "accepted_examples": 1,
+                "rejected_examples": 0,
+                "blind_attempts_per_problem": 3,
+                "audit_format": "natural_language_v1",
+                "schema_based_selection": True,
+                "student_answer_context": False,
+                "teacher_reference_context": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="schema-based"):
+        accepted_teacher_dossiers(manifest)
 
 
 def test_teacher_dossier_selection_is_exact_and_nonempty() -> None:
@@ -84,6 +125,8 @@ def test_dataset_redirect_keeps_privileged_context_out_of_student_problem(
         "cache_sha256": hashlib.sha256(cache.read_bytes()).hexdigest(),
         "requested_examples": 1, "accepted_examples": 1,
         "rejected_examples": 0, "blind_attempts_per_problem": 3,
+        "audit_format": "natural_language_v1",
+        "schema_based_selection": False,
         "student_answer_context": False, "teacher_reference_context": True,
     }), encoding="utf-8")
 

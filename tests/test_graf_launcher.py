@@ -69,6 +69,8 @@ class GrafLauncherTests(unittest.TestCase):
                 "cache_sha256": hashlib.sha256(cache.read_bytes()).hexdigest(),
                 "requested_examples": 1, "accepted_examples": 1,
                 "rejected_examples": 0, "blind_attempts_per_problem": 3,
+                "audit_format": "natural_language_v1",
+                "schema_based_selection": False,
                 "student_answer_context": False, "teacher_reference_context": True,
             }), encoding="utf-8")
             environment = {

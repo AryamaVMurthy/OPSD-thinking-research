@@ -69,6 +69,10 @@ def accepted_teacher_dossiers(manifest_path: str | Path) -> dict[int, str]:
         raise ValueError("CH-OPSD student context must remain answer-free")
     if manifest.get("teacher_reference_context") is not True:
         raise ValueError("CH-OPSD teacher must receive verified reference context")
+    if manifest.get("audit_format") != "natural_language_v1":
+        raise ValueError("CH-OPSD audit must remain free-form natural language")
+    if manifest.get("schema_based_selection") is not False:
+        raise ValueError("CH-OPSD cannot use schema-based example selection")
     if blind_attempts not in {2, 3}:
         raise ValueError("CH-OPSD requires two or three blind attempts")
     if requested <= 0 or accepted <= 0 or rejected < 0 or accepted + rejected != requested:
