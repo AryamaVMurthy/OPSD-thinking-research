@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,133 @@ DEFAULT_MODEL_REVISION = "1cfa9a7208912126459214e8b04321603b3df60c"
 TRAINING_DATASET_REVISION = "1435fb21d4fecc8ad4966a26f22a874cf2b527f1"
 
 
+def reference_answer_from_solution(reference_solution: str) -> str:
+    """Extract the canonical final answer used as the viability grader target."""
+    answer = extract_last_boxed(reference_solution)
+    if answer is None or not answer.strip():
+        raise ValueError("reference solution lacks a nonempty final boxed answer")
+    return answer
+
+
+def viability_trial_seed(
+    base_seed: int,
+    example_index: int,
+    fork_id: str,
+    action_id: str,
+    sample_index: int,
+) -> int:
+    """Derive a trial seed that is stable under sharding and request ordering."""
+    if base_seed < 0 or example_index < 0 or sample_index < 0:
+        raise ValueError("viability seed inputs must be nonnegative")
+    if not fork_id or not action_id:
+        raise ValueError("viability seed requires fork and action identities")
+    payload = json.dumps(
+        {
+            "action_id": action_id,
+            "base_seed": base_seed,
+            "example_index": example_index,
+            "fork_id": fork_id,
+            "sample_index": sample_index,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return int.from_bytes(hashlib.sha256(payload).digest()[:4], "big") & 0x7FFFFFFF
+
+
+def viability_trial_record(
+    *,
+    example_index: int,
+    fork_id: str,
+    action_id: str,
+    sample_index: int,
+    seed: int,
+    prompt: str,
+    reference_answer: str,
+    completion: str,
+    output_token_ids: list[int],
+    finish_reason: str,
+    legacy_correct: bool,
+    model: str,
+    model_revision: str,
+    forced_prefix_protocol: str,
+) -> dict[str, Any]:
+    """Return the immutable evidence needed to independently regrade a trial."""
+    if example_index < 0 or sample_index < 0 or seed < 0:
+        raise ValueError("viability trial indices and seed must be nonnegative")
+    strings = {
+        "fork_id": fork_id,
+        "action_id": action_id,
+        "prompt": prompt,
+        "reference_answer": reference_answer,
+        "completion": completion,
+        "finish_reason": finish_reason,
+        "model": model,
+        "model_revision": model_revision,
+        "forced_prefix_protocol": forced_prefix_protocol,
+    }
+    if any(not str(value).strip() for value in strings.values()):
+        raise ValueError("viability trial text and provenance must be nonempty")
+    if any(
+        not isinstance(token_id, int) or isinstance(token_id, bool)
+        for token_id in output_token_ids
+    ):
+        raise ValueError("output token IDs must be integers")
+
+    prompt_sha256 = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    completion_sha256 = hashlib.sha256(completion.encode("utf-8")).hexdigest()
+    token_payload = json.dumps(
+        output_token_ids, separators=(",", ":")
+    ).encode("utf-8")
+    token_sha256 = hashlib.sha256(token_payload).hexdigest()
+    identity_payload = json.dumps(
+        {
+            "action_id": action_id,
+            "example_index": example_index,
+            "fork_id": fork_id,
+            "model_revision": model_revision,
+            "sample_index": sample_index,
+            "seed": seed,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return {
+        "schema_version": 1,
+        "trial_id": hashlib.sha256(identity_payload).hexdigest(),
+        "example_index": example_index,
+        "fork_id": fork_id,
+        "action_id": action_id,
+        "sample_index": sample_index,
+        "generation_seed": seed,
+        "prompt_sha256": prompt_sha256,
+        "reference_answer": reference_answer,
+        "raw_completion": completion,
+        "completion_sha256": completion_sha256,
+        "output_tokens": len(output_token_ids),
+        "output_token_ids_sha256": token_sha256,
+        "finish_reason": finish_reason,
+        "extracted_answer": extract_last_boxed(completion),
+        "legacy_grader": "generation_common.grade_math@v1",
+        "legacy_correct": bool(legacy_correct),
+        "model": model,
+        "model_revision": model_revision,
+        "forced_prefix_protocol": forced_prefix_protocol,
+    }
+
+
+@dataclass(frozen=True)
+class ViabilityRequest:
+    example_index: int
+    fork_id: str
+    action_id: str
+    reference_answer: str
+    action_description: str
+    sample_index: int
+    seed: int
+    prompt: str
+
+
 def forced_action_prompt(tokenizer: Any, problem: str, action: str) -> str:
     """Force the *same assistant continuation* scored by GRAF's branch loss.
 
@@ -48,6 +176,14 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build forced-continuation viability targets")
     parser.add_argument("--graph-manifest", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--trials-output",
+        type=Path,
+        help=(
+            "Immutable raw trial JSONL. Defaults beside --output to "
+            "<output-stem>.trials.jsonl."
+        ),
+    )
     parser.add_argument("--manifest", type=Path)
     parser.add_argument(
         "--start-index", type=int, default=0,
@@ -88,6 +224,9 @@ def _require_routable_forks(records: list[dict[str, Any]]) -> None:
 
 def main() -> None:
     args = _parse_args()
+    trials_output = args.trials_output or args.output.with_name(
+        f"{args.output.stem}.trials.jsonl"
+    )
     if (
         args.limit < 1
         or args.start_index < 0
@@ -104,8 +243,14 @@ def main() -> None:
         )
     if args.model != DEFAULT_MODEL or args.model_revision != DEFAULT_MODEL_REVISION:
         raise SystemExit("GRAF viability building is pinned to Qwen3-4B@1cfa9a7")
-    if args.output.exists() or (args.manifest is not None and args.manifest.exists()):
-        raise SystemExit("refusing to alter an existing viability cache or manifest")
+    if (
+        args.output.exists()
+        or trials_output.exists()
+        or (args.manifest is not None and args.manifest.exists())
+    ):
+        raise SystemExit(
+            "refusing to alter an existing viability cache, trial cache, or manifest"
+        )
     action_protocol = (
         RECOVERY_ACTION_PREFIX_PROTOCOL if args.recovery_conditioned
         else ASSISTANT_ACTION_PREFIX_PROTOCOL
@@ -128,40 +273,53 @@ def main() -> None:
     tokenizer = AutoTokenizer.from_pretrained(
         args.model, revision=args.model_revision, trust_remote_code=True
     )
-    requests: list[tuple[int, str, str, str, str]] = []
-    prompts: list[str] = []
+    requests: list[ViabilityRequest] = []
     action_requests: dict[
-        tuple[int, str, str], tuple[int, str, str, str, str]
+        tuple[int, str, str], tuple[str, str, str]
     ] = {}
     for record in accepted:
         row = rows[int(record["example_index"])]
+        reference_answer = reference_answer_from_solution(str(row["response"]))
         graph = record["graph"]
         for fork in graph["forks"]:
             for action in fork["actions"]:
                 if action["status"] in {"invalid", "dead_end"}:
                     continue
+                description = str(action["description"])
+                if args.recovery_conditioned:
+                    description = recovery_conditioned_description(
+                        description,
+                        str(action["validation_test"]),
+                        str(action["recovery_action"]),
+                    )
+                key = (
+                    int(record["example_index"]),
+                    str(fork["fork_id"]),
+                    str(action["action_id"]),
+                )
+                prompt = forced_action_prompt(
+                    tokenizer, str(row["question"]), description
+                )
+                action_requests[key] = (
+                    reference_answer,
+                    description,
+                    prompt,
+                )
                 for sample_index in range(args.samples_per_action):
-                    description = str(action["description"])
-                    if args.recovery_conditioned:
-                        description = recovery_conditioned_description(
-                            description,
-                            str(action["validation_test"]),
-                            str(action["recovery_action"]),
+                    requests.append(
+                        ViabilityRequest(
+                            example_index=key[0],
+                            fork_id=key[1],
+                            action_id=key[2],
+                            reference_answer=reference_answer,
+                            action_description=description,
+                            sample_index=sample_index,
+                            seed=viability_trial_seed(
+                                args.seed, *key, sample_index
+                            ),
+                            prompt=prompt,
                         )
-                    requests.append((
-                        int(record["example_index"]), str(fork["fork_id"]),
-                        str(action["action_id"]), str(row["response"]), description,
-                    ))
-                    action_requests[
-                        (
-                            int(record["example_index"]),
-                            str(fork["fork_id"]),
-                            str(action["action_id"]),
-                        )
-                    ] = requests[-1]
-                    prompts.append(forced_action_prompt(
-                        tokenizer, str(row["question"]), description
-                    ))
+                    )
     llm = LLM(
         model=args.model, revision=args.model_revision, dtype="bfloat16",
         tensor_parallel_size=args.tensor_parallel_size, max_model_len=40960,
@@ -173,17 +331,48 @@ def main() -> None:
             max_tokens=args.max_completion_tokens, seed=seed
         )
 
-    outputs = llm.generate(prompts, sampling_params(args.seed))
+    outputs = llm.generate(
+        [request.prompt for request in requests],
+        [sampling_params(request.seed) for request in requests],
+    )
     successes: dict[tuple[int, str, str], list[bool]] = defaultdict(list)
+    trial_ids: dict[tuple[int, str, str], list[str]] = defaultdict(list)
 
-    def record_outputs(batch_requests, batch_outputs) -> None:
+    def record_outputs(
+        batch_requests: list[ViabilityRequest], batch_outputs: list[Any]
+    ) -> None:
         for request, output in zip(batch_requests, batch_outputs, strict=True):
-            index, fork_id, action_id, answer, _ = request
-            successes[(index, fork_id, action_id)].append(
-                grade_math(
-                    extract_last_boxed(output.outputs[0].text), answer
-                )
+            generated = output.outputs[0]
+            completion = str(generated.text)
+            correct = grade_math(
+                extract_last_boxed(completion), request.reference_answer
             )
+            key = (
+                request.example_index,
+                request.fork_id,
+                request.action_id,
+            )
+            evidence = viability_trial_record(
+                example_index=request.example_index,
+                fork_id=request.fork_id,
+                action_id=request.action_id,
+                sample_index=request.sample_index,
+                seed=request.seed,
+                prompt=request.prompt,
+                reference_answer=request.reference_answer,
+                completion=completion,
+                output_token_ids=list(generated.token_ids),
+                finish_reason=str(
+                    getattr(generated, "finish_reason", None) or "unknown"
+                ),
+                legacy_correct=correct,
+                model=args.model,
+                model_revision=args.model_revision,
+                forced_prefix_protocol=action_protocol,
+            )
+            append_jsonl(trials_output, evidence)
+            successes[key].append(correct)
+            trial_ids[key].append(str(evidence["trial_id"]))
 
     record_outputs(requests, outputs)
     total_completions = len(requests)
@@ -216,20 +405,30 @@ def main() -> None:
                     )
             if not selected_keys:
                 break
-            adaptive_requests = [
-                action_requests[key] for key in selected_keys
-            ]
-            adaptive_prompts = [
-                forced_action_prompt(
-                    tokenizer,
-                    str(rows[request[0]]["question"]),
-                    request[4],
+            adaptive_requests = []
+            for key in selected_keys:
+                answer, description, prompt = action_requests[key]
+                sample_index = len(successes[key])
+                adaptive_requests.append(
+                    ViabilityRequest(
+                        example_index=key[0],
+                        fork_id=key[1],
+                        action_id=key[2],
+                        reference_answer=answer,
+                        action_description=description,
+                        sample_index=sample_index,
+                        seed=viability_trial_seed(
+                            args.seed, *key, sample_index
+                        ),
+                        prompt=prompt,
+                    )
                 )
-                for request in adaptive_requests
-            ]
             adaptive_outputs = llm.generate(
-                adaptive_prompts,
-                sampling_params(args.seed + round_index + 1),
+                [request.prompt for request in adaptive_requests],
+                [
+                    sampling_params(request.seed)
+                    for request in adaptive_requests
+                ],
             )
             record_outputs(adaptive_requests, adaptive_outputs)
             total_completions += len(adaptive_requests)
@@ -264,6 +463,16 @@ def main() -> None:
                     action_id: len(observations)
                     for action_id, observations in action_samples.items()
                 },
+                "trial_ids_by_action": {
+                    action_id: trial_ids[
+                        (
+                            int(record["example_index"]),
+                            raw_fork["fork_id"],
+                            action_id,
+                        )
+                    ]
+                    for action_id in action_samples
+                },
                 "credible_intervals": {
                     action_id: beta_credible_interval(
                         sum(observations),
@@ -293,6 +502,13 @@ def main() -> None:
         "graph_cache_sha256": graph_manifest["cache_sha256"],
         "viability_cache": str(args.output),
         "viability_cache_sha256": hashlib.sha256(args.output.read_bytes()).hexdigest(),
+        "trial_cache": str(trials_output),
+        "trial_cache_sha256": hashlib.sha256(
+            trials_output.read_bytes()
+        ).hexdigest(),
+        "trial_records": sum(len(values) for values in trial_ids.values()),
+        "trial_schema_version": 1,
+        "legacy_grader": "generation_common.grade_math@v1",
         "examples": len(accepted),
         "samples_per_action": args.samples_per_action,
         "adaptive_max_samples_per_action": adaptive_max,

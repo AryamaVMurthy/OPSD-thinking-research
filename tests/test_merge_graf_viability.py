@@ -45,3 +45,115 @@ def test_merges_verified_nonoverlapping_shards(tmp_path: Path, monkeypatch) -> N
     assert payload["max_completion_tokens"] == 4096
     assert payload["forced_prefix_protocol"] == ASSISTANT_ACTION_PREFIX_PROTOCOL
     assert [json.loads(line)["example_index"] for line in output.read_text().splitlines()] == [1, 2]
+
+
+def test_merges_and_hashes_regradable_trial_shards(
+    tmp_path: Path, monkeypatch
+) -> None:
+    graphs = tmp_path / "graphs.jsonl"
+    graph_row = {
+        "accepted": True,
+        "example_index": 1,
+        "graph_sha256": "graph-a",
+    }
+    graphs.write_text(json.dumps(graph_row) + "\n", encoding="utf-8")
+    graph_manifest = tmp_path / "graphs-manifest.json"
+    graph_manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "cache": "graphs.jsonl",
+                "cache_sha256": hashlib.sha256(
+                    graphs.read_bytes()
+                ).hexdigest(),
+                "requested_examples": 1,
+                "accepted_examples": 1,
+                "rejected_examples": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+    viability_shard = tmp_path / "part-0.jsonl"
+    viability_shard.write_text(
+        json.dumps(
+            {
+                "example_index": 1,
+                "graph_sha256": "graph-a",
+                "samples_per_action": 1,
+                "temperature": 1.0,
+                "max_completion_tokens": 4096,
+                "model": "Qwen/Qwen3-4B",
+                "model_revision": "pin",
+                "forced_prefix_protocol": ASSISTANT_ACTION_PREFIX_PROTOCOL,
+                "fork_targets": [
+                    {
+                        "fork_id": "f",
+                        "action_ids": ["x"],
+                        "target": [1.0],
+                        "trial_ids_by_action": {"x": ["trial-1"]},
+                    }
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    trial_shard = tmp_path / "part-0.trials.jsonl"
+    trial_shard.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "trial_id": "trial-1",
+                "example_index": 1,
+                "fork_id": "f",
+                "action_id": "x",
+                "sample_index": 0,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "merged.jsonl"
+    trials_output = tmp_path / "merged.trials.jsonl"
+    manifest = tmp_path / "manifest.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "merge_graf_viability",
+            "--graph-manifest",
+            str(graph_manifest),
+            "--shard",
+            str(viability_shard),
+            "--trial-shard",
+            str(trial_shard),
+            "--output",
+            str(output),
+            "--trials-output",
+            str(trials_output),
+            "--manifest",
+            str(manifest),
+            "--samples-per-action",
+            "1",
+            "--temperature",
+            "1.0",
+            "--max-completion-tokens",
+            "4096",
+            "--model",
+            "Qwen/Qwen3-4B",
+            "--model-revision",
+            "pin",
+            "--seed",
+            "42",
+        ],
+    )
+
+    merge_graf_viability.main()
+
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    assert payload["trial_evidence_available"] is True
+    assert payload["trial_records"] == 1
+    assert payload["trial_cache"] == str(trials_output)
+    assert payload["trial_cache_sha256"] == hashlib.sha256(
+        trials_output.read_bytes()
+    ).hexdigest()

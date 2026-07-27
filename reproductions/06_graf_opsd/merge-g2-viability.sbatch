@@ -25,8 +25,10 @@ graph_manifest="${SCRATCH_ROOT}/graf_cache/g1-${CACHE_BUILD_JOB_ID}/manifest.jso
 target_root="${SCRATCH_ROOT}/graf_cache/${VIABILITY_CACHE_LABEL}-${G2_VIABILITY_ARRAY_JOB_ID}"
 
 shards=()
+trial_shards=()
 for ((task=0; task<G2_SHARD_COUNT; task++)); do
   shards+=(--shard "${target_root}/part-${task}.jsonl")
+  trial_shards+=(--trial-shard "${target_root}/part-${task}.trials.jsonl")
 done
 protocol="assistant_action_continuation_v1"
 if [[ "${GRAF_RECOVERY_CONDITIONED}" == 1 ]]; then
@@ -38,7 +40,9 @@ fi
 python3 -m opsd_research.merge_graf_viability \
   --graph-manifest "${graph_manifest}" \
   "${shards[@]}" \
+  "${trial_shards[@]}" \
   --output "${target_root}/viability.jsonl" \
+  --trials-output "${target_root}/viability.trials.jsonl" \
   --manifest "${target_root}/manifest.json" \
   --samples-per-action 2 --temperature 1.0 --max-completion-tokens "${VIABILITY_MAX_COMPLETION_TOKENS}" \
   --model Qwen/Qwen3-4B \

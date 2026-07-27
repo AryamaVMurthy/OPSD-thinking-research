@@ -51,6 +51,7 @@ start_index=$(( SLURM_ARRAY_TASK_ID * records_per_shard ))
 remaining=$(( accepted_graphs - start_index ))
 limit=$(( remaining < records_per_shard ? remaining : records_per_shard ))
 output="${target_root}/part-${SLURM_ARRAY_TASK_ID}.jsonl"
+trials_output="${target_root}/part-${SLURM_ARRAY_TASK_ID}.trials.jsonl"
 recovery_args=()
 if [[ "${GRAF_RECOVERY_CONDITIONED}" == 1 ]]; then
   recovery_args+=(--recovery-conditioned)
@@ -62,6 +63,7 @@ fi
 python3 -m opsd_research.build_graf_viability \
   --graph-manifest "${graph_manifest}" \
   --output "${output}" \
+  --trials-output "${trials_output}" \
   --start-index "${start_index}" --limit "${limit}" \
   --samples-per-action 2 --temperature 1.0 --max-completion-tokens "${VIABILITY_MAX_COMPLETION_TOKENS}" \
   --model Qwen/Qwen3-4B \
