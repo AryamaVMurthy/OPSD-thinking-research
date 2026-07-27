@@ -392,6 +392,13 @@ rollouts. FKL produced loss 0.2198 and pre-clip norm 0.2955. JS produced loss
 memory. This is an 11.6-fold gradient-norm reduction, so JS—not its lower raw
 loss scale alone—won the preregistered stability gate.
 
+The realized first-step adapter changes rule out the simpler explanation that
+JS merely took a negligible update. FKL changed the adapter by
+\(5.57\times10^{-4}\) of its parameter norm; JS changed it by
+\(5.36\times10^{-4}\), only about 3.7% less. Adam's normalization kept update
+magnitudes comparable, while the FKL gradient crossed the global clipping
+threshold and JS did not.
+
 Globally reduced routing telemetry also resolves an apparent conflict. On the
 old 22-identity fixed cache, the route/base ratio could exceed one because
 every row was route-active and JS has a smaller scalar base. On the real
