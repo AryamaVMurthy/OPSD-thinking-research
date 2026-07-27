@@ -33,8 +33,9 @@ lora_alpha: 128
 lora_target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
 seed: 42
 heldout_diagnostic_fraction: 0.05
-# All 128 free-form teacher dossiers remain in base OPSD. The independently
-# measured graph targets are a sparse auxiliary for their 22 active identities.
+# All 124 training-eligible rows from the 128-row free-form dossier cache
+# remain in base OPSD. The other four are intentionally held out by the fixed
+# content-hash split. Graph routing is sparse over 22 active joined identities.
 graph_mode: fluid_viability_routed
 branch_loss_weight: 0.10
 entropy_floor_weight: 0.90
