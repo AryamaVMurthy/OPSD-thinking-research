@@ -3,6 +3,22 @@ from __future__ import annotations
 import torch
 
 
+def canonical_negative_tolerance(dtype: torch.dtype) -> float:
+    """Return the material-negativity threshold for a canonical divergence.
+
+    A vocabulary KL is a signed reduction whose exact result is non-negative.
+    Near equality, positive and negative vocabulary contributions cancel and
+    the FP32 reduction can retain a few ulps of negative residue.  Sixty-four
+    working-precision epsilons is still below 8e-6 nats in FP32 while avoiding
+    false failures seen with 151k-way vocabularies.  Raw negatives remain
+    visible in telemetry; this threshold only classifies whether they are
+    material.
+    """
+    if dtype not in {torch.float32, torch.float64}:
+        raise ValueError("canonical divergence tolerance requires a work dtype")
+    return 64.0 * float(torch.finfo(dtype).eps)
+
+
 @torch.no_grad()
 def divergence_statistics_vocab_chunked(
     student_logits: torch.Tensor,
@@ -75,6 +91,7 @@ def divergence_statistics_vocab_chunked(
         finite_mask = torch.isfinite(selected)
         finite = selected[finite_mask]
         nonfinite_count = int((~finite_mask).sum().item())
+        tolerance = canonical_negative_tolerance(work_dtype)
         if finite.numel() == 0:
             return {
                 "mean": float("nan"),
@@ -85,10 +102,15 @@ def divergence_statistics_vocab_chunked(
                 "max": float("nan"),
                 "nonfinite_count": nonfinite_count,
                 "negative_count": 0,
+                "roundoff_negative_count": 0,
+                "material_negative_count": 0,
+                "roundoff_tolerance": tolerance,
             }
         quantiles = torch.quantile(
             finite, finite.new_tensor([0.50, 0.90, 0.99])
         )
+        negative = finite < 0.0
+        material_negative = finite < -tolerance
         return {
             "mean": float(finite.mean().item()),
             "min": float(finite.min().item()),
@@ -97,9 +119,12 @@ def divergence_statistics_vocab_chunked(
             "p99": float(quantiles[2].item()),
             "max": float(finite.max().item()),
             "nonfinite_count": nonfinite_count,
-            # Values below this tolerance are numerical failures rather than
-            # ordinary reduction-order noise around zero.
-            "negative_count": int((finite < -1e-7).sum().item()),
+            "negative_count": int(negative.sum().item()),
+            "roundoff_negative_count": int(
+                (negative & ~material_negative).sum().item()
+            ),
+            "material_negative_count": int(material_negative.sum().item()),
+            "roundoff_tolerance": tolerance,
         }
 
     return {

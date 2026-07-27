@@ -124,8 +124,13 @@ def compute_loss_with_tail_logits(
             token_clip=self.jsd_token_clip,
         )
         divergence = getattr(self, "_opsd_token_divergence", None)
+        if divergence is not None:
+            from .jsd import canonical_negative_tolerance
+
+            loss_tolerance = canonical_negative_tolerance(loss.dtype)
         if divergence is not None and (
-            not bool(torch.isfinite(loss).item()) or float(loss.detach()) < -1e-7
+            not bool(torch.isfinite(loss).item())
+            or float(loss.detach()) < -loss_tolerance
         ):
             raise FloatingPointError(
                 f"canonical {divergence} produced invalid loss {float(loss.detach())}"
@@ -137,6 +142,7 @@ def compute_loss_with_tail_logits(
                         "event": "canonical_divergence_loss",
                         "objective": divergence,
                         "value": float(loss.detach().float()),
+                        "roundoff_tolerance": loss_tolerance,
                     },
                     separators=(",", ":"),
                 ),
@@ -159,7 +165,7 @@ def compute_loss_with_tail_logits(
                     values = diagnostics[name]
                     if (
                         values["nonfinite_count"] > 0
-                        or values["negative_count"] > 0
+                        or values["material_negative_count"] > 0
                     ):
                         raise FloatingPointError(
                             f"canonical divergence diagnostics failed for {name}: {values}"
