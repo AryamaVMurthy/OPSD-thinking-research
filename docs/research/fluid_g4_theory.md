@@ -424,3 +424,38 @@ would attenuate the auxiliary further, but the audit does not reveal a
 catastrophic hidden target: the active-run auxiliary is already sparse and
 subordinate. This evidence supports leaving the registered pilot unchanged
 and testing uncertainty-calibrated weighting only after component attribution.
+
+## Observed AIME-2024 quality gate
+
+The 12-step Fluid-G4/JS pilot completed its paired full-context AIME-2024
+development evaluation. The untouched model scored 77.50% Average@4 and the
+candidate scored 74.17%, a -3.33 percentage-point change with paired
+problem-cluster bootstrap interval [-10.00, +3.33]. Majority@4 remained 80%,
+while Pass@4 fell from 86.67% to 80.00%. Four paired samples improved and
+eight degraded. This rejects promotion of the registered full method.
+
+The transition structure is more informative than the aggregate alone.
+Twenty-one problems were 4/4 under the untouched model; the candidate retained
+78/84 of those correct samples. Seven of the eight total degradations came
+from this already-solved stratum. Degraded samples became 7,104 tokens longer
+on average, whereas improved samples became 6,520 tokens shorter. The only
+length cutoff was degraded. This is consistent with, but does not by itself
+prove, valid-prefix overwrite or destabilized search on otherwise tractable
+problems.
+
+The action auxiliary remains a plausible contributor. It was active in 44/93
+global loss calls, averaged 13.2% of base-loss magnitude conditional on being
+active, and exceeded the base loss once. The next and only immediate GPU
+diagnostic therefore keeps the complete free-form empirical teacher context
+but removes action scoring and route loss. It is trained for the same 12
+steps and evaluated with the same paired seeds. This control is justified
+despite the negative primary result because it directly chooses between two
+repairs:
+
+1. if context-only recovers relative to full Fluid-G4, remove the route
+   auxiliary; and
+2. if it does not, protect already-correct trajectories with a verifier-based
+   continuous outcome gate before any further long training.
+
+No seed replication, divergence quality sweep, cache expansion, or locked
+benchmark is unlocked by the negative primary result.
