@@ -235,6 +235,32 @@ class ChunkedJSDTests(unittest.TestCase):
 
         self.assertLess(recomputed, ordinary)
 
+    def test_recomputed_js_has_finite_bfloat16_student_only_gradient(self):
+        student = torch.tensor(
+            [[[2.0, 0.0, -1.0], [0.5, -0.5, 1.0]]],
+            dtype=torch.bfloat16,
+            requires_grad=True,
+        )
+        teacher = torch.tensor(
+            [[[-1.0, 0.0, 2.0], [1.0, -0.5, 0.5]]],
+            dtype=torch.bfloat16,
+            requires_grad=True,
+        )
+        labels = torch.tensor([[1, -100]], dtype=torch.long)
+        loss = recomputed_divergence_vocab_chunked(
+            student,
+            teacher,
+            labels,
+            divergence="js",
+            temperature=1.1,
+            chunk_size=2,
+        )
+        loss.backward()
+
+        self.assertTrue(bool(torch.isfinite(student.grad).all()))
+        self.assertGreater(float(student.grad.float().norm()), 0.0)
+        self.assertIsNone(teacher.grad)
+
     def test_canonical_objectives_are_zero_at_equality_in_low_precision(self):
         logits = torch.tensor(
             [[[2.0, -1.0, 0.25], [0.5, 1.5, -3.0]]], dtype=torch.bfloat16
