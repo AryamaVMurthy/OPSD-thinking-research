@@ -26,6 +26,9 @@ test -f "${summary}"
 test -f "${log}"
 test -f "${training_dir}/adapter_model.safetensors"
 test "$(cat "${training_dir}/source-commit.txt")" = "${FLUID_EXPECTED_SOURCE_COMMIT}"
+python3 -m opsd_research.slurm_accounting \
+  --job-id "${FLUID_PILOT_JOB_ID}" \
+  --output "${training_dir}/slurm-accounting.json"
 
 python3 - "${summary}" "${log}" "${steps}" <<'PY'
 import json
