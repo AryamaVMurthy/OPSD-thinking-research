@@ -171,6 +171,51 @@ II:11, but lost three on I:13. Only one degraded sample was evaluation-length
 truncated, so the neutral result cannot be attributed to the evaluation cap.
 CH1 does not advance to the 6,912-row/200-step paper-scale run.
 
+## CH1 diversity/dose confirmation
+
+The single allowed same-method confirmation is in progress. It changes only
+the number of unique training identities and optimizer steps; the CH1
+free-form dossier method, fixed teacher, loss, sampling, and evaluation gate
+remain unchanged.
+
+Eight-GPU cache job 16473 completed in 25:15. All artifacts passed their
+SHA-256 manifest.
+
+| Confirmation-cache metric | Value |
+|---|---:|
+| Requested / accepted / rejected | 1,682 / 1,682 / 0 |
+| Eligible first-pass training identities | 1,600 |
+| Blind attempts per identity | 2 |
+| Any blind attempt correct | 30.737% |
+| Blind cutoff rate, attempts 1 / 2 | 76.100% / 76.813% |
+| Mean blind tokens, attempts 1 / 2 | 3,828.3 / 3,824.6 |
+| Mean auditor output tokens | 744.4 |
+| Mean / maximum teacher prompt tokens | 14,859 / 26,784 |
+| Schema-based selection | Disabled |
+| Acceptance rate | 100% |
+
+The 40 GiB A100 confirmation required a bounded operational memory study
+before step 1. These attempts did not write a checkpoint or accept an
+optimizer step:
+
+| Job / setting | Observed result |
+|---|---|
+| 16477, vLLM 0.35 | Exact-KL backward OOM; 2.32 GiB request with ~2.0 GiB free |
+| 16483, vLLM 0.35 + expandable segments | Peak reached ~40.4 GiB; cuBLAS handle allocation failed |
+| 16486, vLLM 0.25 + expandable segments | vLLM rejected initialization: 1.72 GiB KV available versus 3.94 GiB required |
+| 16491, vLLM 0.32 + expandable segments | Full 28,672 context fits; checkpoint 25 validated at ~180 seconds/step |
+
+Job 16491 preserves the effective batch of 32, 4,096-token completion limit,
+28,672-token context, exact full-vocabulary forward KL, and all 1,600
+first-pass identities. At step 25, all losses and gradient norms were finite;
+the rolling step time was 179.57 seconds and the step-25 loss / gradient norm
+were -0.0052 / 0.01931. The 2.8 GiB checkpoint contains the LoRA adapter,
+trainer and scheduler state, eight RNG states, eight DeepSpeed optimizer
+shards, and the model state. The repository's resume validator selected it as
+the latest valid checkpoint.
+The confirmation remains gated on 50 finite steps and a positive paired
+full-context AIME24 delta.
+
 ## Efficiency and scale plan
 
 Four-GPU CH1 pilot steps took approximately 8:10 on average. The GPUs generated
