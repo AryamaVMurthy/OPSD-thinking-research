@@ -105,6 +105,25 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "max_completion_length"):
             validate_config(changed)
 
+    def test_graf_canonical_divergence_requires_unclipped_supported_objective(self):
+        data = load_config(
+            ROOT / "reproductions/06_graf_opsd/configs/g4-viability-long-4096.yaml"
+        ).data
+        canonical = copy.deepcopy(data)
+        canonical["token_divergence"] = "reverse_kl"
+        canonical["jsd_token_clip"] = None
+        validate_config(canonical)
+
+        clipped = copy.deepcopy(canonical)
+        clipped["jsd_token_clip"] = 0.05
+        with self.assertRaisesRegex(ConfigError, "canonical.*unclipped"):
+            validate_config(clipped)
+
+        unknown = copy.deepcopy(canonical)
+        unknown["token_divergence"] = "symmetric_kl"
+        with self.assertRaisesRegex(ConfigError, "token_divergence"):
+            validate_config(unknown)
+
     def test_ch1_diversity_confirmation_preserves_method_and_batch_contract(self):
         data = load_config(
             ROOT

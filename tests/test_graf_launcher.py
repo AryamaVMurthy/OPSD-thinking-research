@@ -17,6 +17,18 @@ CONFIG = ROOT / "reproductions/06_graf_opsd/configs/c0-long-rollout.yaml"
 
 
 class GrafLauncherTests(unittest.TestCase):
+    def test_canonical_token_divergence_is_exported_to_the_loss_hook(self):
+        config = {"token_divergence": "js"}
+        with mock.patch.dict(os.environ, {}, clear=True):
+            launch_graf_opsd._configure_token_divergence(config)
+            self.assertEqual(os.environ["OPSD_TOKEN_DIVERGENCE"], "js")
+
+        with mock.patch.dict(
+            os.environ, {"OPSD_TOKEN_DIVERGENCE": "reverse_kl"}, clear=True
+        ):
+            launch_graf_opsd._configure_token_divergence({})
+            self.assertNotIn("OPSD_TOKEN_DIVERGENCE", os.environ)
+
     def test_smoke_is_the_only_short_step_exception(self):
         arguments = [
             "launch_graf_opsd", "--model_name_or_path", "Qwen/Qwen3-4B",

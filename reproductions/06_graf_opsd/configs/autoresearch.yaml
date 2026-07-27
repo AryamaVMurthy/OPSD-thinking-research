@@ -37,3 +37,4 @@ allowed_mutations:
   - teacher_graph_critique
   - branch_loss_weight
   - entropy_floor_weight
+  - token_divergence

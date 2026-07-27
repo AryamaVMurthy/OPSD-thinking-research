@@ -26,6 +26,17 @@ def _finite_number(value: object) -> float | None:
     return None
 
 
+def _json_event(line: str, marker: str) -> dict[str, Any] | None:
+    start = line.find(marker)
+    if start < 0:
+        return None
+    try:
+        event, _ = json.JSONDecoder().raw_decode(line[start:])
+    except json.JSONDecodeError:
+        return None
+    return event if isinstance(event, dict) else None
+
+
 def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
     if max_completion_length <= 0:
         raise ValueError("max_completion_length must be positive")
@@ -34,6 +45,8 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
     losses = []
     branch_events = []
     forward_kl_values = []
+    canonical_values: list[tuple[str, float]] = []
+    canonical_diagnostics: list[dict[str, Any]] = []
     observed_step = 0
     for match in _ROLLOUT.finditer(text):
         rollouts.append({
@@ -46,6 +59,19 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
     # HF logs Python dicts, one per rank.  Only accept complete, literal dicts
     # carrying an actual loss to avoid interpreting arbitrary log fragments.
     for line in text.splitlines():
+        canonical_event = _json_event(
+            line, '{"event":"canonical_divergence_loss"'
+        )
+        if canonical_event is not None:
+            objective = canonical_event.get("objective")
+            value = _finite_number(canonical_event.get("value"))
+            if isinstance(objective, str) and value is not None:
+                canonical_values.append((objective, value))
+        diagnostic_event = _json_event(
+            line, '{"event":"divergence_diagnostics"'
+        )
+        if diagnostic_event is not None:
+            canonical_diagnostics.append(diagnostic_event)
         kl_start = line.find('{"event":"exact_forward_kl_loss"')
         if kl_start >= 0:
             kl_end = line.find("}", kl_start)
@@ -95,6 +121,13 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
     elapsed_total = sum(row["elapsed_seconds"] for row in rollouts)
     capped = sum(row["tokens"] >= max_completion_length for row in rollouts)
     branch_active = [row for row in branch_events if row["active_forks"] > 0]
+    canonical_objectives = {objective for objective, _ in canonical_values}
+    canonical_objective = (
+        next(iter(canonical_objectives))
+        if len(canonical_objectives) == 1
+        else ("mixed" if canonical_objectives else None)
+    )
+    canonical_numbers = [value for _, value in canonical_values]
     return {
         "schema_version": 1,
         "log": str(path),
@@ -142,6 +175,19 @@ def summarize_log(path: Path, max_completion_length: int) -> dict[str, Any]:
             ),
             "negative_loss_calls": sum(value < 0.0 for value in forward_kl_values),
         },
+        "canonical_divergence": {
+            "objective": canonical_objective,
+            "loss_calls": len(canonical_numbers),
+            "min": min(canonical_numbers) if canonical_numbers else None,
+            "max": max(canonical_numbers) if canonical_numbers else None,
+            "mean": (
+                sum(canonical_numbers) / len(canonical_numbers)
+                if canonical_numbers else None
+            ),
+            "negative_loss_calls": sum(value < -1e-7 for value in canonical_numbers),
+            "diagnostic_calls": len(canonical_diagnostics),
+            "latest": canonical_diagnostics[-1] if canonical_diagnostics else None,
+        },
     }
 
 
@@ -158,6 +204,27 @@ def render_markdown(status: dict[str, Any]) -> str:
     ]
     branch = status["graf_branch"]
     forward_kl = status["forward_kl"]
+    canonical = status["canonical_divergence"]
+    if canonical["loss_calls"]:
+        lines.extend([
+            "",
+            f"## Canonical {canonical['objective']} telemetry",
+            "",
+            f"- Loss calls: `{canonical['loss_calls']}`",
+            f"- Mean / min / max: `{canonical['mean']:.10g}` / `{canonical['min']:.10g}` / `{canonical['max']:.10g}`",
+            f"- Materially negative loss calls: `{canonical['negative_loss_calls']}`",
+            f"- Full diagnostic snapshots: `{canonical['diagnostic_calls']}`",
+        ])
+        latest = canonical["latest"]
+        if isinstance(latest, dict):
+            objective_stats = latest.get(str(canonical["objective"]))
+            if isinstance(objective_stats, dict):
+                lines.append(
+                    "- Latest token mean / p90 / p99: "
+                    f"`{objective_stats.get('mean')}` / "
+                    f"`{objective_stats.get('p90')}` / "
+                    f"`{objective_stats.get('p99')}`"
+                )
     if forward_kl["loss_calls"]:
         lines.extend([
             "",

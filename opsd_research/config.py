@@ -241,13 +241,36 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         "top_k": 20,
         "lmbda": 1.0,
         "beta": 0.0,
-        "jsd_token_clip": 0.05,
         "seed": 42,
         "tail_logits_only": True,
     }
     for key, value in expected.items():
         if data.get(key) != value:
             raise ConfigError(f"{source}: GRAF protocol requires {key}={value!r}")
+    token_divergence = data.get("token_divergence")
+    if token_divergence is None:
+        if data.get("jsd_token_clip") != 0.05:
+            raise ConfigError(
+                f"{source}: legacy GRAF protocol requires jsd_token_clip=0.05"
+            )
+    else:
+        if token_divergence not in {"forward_kl", "reverse_kl", "js"}:
+            raise ConfigError(
+                f"{source}: token_divergence must be forward_kl, reverse_kl, or js"
+            )
+        if data.get("jsd_token_clip") is not None:
+            raise ConfigError(
+                f"{source}: canonical token divergences must be unclipped"
+            )
+    chunk_size = data.get("exact_jsd_vocab_chunk_size")
+    if (
+        not isinstance(chunk_size, int)
+        or isinstance(chunk_size, bool)
+        or chunk_size <= 0
+    ):
+        raise ConfigError(
+            f"{source}: exact_jsd_vocab_chunk_size must be a positive integer"
+        )
     if data.get("max_completion_length") not in {1024, 2048, 4096}:
         raise ConfigError(
             f"{source}: max_completion_length must be 1024, 2048, or 4096"
@@ -414,7 +437,7 @@ def _validate_graf_autoresearch(data: dict[str, Any], source: str) -> None:
     if not isinstance(data.get("max_candidates"), int) or not 1 <= data["max_candidates"] <= 24:
         raise ConfigError(f"{source}: max_candidates must be in [1, 24]")
     expected_mutations = {
-        "max_completion_length", "heldout_diagnostic_fraction", "graph_mode", "full_graph_method", "teacher_graph_critique", "fork_threshold", "fork_information_threshold", "fork_information_quantile", "information_weighted_routing", "graph_budget",
+        "max_completion_length", "heldout_diagnostic_fraction", "graph_mode", "full_graph_method", "teacher_graph_critique", "fork_threshold", "fork_information_threshold", "fork_information_quantile", "information_weighted_routing", "graph_budget", "token_divergence",
         "viability_temperature", "viability_beta_prior", "recovery_conditioned_routing", "branch_loss_weight", "entropy_floor_weight",
     }
     if not set(data.get("allowed_mutations", [])).issubset(expected_mutations):

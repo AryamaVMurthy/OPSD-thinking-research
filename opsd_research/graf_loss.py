@@ -28,8 +28,12 @@ def branch_routed_loss(
     if active.numel() == 0:
         zero = action_scores.sum() * 0.0
         return zero, {"branch_kl": zero.detach(), "entropy_floor": zero.detach(), "active_forks": zero.detach()}
-    scores = action_scores.index_select(0, active)
-    target = target_distribution.index_select(0, active)
+    # Action likelihood differences are small and the KL reduction spans
+    # several alternatives. Promote only this compact objective to FP32 so a
+    # BF16 log-softmax cannot turn an equal distribution into a spurious loss.
+    work_dtype = torch.float64 if action_scores.dtype == torch.float64 else torch.float32
+    scores = action_scores.index_select(0, active).to(work_dtype)
+    target = target_distribution.index_select(0, active).to(work_dtype)
     if not torch.allclose(target.sum(dim=-1), torch.ones_like(target[:, 0]), atol=1e-6):
         raise ValueError("each target branch distribution must sum to one")
     log_probs = functional.log_softmax(scores, dim=-1)

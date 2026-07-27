@@ -24,3 +24,17 @@ class GrafLossTests(unittest.TestCase):
         loss, _ = branch_routed_loss(scores, target, torch.tensor([False, False]))
         loss.backward()
         self.assertEqual(float(loss), 0.0)
+
+    def test_low_precision_action_scores_use_an_fp32_divergence_reduction(self):
+        scores = torch.zeros((1, 257), dtype=torch.bfloat16, requires_grad=True)
+        target = torch.full((1, 257), 1.0 / 257, dtype=torch.float32)
+        loss, metrics = branch_routed_loss(
+            scores,
+            target,
+            torch.tensor([True]),
+            entropy_floor_fraction=0.0,
+        )
+
+        self.assertEqual(loss.dtype, torch.float32)
+        self.assertLess(abs(float(loss.detach())), 1e-7)
+        self.assertGreaterEqual(float(metrics["branch_kl"]), 0.0)

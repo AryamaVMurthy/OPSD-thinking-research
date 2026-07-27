@@ -162,7 +162,14 @@ def graf_branch_loss(
         branch_kl += float(metrics["branch_kl"]) * information_weight
         entropy_floor += float(metrics["entropy_floor"]) * information_weight
     weight_sum = sum(weights)
-    mean_loss = sum((loss * weight for loss, weight in zip(losses, weights, strict=True))) / weight_sum
+    # Information weights represent absolute evidence strength. Dividing by
+    # ``weight_sum`` made the weight cancel whenever a microbatch had one fork,
+    # so a barely informative target received the same gradient as a certain
+    # one. Average over the number of opportunities instead, preserving the
+    # configured confidence attenuation.
+    mean_loss = sum(
+        loss * weight for loss, weight in zip(losses, weights, strict=True)
+    ) / len(losses)
     active = float(len(losses))
     return branch_loss_weight * mean_loss, {
         "active_forks": active,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
+import json
 from typing import Any
 
 import torch
@@ -122,12 +123,67 @@ def compute_loss_with_tail_logits(
             top_k=self.top_k_loss,
             token_clip=self.jsd_token_clip,
         )
+        divergence = getattr(self, "_opsd_token_divergence", None)
+        if divergence is not None and (
+            not bool(torch.isfinite(loss).item()) or float(loss.detach()) < -1e-7
+        ):
+            raise FloatingPointError(
+                f"canonical {divergence} produced invalid loss {float(loss.detach())}"
+            )
+        if self.accelerator.is_main_process and divergence is not None:
+            print(
+                json.dumps(
+                    {
+                        "event": "canonical_divergence_loss",
+                        "objective": divergence,
+                        "value": float(loss.detach().float()),
+                    },
+                    separators=(",", ":"),
+                ),
+                flush=True,
+            )
+            calls = int(getattr(self, "_opsd_divergence_loss_calls", 0)) + 1
+            self._opsd_divergence_loss_calls = calls
+            interval = int(self._opsd_divergence_diagnostics_interval)
+            if calls % interval == 0:
+                from .jsd import divergence_statistics_vocab_chunked
+
+                diagnostics = divergence_statistics_vocab_chunked(
+                    student_logits_for_loss,
+                    teacher_logits_for_loss,
+                    shifted_labels,
+                    temperature=self.temperature,
+                    chunk_size=int(self._opsd_vocab_chunk_size),
+                )
+                for name in ("forward_kl", "reverse_kl", "js"):
+                    values = diagnostics[name]
+                    if (
+                        values["nonfinite_count"] > 0
+                        or values["negative_count"] > 0
+                    ):
+                        raise FloatingPointError(
+                            f"canonical divergence diagnostics failed for {name}: {values}"
+                        )
+                print(
+                    json.dumps(
+                        {
+                            "event": "divergence_diagnostics",
+                            "objective": divergence,
+                            **diagnostics,
+                        },
+                        separators=(",", ":"),
+                    ),
+                    flush=True,
+                )
         del student_logits_for_loss, teacher_logits_for_loss
 
     # Trainer's normal progress display rounds this scalar to four decimal
     # places.  Preserve the unrounded value separately so a tiny forward KL
     # cannot be mistaken for a zero loss during a long-running experiment.
-    if self.accelerator.is_main_process:
+    if (
+        self.accelerator.is_main_process
+        and getattr(self, "_opsd_token_divergence", None) is None
+    ):
         print(
             '{"event":"exact_forward_kl_loss",'
             f'"value":{float(loss.detach().float()):.10g}' + "}",

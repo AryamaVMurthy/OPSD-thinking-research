@@ -85,8 +85,18 @@ def _validate_invocation() -> dict[str, object]:
     return config
 
 
+def _configure_token_divergence(config: dict[str, object]) -> None:
+    """Select a canonical objective without changing historical GRAF runs."""
+    divergence = config.get("token_divergence")
+    if divergence is None:
+        os.environ.pop("OPSD_TOKEN_DIVERGENCE", None)
+        return
+    os.environ["OPSD_TOKEN_DIVERGENCE"] = str(divergence)
+
+
 def main() -> None:
     config = _validate_invocation()
+    _configure_token_divergence(config)
     # Reuse the tested compatibility and memory hooks without loosening the
     # historical reproduction's validation contract.
     from . import launch_official_opsd as official

@@ -189,6 +189,12 @@ def evaluation_report(summary: dict[str, Any], run_dir: Path) -> dict[str, Any]:
 
 def _training_markdown(report: dict[str, Any]) -> str:
     config = report["config"]
+    token_divergence = config.get("token_divergence")
+    objective = (
+        "full-vocabulary teacher→student KL (legacy per-contribution clipping)"
+        if token_divergence is None
+        else f"canonical full-vocabulary {token_divergence} (unclipped)"
+    )
     opt = report["optimization"]
     rollouts = report["rollouts"]
     lines = [
@@ -212,7 +218,7 @@ def _training_markdown(report: dict[str, Any]) -> str:
             ("Learning rate", config.get("learning_rate")),
             ("LoRA r / alpha", f"{config.get('lora_r')} / {config.get('lora_alpha')}"),
             ("Teacher", "fixed privileged teacher" if config.get("fixed_teacher") else "not fixed"),
-            ("Objective", "full-vocabulary teacher→student KL (beta=0), clipped"),
+            ("Objective", objective),
         ]), "",
         "## Data partition", "",
         *_table([

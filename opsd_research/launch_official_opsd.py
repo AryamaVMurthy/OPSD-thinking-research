@@ -123,7 +123,26 @@ def _install_exact_jsd_chunking() -> None:
 
     import opsd_trainer
 
-    from .jsd import exact_forward_kl_vocab_chunked
+    from .jsd import exact_divergence_vocab_chunked, exact_forward_kl_vocab_chunked
+
+    divergence = os.environ.get("OPSD_TOKEN_DIVERGENCE")
+    if divergence is not None and divergence not in {"forward_kl", "reverse_kl", "js"}:
+        raise SystemExit(
+            "OPSD_TOKEN_DIVERGENCE must be forward_kl, reverse_kl, or js"
+        )
+    raw_diagnostic_interval = os.environ.get(
+        "OPSD_DIVERGENCE_DIAGNOSTICS_INTERVAL", "1"
+    )
+    try:
+        diagnostic_interval = int(raw_diagnostic_interval)
+    except ValueError as error:
+        raise SystemExit(
+            "OPSD_DIVERGENCE_DIAGNOSTICS_INTERVAL must be a positive integer"
+        ) from error
+    if diagnostic_interval <= 0:
+        raise SystemExit(
+            "OPSD_DIVERGENCE_DIAGNOSTICS_INTERVAL must be a positive integer"
+        )
 
     def chunked_loss(
         student_logits,
@@ -136,6 +155,20 @@ def _install_exact_jsd_chunking() -> None:
         top_k=None,
         token_clip=None,
     ):
+        if divergence is not None:
+            if logits_are_probs:
+                raise ValueError("exact chunked OPSD loss requires logits, not probabilities")
+            if top_k not in (None, 0):
+                raise ValueError("exact chunked OPSD loss is incompatible with top-k loss")
+            return exact_divergence_vocab_chunked(
+                student_logits,
+                teacher_logits,
+                labels,
+                divergence=divergence,
+                temperature=temperature,
+                reduction=reduction,
+                chunk_size=chunk_size,
+            )
         return exact_forward_kl_vocab_chunked(
             student_logits,
             teacher_logits,
@@ -150,10 +183,17 @@ def _install_exact_jsd_chunking() -> None:
         )
 
     opsd_trainer.OPSDTrainer.generalized_jsd_loss = staticmethod(chunked_loss)
+    opsd_trainer.OPSDTrainer._opsd_token_divergence = divergence
+    opsd_trainer.OPSDTrainer._opsd_vocab_chunk_size = chunk_size
+    opsd_trainer.OPSDTrainer._opsd_divergence_diagnostics_interval = (
+        diagnostic_interval
+    )
+    objective = divergence or "legacy_clipped_forward_kl"
     print(
         '{"event":"exact_jsd_chunking_enabled",'
         f'"vocab_chunk_size":{chunk_size},'
-        '"objective":"full_vocab_forward_kl"}',
+        f'"objective":"full_vocab_{objective}",'
+        f'"upstream_token_clip_ignored":{str(divergence is not None).lower()}' + "}",
         flush=True,
     )
 
