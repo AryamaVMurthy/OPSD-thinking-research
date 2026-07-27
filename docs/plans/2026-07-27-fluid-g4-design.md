@@ -429,3 +429,27 @@ method-selection campaign to roughly 20--35 allocated GPU-hours if early
 gates work, while negative gates stop much earlier. Evidence already cached is
 reused and reported as sunk compute; it is not silently excluded from the
 final efficiency table.
+
+### Eight-GPU execution gate
+
+Turing node10 currently exposes eight A100 GPUs, 256 CPUs, and approximately
+1 TB host memory. Historical node10 telemetry is consistent with 40 GB A100s,
+not the 48 GB RTX 6000 Ada cards used by the active Fluid-G4 runs. Therefore
+availability does not by itself authorize an eight-GPU long run.
+
+The next positive repaired-JS candidate first receives one optimizer step on
+node10 with data parallelism 8 and gradient accumulation 4, preserving
+effective batch size 32. It must reproduce the four-GPU loss within
+rollout-induced variation, save an adapter, and stay below a 39.5 GiB
+per-device memory guard. Exact recomputed JS used about 38.1 GiB on the Ada
+node and is the only current objective with a plausible margin. The older
+ordinary-RKL path used about 45.2 GiB and cannot be assumed to fit; every
+divergence receives its own memory smoke.
+
+Only after the smoke passes does node10 become the default for subsequent
+training, with all eight GPUs used and the same effective batch, data seed,
+rollout seed, and token budget. Speedup is reported from measured
+examples/second and wall time rather than assumed to be 2x. Node-local
+scratch means adapters and result sidecars must be checksum-staged when a
+controller changes nodes; a live node03 job is never restarted merely to
+chase temporary node10 availability.
