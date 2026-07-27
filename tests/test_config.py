@@ -276,13 +276,16 @@ class ConfigTests(unittest.TestCase):
     def test_fluid_divergence_pair_changes_only_the_token_objective(self):
         root = ROOT / "reproductions/06_graf_opsd/configs"
         fkl = load_config(root / "fluid-g4-fkl-128.yaml").data
+        rkl = load_config(root / "fluid-g4-rkl-128.yaml").data
         js = load_config(root / "fluid-g4-js-128.yaml").data
         self.assertEqual(fkl["token_divergence"], "forward_kl")
+        self.assertEqual(rkl["token_divergence"], "reverse_kl")
         self.assertEqual(js["token_divergence"], "js")
-        for config in (fkl, js):
+        for config in (fkl, rkl, js):
             config.pop("variant")
             config.pop("token_divergence")
-        self.assertEqual(fkl, js)
+        self.assertEqual(fkl, rkl)
+        self.assertEqual(rkl, js)
 
     def test_fluid_dossier_control_removes_both_empirical_graph_channels(self):
         root = ROOT / "reproductions/06_graf_opsd/configs"
