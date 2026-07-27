@@ -29,6 +29,15 @@ import sys
 print(load_config(sys.argv[1]).data.get("token_divergence", "legacy_clipped_forward_kl"))
 PY
 )"
+graph_mode="$(python3 - "${GRAF_CANDIDATE_CONFIG}" <<'PY'
+from opsd_research.config import load_config
+import sys
+print(load_config(sys.argv[1]).data["graph_mode"])
+PY
+)"
+if [[ "${graph_mode}" == "fluid_viability_routed" ]]; then
+  : "${CH_DOSSIER_MANIFEST:?fluid routing requires CH_DOSSIER_MANIFEST}"
+fi
 if [[ "${GRAF_MAX_STEPS}" == 1 || "${GRAF_MAX_STEPS}" == 5 ]]; then
   export GRAF_SMOKE_MAX_STEPS="${GRAF_MAX_STEPS}"
 fi
@@ -53,10 +62,15 @@ fi
 vllm_utilization="${GRAF_VLLM_GPU_MEMORY_UTILIZATION:-0.35}"
 run_name="graf-${GRAF_CANDIDATE_ID}-${GRAF_MAX_STEPS}-${SLURM_JOB_ID}"; output_dir="${TRAIN_ROOT}/${run_name}"
 mkdir -p "${output_dir}"; cp "${GRAF_CANDIDATE_CONFIG}" "${output_dir}/config.yaml"; cp "${GRAF_GRAPH_CACHE_MANIFEST}" "${output_dir}/graph-cache-manifest.json"; cp "${GRAF_VIABILITY_MANIFEST}" "${output_dir}/viability-manifest.json"
+manifest_inputs=(runtime-overrides.txt graph-cache-manifest.json viability-manifest.json)
+if [[ "${graph_mode}" == "fluid_viability_routed" ]]; then
+  cp "${CH_DOSSIER_MANIFEST}" "${output_dir}/ch-dossier-manifest.json"
+  manifest_inputs+=(ch-dossier-manifest.json)
+fi
 export OPSD_TRAINING_PARTITION_MANIFEST="${output_dir}/training-partition.json"
 export OPSD_ADAPTER_STABILITY_INTERVAL=1
-printf 'candidate=%s\nmax_steps=%s\nnum_gpus=4\ngradient_accumulation_steps=8\neffective_batch_size=32\nvllm_gpu_memory_utilization=%s\ntoken_divergence=%s\njsd_token_clip=%s\ndivergence_diagnostics_interval=%s\nadapter_stability_interval=%s\n' "${GRAF_CANDIDATE_ID}" "${GRAF_MAX_STEPS}" "${vllm_utilization}" "${token_divergence}" "${jsd_token_clip}" "${OPSD_DIVERGENCE_DIAGNOSTICS_INTERVAL}" "${OPSD_ADAPTER_STABILITY_INTERVAL}" > "${output_dir}/runtime-overrides.txt"
-record_run_manifest "${output_dir}" runtime-overrides.txt graph-cache-manifest.json viability-manifest.json
+printf 'candidate=%s\nmax_steps=%s\nnum_gpus=4\ngradient_accumulation_steps=8\neffective_batch_size=32\nvllm_gpu_memory_utilization=%s\ntoken_divergence=%s\ngraph_mode=%s\njsd_token_clip=%s\ndivergence_diagnostics_interval=%s\nadapter_stability_interval=%s\n' "${GRAF_CANDIDATE_ID}" "${GRAF_MAX_STEPS}" "${vllm_utilization}" "${token_divergence}" "${graph_mode}" "${jsd_token_clip}" "${OPSD_DIVERGENCE_DIAGNOSTICS_INTERVAL}" "${OPSD_ADAPTER_STABILITY_INTERVAL}" > "${output_dir}/runtime-overrides.txt"
+record_run_manifest "${output_dir}" "${manifest_inputs[@]}"
 start_gpu_telemetry "${run_name}"; trap stop_gpu_telemetry EXIT
 accelerate launch --config_file third_party/opsd/accelerate.yaml --num_processes 4 --gradient_accumulation_steps 8 --main_process_port "${GRAF_PORT}" \
   -m opsd_research.launch_graf_opsd --model_name_or_path Qwen/Qwen3-4B --model_revision 1cfa9a7208912126459214e8b04321603b3df60c --student_model_revision 1cfa9a7208912126459214e8b04321603b3df60c \
