@@ -199,6 +199,14 @@ Promote only if:
 - completed correct trajectories per GPU-hour improve;
 - graph/action supervision beats the matched plain-OPSD control.
 
+The non-AIME set is also the early detector for valid-prefix overwrite.
+Contemporary reflective OPSD reports that full-response distillation may
+damage already-correct prefixes and out-of-domain generalization. We therefore
+do not select a checkpoint from AIME alone. A soft-localization experiment is
+permitted only when the unmasked method has a positive in-domain signal but a
+repeatable transfer regression; introducing it earlier would add another
+factor before establishing that the evidence packet works.
+
 ### Stage E: scale decision
 
 The 60-GPU-hour cap ends at the promotion decision. A promoted method first

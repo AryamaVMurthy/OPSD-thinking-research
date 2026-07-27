@@ -150,6 +150,47 @@ checksums; prompts have strict student/teacher separation; generation must fit
 the context window; evidence coverage and leakage are measured. Only the
 teacher's mathematical analysis remains unrestricted prose.
 
+## Closest contemporary methods and the actual research boundary
+
+Recent methods make it especially important not to claim novelty for
+"reflection plus OPSD" by itself. ROSD already conditions a self-teacher on a
+reflection, uses JS divergence, and masks distillation before a quoted first
+error [@zhao2026rosd]. SSOPD already contrasts multiple on-policy correct and
+wrong attempts and turns the contrast into dense supervision
+[@tan2026ssopd]. SD-Zero already conditions a reviser on an attempt and its
+binary outcome, then distils the reviser back into the generator
+[@he2026sdzero].
+
+The narrower Fluid-G4 hypothesis is the combination of:
+
+1. a free-form comparative audit over several answer-blind attempts and a
+   verified reference, without requiring a correct on-policy attempt;
+2. empirical forced-continuation outcomes, including uncertainty, shown to
+   the teacher as natural language;
+3. the same outcome evidence converted into a sparse posterior-weighted
+   action auxiliary;
+4. coverage-preserving base OPSD for every eligible identity; and
+5. an exact-divergence and stability protocol that treats FKL, RKL, and JS as
+   controlled alternatives.
+
+This boundary is a hypothesis until the context-only and action-only
+attribution controls show that empirical continuation evidence contributes
+beyond ordinary reflection. If those controls are null, Fluid-G4 should be
+reported as an engineering variant of reflective OPSD, not as a new learning
+principle.
+
+ROSD also exposes a serious risk in the current primary arm: full-response
+distillation can overwrite valid prefixes. Fluid-G4 does not add a rigid
+quoted-error schema to the active run because that would change the registered
+method and violate the free-form design goal. Instead, the publication ladder
+adds an out-of-domain check and measures correctness as a function of prefix
+position. Only if full-response Fluid-G4 improves in-domain performance but
+harms transfer will a separately registered *soft localization* arm be tried.
+That arm should derive a continuous token weight from already available
+teacher disagreement or cached recoverability, rather than requiring a
+model-generated error tag. It must be compared against both the unmasked
+Fluid-G4 arm and ROSD-style hard localization.
+
 ## Applicability beyond contest mathematics
 
 The method is not inherently tied to a fixed answer format. It requires:
@@ -199,6 +240,10 @@ excluding cache construction would make the efficiency claim misleading.
    receives base versus auxiliary supervision.
 7. **Reward hacking by verbosity.** Log rollout length, cap rate, thinking
    closure, answer extraction, correctness per generated token, and wall time.
+8. **Valid-prefix overwrite.** Full-response distillation may alter tokens
+   before the first substantive mistake. Measure divergence and downstream
+   correctness by normalized prefix position and include an out-of-domain
+   development set before considering any localization repair.
 
 The component attribution order is fixed to avoid spending control compute on
 a method with no task effect:

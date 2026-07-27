@@ -56,6 +56,50 @@ interpretations and experimental hypotheses are labeled explicitly.
   auxiliary. An adaptive mixture is a later hypothesis only if the canonical
   arms establish a stable benefit.
 
+## `zhao2026rosd`
+
+- Status: arXiv preprint, v1 dated 27 May 2026.
+- Verified source: <https://arxiv.org/abs/2605.28014>
+- Directly supports: reflection-conditioned self-teaching, JS token
+  divergence, and suffix-only distillation localized by a quoted first error;
+  the paper reports that full-response OPSD can overwrite valid prefixes and
+  harm out-of-domain performance.
+- Relevance: establishes that reflection plus OPSD and JS are not by
+  themselves novel, and motivates a non-AIME transfer check and
+  position-resolved diagnostics.
+- Limitation: ROSD requires a structured exact error quote and, for wrong
+  rollouts, an on-policy correct rollout. It does not test uncertain forced
+  continuations, posterior-weighted action supervision, or a
+  coverage-preserving free-form packet.
+
+## `tan2026ssopd`
+
+- Status: arXiv preprint, v1 dated 17 May 2026.
+- Verified source: <https://arxiv.org/abs/2605.17497>
+- Directly supports: contrasting correct and wrong samples from one on-policy
+  group can provide dense process supervision; the method selects the shortest
+  correct and longest wrong responses and applies a prompt-level frontier
+  weight.
+- Relevance: overlaps with the multiple-attempt motivation and makes the
+  verified-reference and empirical-continuation contributions subject to
+  explicit controls.
+- Limitation: SSOPD is verifier-only and depends on a mixed group containing a
+  correct attempt. It does not study a free-form audit with a reference
+  fallback or local forced-continuation posteriors.
+
+## `he2026sdzero`
+
+- Status: arXiv preprint, v2 dated 11 June 2026.
+- Verified source: <https://arxiv.org/abs/2604.12002>
+- Directly supports: a self-reviser can condition on an initial attempt and
+  binary reward, and its token distributions can be distilled into the
+  generator; the paper reports sample-efficiency gains over matched RL
+  baselines.
+- Relevance: reinforces the value of converting outcome signals into dense
+  self-supervision and narrows any Fluid-G4 novelty claim.
+- Limitation: binary whole-response revision is not empirical comparison of
+  several local continuations with calibrated uncertainty.
+
 ## Evidence policy
 
 - A source is not counted as evidence for Fluid-G4 quality merely because its
