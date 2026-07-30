@@ -12,6 +12,21 @@ from .generation_common import extract_last_boxed
 OFFICIAL_HARDCODED_DATASET = "siyanzhao/Openthoughts_math_30k_opsd"
 
 
+def remove_graph_identifiers(guide: str) -> str:
+    """Remove cache-local IDs that can coincide with a short reference answer.
+
+    Fork and action IDs carry no procedural content.  In particular, an action
+    named ``4`` is not an answer leak, but placing that token in the teacher
+    view would make a literal leakage audit indistinguishable from one.
+    """
+    cleaned = []
+    for line in str(guide).splitlines():
+        line = re.sub(r"^State\s+\S+:\s*", "Strategy state: ", line)
+        line = re.sub(r"^-\s+\S+\s+(\[[^\]]+\]:)", r"- \1", line)
+        cleaned.append(line)
+    return "\n".join(cleaned)
+
+
 def finod_training_row(
     *,
     question: str,
@@ -79,7 +94,7 @@ def install_finod_dataset_redirect(
             return finod_training_row(
                 question=example["question"],
                 reference_solution=example["response"],
-                answer_masked_guide=scaffolds[index],
+                answer_masked_guide=remove_graph_identifiers(scaffolds[index]),
                 source_index=index,
             )
 

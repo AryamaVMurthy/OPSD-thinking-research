@@ -68,9 +68,79 @@ def _teacher_context(self, model):
     return self.accelerator.unwrap_model(model).disable_adapter()
 
 
-def _masked_mean(value: torch.Tensor, mask: torch.Tensor) -> float:
-    selected = value[mask]
-    return float(selected.mean().detach()) if selected.numel() else 0.0
+def _aggregate_finod_metrics(
+    self,
+    *,
+    loss: torch.Tensor,
+    metrics: dict[str, torch.Tensor],
+    selected_mask: torch.Tensor,
+    step_size: float,
+    residual_energy_threshold: float,
+) -> dict[str, float | int]:
+    """Reduce token-weighted FiNOD diagnostics across every data-parallel rank."""
+    mask = selected_mask.to(torch.bool)
+    count = mask.sum().to(torch.float64)
+
+    def total(name: str) -> torch.Tensor:
+        return metrics[name][mask].detach().to(torch.float64).sum()
+
+    active = metrics["active_projection"][mask].detach().to(torch.float64)
+    residual = metrics["residual_energy"][mask].detach().to(torch.float64)
+    alignment_after = (
+        metrics["residual_nuisance_alignment"][mask].detach().to(torch.float64)
+    )
+    effective_step = (
+        metrics["effective_step_size"][mask].detach().to(torch.float64)
+    )
+    local = torch.stack(
+        [
+            count,
+            loss.detach().to(torch.float64) * count,
+            total("guide_energy"),
+            total("nuisance_energy"),
+            residual.sum(),
+            total("target_kl"),
+            effective_step.sum(),
+            active.sum(),
+            (residual <= residual_energy_threshold).to(torch.float64).sum(),
+            total("guide_nuisance_alignment"),
+            alignment_after.sum(),
+            (alignment_after > 1e-5).to(torch.float64).sum(),
+            (effective_step < step_size - 1e-7).to(torch.float64).sum(),
+        ]
+    )
+    local_max_kl = metrics["target_kl"][mask].detach().to(torch.float64).max()
+    accelerator = self.accelerator
+    if hasattr(accelerator, "reduce"):
+        reduced = accelerator.reduce(local, reduction="sum")
+        max_kl = accelerator.reduce(local_max_kl, reduction="max")
+    else:
+        reduced = local
+        max_kl = local_max_kl
+    values = reduced.detach().cpu().tolist()
+    global_count = values[0]
+    if global_count <= 0:
+        raise RuntimeError("FiNOD selected no valid rollout tokens")
+
+    def average(index: int) -> float:
+        return values[index] / global_count
+
+    return {
+        "retained_tokens": int(global_count),
+        "loss": average(1),
+        "guide_energy": average(2),
+        "nuisance_energy": average(3),
+        "residual_energy": average(4),
+        "target_kl": average(5),
+        "effective_step_size": average(6),
+        "active_projection_fraction": average(7),
+        "collapsed_residual_fraction": average(8),
+        "alignment_before": average(9),
+        "alignment_after": average(10),
+        "positive_alignment_after_fraction": average(11),
+        "clipped_target_fraction": average(12),
+        "max_observed_target_kl": float(max_kl.detach().cpu()),
+    }
 
 
 def compute_loss_with_finod(
@@ -157,63 +227,26 @@ def compute_loss_with_finod(
         ),
         temperature=float(self.temperature),
     )
-    metrics = result.metrics
-    residual_energy = _masked_mean(metrics["residual_energy"], selected_mask)
-    guide_energy = _masked_mean(metrics["guide_energy"], selected_mask)
-    nuisance_energy = _masked_mean(metrics["nuisance_energy"], selected_mask)
-    target_kl = _masked_mean(metrics["target_kl"], selected_mask)
-    effective_step = _masked_mean(
-        metrics["effective_step_size"], selected_mask
-    )
-    active_fraction = _masked_mean(
-        metrics["active_projection"].to(torch.float32), selected_mask
-    )
-    collapsed_fraction = _masked_mean(
-        (metrics["residual_energy"] <= self._finod_residual_energy_threshold).to(
-            torch.float32
+    metrics = _aggregate_finod_metrics(
+        self,
+        loss=loss,
+        metrics=result.metrics,
+        selected_mask=selected_mask,
+        step_size=float(self._finod_step_size),
+        residual_energy_threshold=float(
+            self._finod_residual_energy_threshold
         ),
-        selected_mask,
-    )
-    alignment_before = _masked_mean(
-        metrics["guide_nuisance_alignment"], selected_mask
-    )
-    alignment_after = _masked_mean(
-        metrics["residual_nuisance_alignment"], selected_mask
-    )
-    positive_alignment_after_fraction = _masked_mean(
-        (metrics["residual_nuisance_alignment"] > 1e-5).to(torch.float32),
-        selected_mask,
-    )
-    clipped_target_fraction = _masked_mean(
-        (
-            metrics["effective_step_size"]
-            < float(self._finod_step_size) - 1e-7
-        ).to(torch.float32),
-        selected_mask,
     )
     if self.accelerator.is_main_process:
         print(
             json.dumps(
                 {
                     "event": "finod_loss",
-                    "loss": float(loss.detach().float()),
+                    "loss": metrics["loss"],
                     "selected_positions": int(rollout_positions.numel()),
-                    "retained_tokens": int(selected_mask.sum()),
-                    "guide_energy": guide_energy,
-                    "nuisance_energy": nuisance_energy,
-                    "residual_energy": residual_energy,
-                    "retained_energy_fraction": residual_energy
-                    / max(guide_energy, 1e-12),
-                    "active_projection_fraction": active_fraction,
-                    "collapsed_residual_fraction": collapsed_fraction,
-                    "alignment_before": alignment_before,
-                    "alignment_after": alignment_after,
-                    "positive_alignment_after_fraction": (
-                        positive_alignment_after_fraction
-                    ),
-                    "target_kl": target_kl,
-                    "effective_step_size": effective_step,
-                    "clipped_target_fraction": clipped_target_fraction,
+                    **metrics,
+                    "retained_energy_fraction": metrics["residual_energy"]
+                    / max(metrics["guide_energy"], 1e-12),
                     "max_target_kl": float(self._finod_max_target_kl),
                 },
                 separators=(",", ":"),

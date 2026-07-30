@@ -6,10 +6,26 @@ import unittest
 from pathlib import Path
 
 from opsd_research.summarize_training import summarize
-from opsd_research.summarize_training import _parse_training_log
+from opsd_research.summarize_training import _parse_finod_events, _parse_training_log
 
 
 class TrainingSummaryTests(unittest.TestCase):
+    def test_parses_unrounded_finod_signal_events(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            log = Path(temporary) / "train.log"
+            event = {
+                "event": "finod_loss",
+                "loss": 0.003,
+                "residual_energy": 0.2,
+                "target_kl": 0.003,
+            }
+            log.write_text(
+                "ordinary output\n" + json.dumps(event) + "\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(_parse_finod_events(log), [event])
+
     def test_resumed_log_keeps_last_loss_for_replayed_step(self):
         with tempfile.TemporaryDirectory() as temporary:
             log = Path(temporary) / "train.log"

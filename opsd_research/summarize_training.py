@@ -59,6 +59,23 @@ def _parse_training_log(path: Path) -> tuple[list[dict[str, Any]], list[int]]:
     return deduplicated, rollout_tokens
 
 
+def _parse_finod_events(path: Path) -> list[dict[str, Any]]:
+    events = []
+    marker = re.compile(r'\{\s*"event"\s*:\s*"finod_loss"')
+    for fragment in re.split(r"[\r\n]+", path.read_text(encoding="utf-8")):
+        match = marker.search(fragment)
+        if match is None:
+            continue
+        try:
+            event = json.loads(fragment[match.start():])
+        except json.JSONDecodeError as error:
+            raise ValueError(f"malformed FiNOD event in {path}") from error
+        if event.get("event") != "finod_loss":
+            raise ValueError(f"unexpected FiNOD event in {path}")
+        events.append(event)
+    return events
+
+
 def _parse_gpu_telemetry(path: Path) -> list[dict[str, Any]]:
     by_gpu: dict[int, dict[str, Any]] = {}
     with path.open("r", encoding="utf-8", newline="") as handle:
@@ -139,6 +156,7 @@ def summarize(
 
     completions = [str(row.get("completion", "")) for row in generations]
     losses, rollout_tokens = _parse_training_log(training_log)
+    finod_events = _parse_finod_events(training_log)
 
     checkpoint_records = []
     for path in sorted(
@@ -178,6 +196,53 @@ def summarize(
             and float("-inf") < float(record["loss"]) < float("inf")
             for record in losses
         ),
+        "finod_signal_history": finod_events,
+        "finod_signal": {
+            "events": len(finod_events),
+            "all_finite": all(
+                all(
+                    isinstance(event.get(key), (int, float))
+                    and float("-inf") < float(event[key]) < float("inf")
+                    for key in (
+                        "loss",
+                        "guide_energy",
+                        "nuisance_energy",
+                        "residual_energy",
+                        "target_kl",
+                    )
+                )
+                for event in finod_events
+            ),
+            "positive_loss_events": sum(
+                float(event.get("loss", 0.0)) > 0.0
+                for event in finod_events
+            ),
+            "max_target_kl": max(
+                (
+                    float(
+                        event.get(
+                            "max_observed_target_kl",
+                            event["target_kl"],
+                        )
+                    )
+                    for event in finod_events
+                ),
+                default=None,
+            ),
+            "mean_residual_energy": (
+                mean(float(event["residual_energy"]) for event in finod_events)
+                if finod_events
+                else None
+            ),
+            "mean_collapsed_residual_fraction": (
+                mean(
+                    float(event["collapsed_residual_fraction"])
+                    for event in finod_events
+                )
+                if finod_events
+                else None
+            ),
+        },
         "checkpoints": checkpoint_records,
         "generation_dumps": generation_file_records,
         "rollout_dump_integrity": {
