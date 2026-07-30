@@ -1,5 +1,7 @@
 import unittest
 
+import pytest
+
 try:
     import torch
 except ImportError as error:

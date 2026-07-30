@@ -196,6 +196,31 @@ def main() -> None:
             ),
             flush=True,
         )
+    elif config["graph_mode"] == "finod_scaffold":
+        from .finod_dataset import install_finod_dataset_redirect
+        from .graf_scaffold_dataset import accepted_scaffolds
+
+        available = accepted_scaffolds(
+            os.environ["GRAF_GRAPH_CACHE_MANIFEST"]
+        )
+        eligible = sorted(set(available).intersection(train_index_set))
+        records = install_finod_dataset_redirect(
+            os.environ["GRAF_GRAPH_CACHE_MANIFEST"],
+            source_indices=eligible,
+        )
+        print(
+            json.dumps(
+                {
+                    "event": "finod_dataset_enabled",
+                    "records": records,
+                    "student_answer_context": False,
+                    "guide_answer_masked": True,
+                    "answer_control_isolated": True,
+                },
+                separators=(",", ":"),
+            ),
+            flush=True,
+        )
     elif config["graph_mode"] == "scaffold_graph":
         from .graf_scaffold_dataset import (
             accepted_scaffolds,
@@ -325,6 +350,46 @@ def main() -> None:
     official._install_exact_jsd_chunking()
     official._install_tail_logits_loss()
     official._install_adapter_stability_callback()
+    if config["graph_mode"] == "finod_scaffold":
+        from .finod_prompts import install_finod_collator
+        from .finod_training import compute_loss_with_finod
+
+        install_finod_collator()
+        import opsd_trainer
+
+        opsd_trainer.OPSDTrainer._finod_positions_per_rollout = int(
+            config["finod_positions_per_rollout"]
+        )
+        opsd_trainer.OPSDTrainer._finod_step_size = float(
+            config["finod_step_size"]
+        )
+        opsd_trainer.OPSDTrainer._finod_max_target_kl = float(
+            config["finod_max_target_kl"]
+        )
+        opsd_trainer.OPSDTrainer._finod_nuisance_strength_threshold = float(
+            config["finod_nuisance_strength_threshold"]
+        )
+        opsd_trainer.OPSDTrainer._finod_residual_energy_threshold = float(
+            config["finod_residual_energy_threshold"]
+        )
+        opsd_trainer.OPSDTrainer.compute_loss = compute_loss_with_finod
+        print(
+            json.dumps(
+                {
+                    "event": "finod_loss_enabled",
+                    "positions_per_rollout": int(
+                        config["finod_positions_per_rollout"]
+                    ),
+                    "step_size": float(config["finod_step_size"]),
+                    "max_target_kl": float(config["finod_max_target_kl"]),
+                    "nuisance_strength_threshold": float(
+                        config["finod_nuisance_strength_threshold"]
+                    ),
+                },
+                separators=(",", ":"),
+            ),
+            flush=True,
+        )
     if routed_targets is not None:
         official._install_nonreentrant_gradient_checkpointing()
         official._install_graf_source_index_collator()

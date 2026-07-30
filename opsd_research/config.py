@@ -342,6 +342,7 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         "fluid_viability_routed",
         "fluid_context_dossier",
         "context_dossier",
+        "finod_scaffold",
     }:
         raise ConfigError(f"{source}: unsupported graph_mode")
     for key in ("branch_loss_weight", "entropy_floor_weight"):
@@ -422,6 +423,45 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         or teacher_graph_critique
     ):
         raise ConfigError(f"{source}: branch settings require graph_mode=viability_routed")
+    if data.get("graph_mode") == "finod_scaffold":
+        positions = data.get("finod_positions_per_rollout")
+        if (
+            not isinstance(positions, int)
+            or isinstance(positions, bool)
+            or not 1 <= positions <= 256
+        ):
+            raise ConfigError(
+                f"{source}: finod_positions_per_rollout must be in [1, 256]"
+            )
+        bounded_positive = {
+            "finod_step_size": 2.0,
+            "finod_max_target_kl": 0.1,
+        }
+        for key, upper in bounded_positive.items():
+            value = data.get(key)
+            if (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not math.isfinite(float(value))
+                or not 0.0 < float(value) <= upper
+            ):
+                raise ConfigError(
+                    f"{source}: {key} must be finite in (0, {upper}]"
+                )
+        for key in (
+            "finod_nuisance_strength_threshold",
+            "finod_residual_energy_threshold",
+        ):
+            value = data.get(key)
+            if (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not math.isfinite(float(value))
+                or float(value) < 0.0
+            ):
+                raise ConfigError(
+                    f"{source}: {key} must be finite and nonnegative"
+                )
 
 
 def _validate_graf_autoresearch(data: dict[str, Any], source: str) -> None:
