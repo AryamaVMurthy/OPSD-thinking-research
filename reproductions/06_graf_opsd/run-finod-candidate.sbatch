@@ -64,6 +64,7 @@ export OPSD_ADAPTER_STABILITY_INTERVAL=1
 vllm_utilization="${FINOD_VLLM_GPU_MEMORY_UTILIZATION:-0.32}"
 run_name="finod-g1-128-${FINOD_MAX_STEPS}-${SLURM_JOB_ID}"
 output_dir="${TRAIN_ROOT}/${run_name}"
+training_log="${SLURM_SUBMIT_DIR}/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out"
 mkdir -p "${output_dir}" logs
 cp "${FINOD_CONFIG}" "${output_dir}/config.yaml"
 cp "${GRAF_GRAPH_CACHE_MANIFEST}" "${output_dir}/graph-cache-manifest.json"
@@ -125,7 +126,7 @@ accelerate launch \
 
 python3 -m opsd_research.summarize_training \
   --training-dir "${output_dir}" \
-  --training-log "${PROJECT_SOURCE}/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out" \
+  --training-log "${training_log}" \
   --telemetry "${TELEMETRY_ROOT}/${run_name}-${SLURM_JOB_ID}.csv" \
   --output "${output_dir}/training-summary.json" \
   --max-completion-length "${completion_length}"
