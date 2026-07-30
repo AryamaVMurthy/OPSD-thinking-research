@@ -18,8 +18,10 @@ source_cache="${HOME}/finod-staging/g1-16326"
 : "${FINOD_EXPECTED_COMMIT:?}"
 
 if [[ -d "${source_dir}/.git" ]]; then
-  test "$(git -C "${source_dir}" rev-parse HEAD)" = "${FINOD_EXPECTED_COMMIT}"
   test -z "$(git -C "${source_dir}" status --short)"
+  git -C "${source_dir}" fetch origin autoresearch/2026-07-31-finod
+  git -C "${source_dir}" checkout --detach "${FINOD_EXPECTED_COMMIT}"
+  git -C "${source_dir}" submodule update --init --recursive
 elif [[ -e "${source_dir}" ]]; then
   echo "Refusing ambiguous existing FiNOD source: ${source_dir}" >&2
   exit 1
