@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build four disjoint shards of a uniform 2,400-problem source sample.
+# Build four disjoint shards of a uniform 3,200-problem source sample.
 #SBATCH --job-name=finod-cache
 #SBATCH --account=priyesh.shukla
 #SBATCH --partition=u22
@@ -19,7 +19,8 @@ source "${HOME}/OPSD-thinking-research/infra/turing/common.sh"
 cd "${PROJECT_SOURCE}"
 test -z "$(git status --short)"
 
-export FINOD_GRAPH_LIMIT="${FINOD_GRAPH_LIMIT:-2400}"
+export FINOD_GRAPH_LIMIT="${FINOD_GRAPH_LIMIT:-3200}"
+export FINOD_MIN_ACCEPTED="${FINOD_MIN_ACCEPTED:-1024}"
 export FINOD_SELECTION_SEED="${FINOD_SELECTION_SEED:-73}"
 export FINOD_CACHE_SHARDS=4
 export FINOD_CACHE_ROOT="${FINOD_CACHE_ROOT:-${SCRATCH_ROOT}/finod_cache/representative-${SLURM_JOB_ID}}"
@@ -42,6 +43,19 @@ python3 -m opsd_research.merge_graf_cache \
   --manifest "${manifests[@]}" \
   --output "${FINOD_CACHE_ROOT}/graphs.jsonl" \
   --manifest-output "${FINOD_CACHE_ROOT}/manifest.json"
+python3 - "${FINOD_CACHE_ROOT}/manifest.json" "${FINOD_MIN_ACCEPTED}" <<'PY'
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+accepted = int(manifest["accepted_examples"])
+required = int(sys.argv[2])
+if accepted < required:
+    raise SystemExit(
+        f"FiNOD cache accepted {accepted} examples, fewer than required "
+        f"{required}"
+    )
+PY
 python3 -m opsd_research.audit_finod_cache \
   --manifest "${FINOD_CACHE_ROOT}/manifest.json" \
   --output "${FINOD_CACHE_ROOT}/audit.json"

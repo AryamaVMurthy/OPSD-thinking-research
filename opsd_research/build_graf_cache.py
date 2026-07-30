@@ -18,6 +18,7 @@ from .answer_masking import (
     ANSWER_LEAKAGE_PROTOCOL,
     PROBLEM_ONLY_GUIDANCE_PROTOCOL,
 )
+from .finod_dataset import finod_training_row_from_graph
 from .graf_graph import (
     graph_builder_prompt,
     graph_critic_prompt,
@@ -335,6 +336,13 @@ def main() -> None:
                     graph_budget=args.graph_budget,
                     check_reference_fragments=not args.answer_blind,
                 )
+                if args.answer_blind:
+                    finod_training_row_from_graph(
+                        question=question,
+                        reference_solution=response,
+                        graph=graph,
+                        source_index=source_indices[index],
+                    )
                 record.update({
                     "accepted": True,
                     "graph": json.loads(graph.canonical_json()),

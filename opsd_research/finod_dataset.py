@@ -16,6 +16,11 @@ from .answer_masking import (
     contains_reference_answer,
 )
 from .generation_common import extract_last_boxed
+from .graf_graph import (
+    GRAPH_SCAFFOLD_PREAMBLE,
+    ReasoningGraph,
+    render_graph_scaffold,
+)
 
 
 OFFICIAL_HARDCODED_DATASET = "siyanzhao/Openthoughts_math_30k_opsd"
@@ -192,14 +197,19 @@ def select_representative_finod_indices(
 
 
 def remove_graph_identifiers(guide: str) -> str:
-    """Remove cache-local IDs that can coincide with a short reference answer.
+    """Remove fixed renderer prose and IDs from FiNOD procedural guidance.
 
-    Fork and action IDs carry no procedural content.  In particular, an action
-    named ``4`` is not an answer leak, but placing that token in the teacher
-    view would make a literal leakage audit indistinguishable from one.
+    The matched teacher-view wrapper already explains how auxiliary context is
+    used, so the graph renderer's fixed preamble is redundant.  It can also
+    coincide spuriously with categorical answers such as ``A`` or ``No``.
+    Fork and action IDs likewise carry no procedural content.  In particular,
+    an action named ``4`` is not an answer leak, but placing that token in the
+    teacher view would make a literal leakage audit indistinguishable from one.
     """
     cleaned = []
     for line in str(guide).splitlines():
+        if line.strip() == GRAPH_SCAFFOLD_PREAMBLE:
+            continue
         line = re.sub(r"^State\s+\S+:\s*", "Strategy state: ", line)
         line = re.sub(r"^-\s+\S+\s+(\[[^\]]+\]:)", r"- \1", line)
         cleaned.append(line)
@@ -235,6 +245,24 @@ def finod_training_row(
         "finod_answer_control": answer,
         "finod_source_index": int(source_index),
     }
+
+
+def finod_training_row_from_graph(
+    *,
+    question: str,
+    reference_solution: str,
+    graph: ReasoningGraph,
+    source_index: int,
+) -> dict[str, object]:
+    """Render a graph through the exact FiNOD training-row safety path."""
+    return finod_training_row(
+        question=question,
+        reference_solution=reference_solution,
+        answer_masked_guide=remove_graph_identifiers(
+            render_graph_scaffold(graph)
+        ),
+        source_index=source_index,
+    )
 
 
 def install_finod_dataset_redirect(

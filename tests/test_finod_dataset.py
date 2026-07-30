@@ -3,10 +3,12 @@ from __future__ import annotations
 import pytest
 
 from opsd_research.finod_dataset import (
+    finod_training_row_from_graph,
     finod_training_row,
     remove_graph_identifiers,
     select_representative_finod_indices,
 )
+from opsd_research.graf_graph import parse_answer_masked_graph
 
 
 def test_finod_row_keeps_answer_control_out_of_student_and_guide_fields():
@@ -44,6 +46,77 @@ def test_graph_identifiers_cannot_accidentally_reveal_a_short_answer():
     assert "State 4" not in row["solution"]
     assert "- 4 " not in row["solution"]
     assert "Isolate n" in row["solution"]
+
+
+def test_fixed_graph_preamble_is_not_part_of_finod_guidance():
+    guide = "\n".join(
+        [
+            (
+                "Use this answer-masked strategy graph as a scaffold. It "
+                "contains no final answer; independently solve and verify "
+                "the problem."
+            ),
+            "State initial: Compare the symbolic cases.",
+            (
+                "- route [viable]: Factor the expression. "
+                "Check: Verify every condition. Recovery: Try substitution."
+            ),
+        ]
+    )
+
+    cleaned = remove_graph_identifiers(guide)
+    row = finod_training_row(
+        question="Choose the correct option.",
+        reference_solution=r"A private derivation ends with \boxed{A}.",
+        answer_masked_guide=cleaned,
+        source_index=36,
+    )
+
+    assert not cleaned.startswith("Use this answer-masked")
+    assert row["solution"].startswith("Strategy state:")
+    assert "Factor the expression" in row["solution"]
+
+
+def test_graph_is_replayed_through_exact_rendered_training_path():
+    payload = {
+        "forks": [
+            {
+                "fork_id": "f1",
+                "state": "Compare symbolic routes.",
+                "actions": [
+                    {
+                        "action_id": "a1",
+                        "description": "Factor the expression.",
+                        "status": "viable",
+                        "validation_test": "Verify every condition.",
+                        "recovery_action": "Try substitution.",
+                    },
+                    {
+                        "action_id": "a2",
+                        "description": "Use a parity argument.",
+                        "status": "risky",
+                        "validation_test": "Check both cases.",
+                        "recovery_action": "Return to factorization.",
+                    },
+                ],
+            }
+        ]
+    }
+    graph = parse_answer_masked_graph(
+        payload,
+        problem="Classify the route.",
+        reference_solution=r"A private derivation ends with \boxed{viable}.",
+    )
+
+    with pytest.raises(ValueError, match="reference answer"):
+        finod_training_row_from_graph(
+            question="Classify the route.",
+            reference_solution=(
+                r"A private derivation ends with \boxed{viable}."
+            ),
+            graph=graph,
+            source_index=37,
+        )
 
 
 def test_semantic_answer_leak_is_still_rejected_after_identifier_removal():

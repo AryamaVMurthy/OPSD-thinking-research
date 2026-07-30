@@ -115,7 +115,10 @@ def test_audit_rejects_a_cached_numerical_result_before_publication(
         }
     ]
 
-    with pytest.raises(ValueError, match="numerical result"):
+    with pytest.raises(
+        ValueError,
+        match=r"source index 0.*numerical result",
+    ):
         audit_finod_cache(
             _cache(
                 tmp_path,

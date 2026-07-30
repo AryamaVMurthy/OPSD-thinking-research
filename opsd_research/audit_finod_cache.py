@@ -88,12 +88,20 @@ def audit_finod_cache(
             raise ValueError(
                 f"FiNOD graph hash mismatch at source index {index}"
             )
-        finod_training_row(
-            question=question,
-            reference_solution=str(row["response"]),
-            answer_masked_guide=remove_graph_identifiers(scaffolds[index]),
-            source_index=index,
-        )
+        try:
+            finod_training_row(
+                question=question,
+                reference_solution=str(row["response"]),
+                answer_masked_guide=remove_graph_identifiers(
+                    scaffolds[index]
+                ),
+                source_index=index,
+            )
+        except ValueError as error:
+            raise ValueError(
+                f"FiNOD training safety check failed at source index "
+                f"{index}: {error}"
+            ) from error
         accepted_sources[str(row.get("data_source") or "unknown")] += 1
     if accepted_seen != set(scaffolds):
         raise ValueError("accepted cache records and rendered scaffolds disagree")

@@ -26,6 +26,10 @@ ALLOWED_BRANCH_STATUS = {
     "recoverable",
     "redundant",
 }
+GRAPH_SCAFFOLD_PREAMBLE = (
+    "Use this answer-masked strategy graph as a scaffold. It contains no final "
+    "answer; independently solve and verify the problem."
+)
 _REFERENCE_FRAGMENT = re.compile(r"\S+(?:\s+\S+){3,}")
 
 
@@ -272,10 +276,7 @@ def branch_target(
 
 def render_graph_scaffold(graph: ReasoningGraph) -> str:
     """Render a non-answer graph as a compact privileged teacher scaffold."""
-    lines = [
-        "Use this answer-masked strategy graph as a scaffold. It contains no final "
-        "answer; independently solve and verify the problem."
-    ]
+    lines = [GRAPH_SCAFFOLD_PREAMBLE]
     for fork in graph.forks:
         lines.append(f"State {fork.fork_id}: {fork.state}")
         for action in fork.actions:
