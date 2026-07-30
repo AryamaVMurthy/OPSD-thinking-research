@@ -113,7 +113,8 @@ def _aggregate_finod_metrics(
     accelerator = self.accelerator
     if hasattr(accelerator, "reduce"):
         reduced = accelerator.reduce(local, reduction="sum")
-        max_kl = accelerator.reduce(local_max_kl, reduction="max")
+        gathered_max_kl = accelerator.gather(local_max_kl.reshape(1))
+        max_kl = gathered_max_kl.max()
     else:
         reduced = local
         max_kl = local_max_kl

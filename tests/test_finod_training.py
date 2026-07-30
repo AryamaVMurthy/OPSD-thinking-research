@@ -14,9 +14,10 @@ class _TwoRankMirrorAccelerator:
     def reduce(self, value, reduction):
         if reduction == "sum":
             return value * 2
-        if reduction == "max":
-            return value
         raise AssertionError(reduction)
+
+    def gather(self, value):
+        return torch.cat([value, value])
 
 
 def test_finod_telemetry_is_token_weighted_and_reduced_across_ranks():
