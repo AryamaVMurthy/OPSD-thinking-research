@@ -37,7 +37,11 @@ def test_finod_telemetry_is_token_weighted_and_reduced_across_ranks():
         "effective_step_size": torch.tensor([[0.2, 99.0], [0.1, 0.2]]),
         "active_projection": torch.tensor([[True, False], [False, True]]),
         "guide_nuisance_alignment": torch.tensor([[1.0, 99.0], [-1.0, 2.0]]),
-        "residual_nuisance_alignment": torch.tensor([[0.0, 99.0], [-1.0, 0.0]]),
+        # A weak nuisance is intentionally left unprojected.  Its positive
+        # alignment must not be reported as a projection violation.
+        "residual_nuisance_alignment": torch.tensor(
+            [[0.0, 99.0], [2.0e-5, 0.0]]
+        ),
     }
 
     result = _aggregate_finod_metrics(
@@ -60,3 +64,31 @@ def test_finod_telemetry_is_token_weighted_and_reduced_across_ranks():
     assert result["collapsed_residual_fraction"] == pytest.approx(1 / 3)
     assert result["positive_alignment_after_fraction"] == 0.0
     assert result["clipped_target_fraction"] == 1.0
+
+
+def test_finod_telemetry_reports_alignment_on_active_nuisance():
+    trainer = SimpleNamespace(accelerator=_TwoRankMirrorAccelerator())
+    mask = torch.tensor([[True]])
+    metrics = {
+        "guide_energy": torch.tensor([[1.0]]),
+        "nuisance_energy": torch.tensor([[1.0]]),
+        "residual_energy": torch.tensor([[1.0]]),
+        "target_forward_kl": torch.tensor([[0.001]]),
+        "target_reverse_kl": torch.tensor([[0.001]]),
+        "target_kl": torch.tensor([[0.001]]),
+        "effective_step_size": torch.tensor([[0.25]]),
+        "active_projection": torch.tensor([[True]]),
+        "guide_nuisance_alignment": torch.tensor([[0.1]]),
+        "residual_nuisance_alignment": torch.tensor([[2.0e-5]]),
+    }
+
+    result = _aggregate_finod_metrics(
+        trainer,
+        loss=torch.tensor(0.001),
+        metrics=metrics,
+        selected_mask=mask,
+        step_size=0.25,
+        residual_energy_threshold=1.0e-8,
+    )
+
+    assert result["positive_alignment_after_fraction"] == 1.0

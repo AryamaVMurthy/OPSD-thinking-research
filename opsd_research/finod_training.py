@@ -107,7 +107,9 @@ def _aggregate_finod_metrics(
             (residual <= residual_energy_threshold).to(torch.float64).sum(),
             total("guide_nuisance_alignment"),
             alignment_after.sum(),
-            (alignment_after > 1e-5).to(torch.float64).sum(),
+            (
+                (alignment_after > 1e-5) & active.to(torch.bool)
+            ).to(torch.float64).sum(),
             (effective_step < step_size - 1e-7).to(torch.float64).sum(),
         ]
     )
@@ -142,7 +144,9 @@ def _aggregate_finod_metrics(
         "collapsed_residual_fraction": average(10),
         "alignment_before": average(11),
         "alignment_after": average(12),
-        "positive_alignment_after_fraction": average(13),
+        "positive_alignment_after_fraction": (
+            values[13] / values[9] if values[9] > 0 else 0.0
+        ),
         "clipped_target_fraction": average(14),
         "max_observed_target_kl": float(max_kl.detach().cpu()),
     }
