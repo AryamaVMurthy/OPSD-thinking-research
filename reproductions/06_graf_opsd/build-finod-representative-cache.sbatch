@@ -22,9 +22,7 @@ test -z "$(git status --short)"
 export FINOD_GRAPH_LIMIT="${FINOD_GRAPH_LIMIT:-2400}"
 export FINOD_SELECTION_SEED="${FINOD_SELECTION_SEED:-73}"
 export FINOD_CACHE_SHARDS=4
-export FINOD_CACHE_ROOT="${
-  FINOD_CACHE_ROOT:-${SCRATCH_ROOT}/finod_cache/representative-${SLURM_JOB_ID}
-}"
+export FINOD_CACHE_ROOT="${FINOD_CACHE_ROOT:-${SCRATCH_ROOT}/finod_cache/representative-${SLURM_JOB_ID}}"
 mkdir -p "${FINOD_CACHE_ROOT}"
 git rev-parse HEAD > "${FINOD_CACHE_ROOT}/source-commit.txt"
 

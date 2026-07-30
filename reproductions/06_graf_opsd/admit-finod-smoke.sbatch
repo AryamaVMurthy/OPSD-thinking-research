@@ -17,9 +17,7 @@ set -euo pipefail
 source "${HOME}/OPSD-thinking-research/infra/turing/common.sh"
 cd "${PROJECT_SOURCE}"
 summary="${TRAIN_ROOT}/${FINOD_SMOKE_RUN_NAME}/training-summary.json"
-manifest="${
-  SCRATCH_ROOT
-}/finod/cache/representative-${FINOD_CACHE_JOB_ID}/manifest.json"
+manifest="${SCRATCH_ROOT}/finod/cache/representative-${FINOD_CACHE_JOB_ID}/manifest.json"
 test -s "${summary}"
 test -s "${manifest}"
 
