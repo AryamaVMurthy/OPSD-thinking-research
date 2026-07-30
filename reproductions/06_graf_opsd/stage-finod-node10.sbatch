@@ -14,22 +14,27 @@ set -euo pipefail
 root="/scratch/node10/${USER}/finod"
 source_dir="${root}/source"
 cache_dir="${root}/cache/g1-16326"
-source_cache="/scratch/node03/${USER}/opsd-thinking-research/graf_cache/g1-16326"
+source_cache="${HOME}/finod-staging/g1-16326"
 : "${FINOD_EXPECTED_COMMIT:?}"
 
-if [[ -e "${source_dir}" ]]; then
-  echo "Refusing to overwrite existing FiNOD source: ${source_dir}" >&2
+if [[ -d "${source_dir}/.git" ]]; then
+  test "$(git -C "${source_dir}" rev-parse HEAD)" = "${FINOD_EXPECTED_COMMIT}"
+  test -z "$(git -C "${source_dir}" status --short)"
+elif [[ -e "${source_dir}" ]]; then
+  echo "Refusing ambiguous existing FiNOD source: ${source_dir}" >&2
   exit 1
+else
+  mkdir -p "${root}"
+  git clone \
+    --recurse-submodules \
+    --branch autoresearch/2026-07-31-finod \
+    https://github.com/AryamaVMurthy/OPSD-thinking-research.git \
+    "${source_dir}"
 fi
-mkdir -p "${root}" "${cache_dir}"
-git clone \
-  --recurse-submodules \
-  --branch autoresearch/2026-07-31-finod \
-  https://github.com/AryamaVMurthy/OPSD-thinking-research.git \
-  "${source_dir}"
 test "$(git -C "${source_dir}" rev-parse HEAD)" = "${FINOD_EXPECTED_COMMIT}"
 test -z "$(git -C "${source_dir}" status --short)"
 
+mkdir -p "${cache_dir}"
 cp "${source_cache}/graphs.jsonl" "${cache_dir}/graphs.jsonl"
 cp "${source_cache}/manifest.json" "${cache_dir}/manifest.json"
 sed -i \
