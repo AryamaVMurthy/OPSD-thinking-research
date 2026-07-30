@@ -27,6 +27,12 @@ def test_finod_telemetry_is_token_weighted_and_reduced_across_ranks():
         "guide_energy": torch.tensor([[2.0, 99.0], [4.0, 6.0]]),
         "nuisance_energy": torch.tensor([[1.0, 99.0], [2.0, 3.0]]),
         "residual_energy": torch.tensor([[1.0, 99.0], [2.0, 3.0]]),
+        "target_forward_kl": torch.tensor(
+            [[0.0008, 99.0], [0.0025, 0.0015]]
+        ),
+        "target_reverse_kl": torch.tensor(
+            [[0.001, 99.0], [0.003, 0.002]]
+        ),
         "target_kl": torch.tensor([[0.001, 99.0], [0.003, 0.002]]),
         "effective_step_size": torch.tensor([[0.2, 99.0], [0.1, 0.2]]),
         "active_projection": torch.tensor([[True, False], [False, True]]),
@@ -47,6 +53,8 @@ def test_finod_telemetry_is_token_weighted_and_reduced_across_ranks():
     assert result["loss"] == pytest.approx(0.004)
     assert result["guide_energy"] == pytest.approx(4.0)
     assert result["target_kl"] == pytest.approx(0.002)
+    assert result["target_forward_kl"] == pytest.approx(0.0016)
+    assert result["target_reverse_kl"] == pytest.approx(0.002)
     assert result["max_observed_target_kl"] == pytest.approx(0.003)
     assert result["active_projection_fraction"] == pytest.approx(2 / 3)
     assert result["collapsed_residual_fraction"] == pytest.approx(1 / 3)

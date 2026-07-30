@@ -53,6 +53,15 @@ def test_target_kl_is_clipped_without_changing_residual_direction():
     )
 
     assert result.metrics["target_kl"].item() <= 0.0100001
+    assert result.metrics["target_forward_kl"].item() <= 0.0100001
+    assert result.metrics["target_reverse_kl"].item() <= 0.0100001
+    assert abs(
+        result.metrics["target_kl"].item()
+        - max(
+            result.metrics["target_forward_kl"].item(),
+            result.metrics["target_reverse_kl"].item(),
+        )
+    ) < 1e-12
     assert result.metrics["effective_step_size"].item() < 1.0
     torch.testing.assert_close(
         result.residual_direction,

@@ -208,6 +208,8 @@ def summarize(
                         "guide_energy",
                         "nuisance_energy",
                         "residual_energy",
+                        "target_forward_kl",
+                        "target_reverse_kl",
                         "target_kl",
                     )
                 )
@@ -225,6 +227,20 @@ def summarize(
                             event["target_kl"],
                         )
                     )
+                    for event in finod_events
+                ),
+                default=None,
+            ),
+            "max_target_forward_kl": max(
+                (
+                    float(event["target_forward_kl"])
+                    for event in finod_events
+                ),
+                default=None,
+            ),
+            "max_target_reverse_kl": max(
+                (
+                    float(event["target_reverse_kl"])
                     for event in finod_events
                 ),
                 default=None,

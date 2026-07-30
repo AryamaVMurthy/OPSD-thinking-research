@@ -17,7 +17,7 @@ The first candidate is fixed before GPU inspection:
 - 32 uniformly spaced valid rollout positions;
 - one-sided Fisher answer-control projection;
 - exponential-tilt step size 0.25;
-- exact per-token target-KL cap 0.01;
+- exact per-token cap of 0.01 on the worse of forward and reverse target KL;
 - LoRA rank 64 on all projection modules;
 - AdamW through the pinned upstream Trainer, learning rate `5e-6`;
 - global gradient clipping at `0.1`;

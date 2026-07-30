@@ -167,25 +167,47 @@ def fisher_projected_target(
 
     def tilted(
         scale: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
         target_log = (
             log_probability + scale.unsqueeze(-1) * residual
         ).log_softmax(dim=-1)
         target_probability = target_log.exp()
-        kl = (
+        reverse_kl = (
             target_probability * (target_log - log_probability)
         ).sum(dim=-1)
-        return target_log, target_probability, kl
+        forward_kl = (
+            probability * (log_probability - target_log)
+        ).sum(dim=-1)
+        worst_kl = torch.maximum(forward_kl, reverse_kl)
+        return (
+            target_log,
+            target_probability,
+            forward_kl,
+            reverse_kl,
+            worst_kl,
+        )
 
     effective_step = torch.full_like(alignment, float(step_size))
-    target_log_probs, target, target_kl = tilted(effective_step)
+    (
+        target_log_probs,
+        target,
+        target_forward_kl,
+        target_reverse_kl,
+        target_kl,
+    ) = tilted(effective_step)
     if max_target_kl is not None:
         needs_clip = target_kl > float(max_target_kl)
         lower = torch.zeros_like(effective_step)
         upper = effective_step
         for _ in range(32):
             midpoint = (lower + upper) / 2
-            _, _, midpoint_kl = tilted(midpoint)
+            _, _, _, _, midpoint_kl = tilted(midpoint)
             lower = torch.where(
                 midpoint_kl <= float(max_target_kl), midpoint, lower
             )
@@ -193,7 +215,13 @@ def fisher_projected_target(
                 midpoint_kl > float(max_target_kl), midpoint, upper
             )
         effective_step = torch.where(needs_clip, lower, effective_step)
-        target_log_probs, target, target_kl = tilted(effective_step)
+        (
+            target_log_probs,
+            target,
+            target_forward_kl,
+            target_reverse_kl,
+            target_kl,
+        ) = tilted(effective_step)
     residual_energy = (probability * residual.square()).sum(dim=-1)
 
     return FisherProjectedTarget(
@@ -209,6 +237,8 @@ def fisher_projected_target(
                 residual_nuisance_alignment.detach()
             ),
             "residual_energy": residual_energy.detach(),
+            "target_forward_kl": target_forward_kl.detach(),
+            "target_reverse_kl": target_reverse_kl.detach(),
             "target_kl": target_kl.detach(),
             "effective_step_size": effective_step.detach(),
         },
