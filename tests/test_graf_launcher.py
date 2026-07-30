@@ -17,6 +17,24 @@ CONFIG = ROOT / "reproductions/06_graf_opsd/configs/c0-long-rollout.yaml"
 
 
 class GrafLauncherTests(unittest.TestCase):
+    def test_representative_finod_rejects_a_privileged_guidance_cache(self):
+        config = {
+            "graph_mode": "finod_scaffold",
+            "finod_guidance_input_protocol": "problem-only-v1",
+            "finod_answer_leakage_protocol": (
+                "surface-equivalence-and-result-claim-v2"
+            ),
+        }
+        legacy_manifest = {
+            "guidance_input_protocol": "problem-plus-reference-filtered-v1",
+            "answer_leakage_protocol": "literal-only-v1",
+        }
+
+        with self.assertRaisesRegex(SystemExit, "guidance_input_protocol"):
+            launch_graf_opsd._validate_finod_manifest_protocols(
+                config, legacy_manifest
+            )
+
     def test_canonical_token_divergence_is_exported_to_the_loss_hook(self):
         config = {"token_divergence": "js"}
         with mock.patch.dict(os.environ, {}, clear=True):

@@ -11,6 +11,10 @@ from collections.abc import Collection, Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
+from .answer_masking import (
+    contains_explicit_numerical_result,
+    contains_reference_answer,
+)
 from .generation_common import extract_last_boxed
 
 
@@ -221,11 +225,10 @@ def finod_training_row(
         raise ValueError("FiNOD reference solution lacks a boxed answer")
     if "\\boxed" in guide:
         raise ValueError("FiNOD guide contains an answer-format leak")
-    if re.search(
-        rf"(?<![A-Za-z0-9]){re.escape(answer)}(?![A-Za-z0-9])",
-        guide,
-    ):
+    if contains_reference_answer(guide, answer):
         raise ValueError("FiNOD guide contains the reference answer")
+    if contains_explicit_numerical_result(guide):
+        raise ValueError("FiNOD guide contains an explicit numerical result")
     return {
         "problem": problem,
         "solution": guide,

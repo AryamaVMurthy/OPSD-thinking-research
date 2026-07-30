@@ -14,6 +14,10 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from .answer_masking import (
+    ANSWER_LEAKAGE_PROTOCOL,
+    PROBLEM_ONLY_GUIDANCE_PROTOCOL,
+)
 from .graf_graph import (
     graph_builder_prompt,
     graph_critic_prompt,
@@ -154,6 +158,27 @@ def _sanitizer_chat_prompt(
     return prompt
 
 
+def _cache_builder_chat_prompt(
+    tokenizer: Any,
+    problem: str,
+    reference_solution: str,
+    *,
+    answer_blind: bool,
+    graph_budget: int = 24,
+) -> str:
+    """Select an auditable problem-only or legacy privileged builder input."""
+    if answer_blind:
+        return _sanitizer_chat_prompt(
+            tokenizer, problem, graph_budget=graph_budget
+        )
+    return _builder_chat_prompt(
+        tokenizer,
+        problem,
+        reference_solution,
+        graph_budget=graph_budget,
+    )
+
+
 def _critic_chat_prompt(
     tokenizer: Any, problem: str, reference_solution: str, candidate_graph: dict[str, Any], *, graph_budget: int = 24
 ) -> str:
@@ -184,6 +209,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--max-actions-per-fork", type=int, default=6)
     parser.add_argument("--graph-budget", type=int, default=24)
     parser.add_argument("--teacher-critique", action="store_true")
+    parser.add_argument(
+        "--answer-blind",
+        action="store_true",
+        help="generate every guide from the problem alone; references are audit-only",
+    )
     parser.add_argument("--selection-seed", type=int)
     parser.add_argument("--shard-id", type=int, default=0)
     parser.add_argument("--num-shards", type=int, default=1)
@@ -201,6 +231,8 @@ def main() -> None:
         raise SystemExit("shard-id must be in [0, num-shards)")
     if args.model != DEFAULT_MODEL or args.model_revision != DEFAULT_MODEL_REVISION:
         raise SystemExit("GRAF cache building is pinned to Qwen3-4B@1cfa9a7")
+    if args.answer_blind and args.teacher_critique:
+        raise SystemExit("answer-blind cache building forbids privileged teacher critique")
     if args.output.exists():
         raise SystemExit(f"refusing to alter existing cache {args.output}")
     if args.manifest.exists():
@@ -252,8 +284,11 @@ def main() -> None:
         for index in pending:
             row = rows[index]
             try:
-                prompts.append(_builder_chat_prompt(
-                    tokenizer, str(row["question"]), str(row["response"]),
+                prompts.append(_cache_builder_chat_prompt(
+                    tokenizer,
+                    str(row["question"]),
+                    str(row["response"]),
+                    answer_blind=args.answer_blind,
                     graph_budget=args.graph_budget,
                 ))
                 viable_indices.append(index)
@@ -283,6 +318,12 @@ def main() -> None:
                 "training_dataset_revision": TRAINING_DATASET_REVISION,
                 "builder_seed": args.seed + attempt,
                 "builder_attempt": attempt + 1,
+                "guidance_input_protocol": (
+                    PROBLEM_ONLY_GUIDANCE_PROTOCOL
+                    if args.answer_blind
+                    else "problem-plus-reference-filtered-v1"
+                ),
+                "answer_leakage_protocol": ANSWER_LEAKAGE_PROTOCOL,
             }
             try:
                 graph = parse_answer_masked_graph(
@@ -292,6 +333,7 @@ def main() -> None:
                     max_forks=args.max_forks,
                     max_actions_per_fork=args.max_actions_per_fork,
                     graph_budget=args.graph_budget,
+                    check_reference_fragments=not args.answer_blind,
                 )
                 record.update({
                     "accepted": True,
@@ -389,6 +431,12 @@ def main() -> None:
             "training_dataset_revision": TRAINING_DATASET_REVISION,
             "builder_seed": args.seed,
             "builder_attempts": args.attempts,
+            "guidance_input_protocol": (
+                PROBLEM_ONLY_GUIDANCE_PROTOCOL
+                if args.answer_blind
+                else "problem-plus-reference-filtered-v1"
+            ),
+            "answer_leakage_protocol": ANSWER_LEAKAGE_PROTOCOL,
             "accepted": False,
             "reject_reason": last_errors.get(index, "prompt could not be rendered"),
         }
@@ -467,6 +515,12 @@ def main() -> None:
         "teacher_critique": args.teacher_critique,
         "teacher_critique_applied": critique_applied,
         "teacher_critique_rejected": critique_rejected,
+        "guidance_input_protocol": (
+            PROBLEM_ONLY_GUIDANCE_PROTOCOL
+            if args.answer_blind
+            else "problem-plus-reference-filtered-v1"
+        ),
+        "answer_leakage_protocol": ANSWER_LEAKAGE_PROTOCOL,
     }
     args.manifest.parent.mkdir(parents=True, exist_ok=True)
     args.manifest.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")

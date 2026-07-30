@@ -22,6 +22,8 @@ _IDENTITY_FIELDS = (
     "max_actions_per_fork",
     "graph_budget",
     "teacher_critique",
+    "guidance_input_protocol",
+    "answer_leakage_protocol",
     "selection_protocol",
     "selection_seed",
     "requested_global_examples",

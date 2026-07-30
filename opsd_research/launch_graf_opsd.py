@@ -17,6 +17,27 @@ from pathlib import Path
 from .config import load_config
 
 
+def _validate_finod_manifest_protocols(
+    config: dict[str, object], manifest: dict[str, object]
+) -> None:
+    """Bind a FiNOD run to the cache-construction protocol it declares."""
+    if config.get("graph_mode") != "finod_scaffold":
+        return
+    for config_key, manifest_key in (
+        ("finod_guidance_input_protocol", "guidance_input_protocol"),
+        ("finod_answer_leakage_protocol", "answer_leakage_protocol"),
+    ):
+        required = config.get(config_key)
+        if required is None:
+            continue
+        observed = manifest.get(manifest_key)
+        if observed != required:
+            raise SystemExit(
+                f"FiNOD requires cache {manifest_key}={required!r}, "
+                f"observed {observed!r}"
+            )
+
+
 def _argument(name: str) -> str | None:
     try:
         return sys.argv[sys.argv.index(name) + 1]
@@ -85,6 +106,7 @@ def _validate_invocation() -> dict[str, object]:
             graph_manifest = validate_graph_cache_manifest(manifest)
         except ValueError as error:
             raise SystemExit(f"invalid GRAF graph cache: {error}") from error
+        _validate_finod_manifest_protocols(config, graph_manifest)
         if bool(config.get("teacher_graph_critique", False)) and not bool(
             graph_manifest.get("teacher_critique", False)
         ):

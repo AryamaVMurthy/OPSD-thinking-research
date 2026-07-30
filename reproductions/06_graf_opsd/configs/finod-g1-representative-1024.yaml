@@ -37,6 +37,8 @@ branch_loss_weight: 0.0
 entropy_floor_weight: 0.0
 finod_max_records: 1024
 finod_selection_seed: 73
+finod_guidance_input_protocol: problem-only-v1
+finod_answer_leakage_protocol: surface-equivalence-and-result-claim-v2
 finod_positions_per_rollout: 32
 finod_step_size: 0.25
 finod_max_target_kl: 0.01

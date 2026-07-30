@@ -32,6 +32,11 @@ def test_finod_representative_config_registers_exact_one_epoch_scale():
 
     assert config["finod_max_records"] == 1024
     assert config["finod_selection_seed"] == 73
+    assert config["finod_guidance_input_protocol"] == "problem-only-v1"
+    assert (
+        config["finod_answer_leakage_protocol"]
+        == "surface-equivalence-and-result-claim-v2"
+    )
     assert config["max_completion_length"] == 4096
     assert config["max_steps"] == 32
     assert config["save_steps"] == 32

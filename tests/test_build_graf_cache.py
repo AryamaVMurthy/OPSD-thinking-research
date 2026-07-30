@@ -4,6 +4,7 @@ from opsd_research.build_graf_cache import (
     MAX_COMPLETION_TOKENS,
     MAX_MODEL_LEN,
     _builder_chat_prompt,
+    _cache_builder_chat_prompt,
     _critic_chat_prompt,
     _representative_source_indices,
     _sanitizer_chat_prompt,
@@ -57,6 +58,19 @@ def test_sanitizer_never_receives_reference_solution() -> None:
     assert "Construct a fresh" in prompt
     assert "Candidate graph" not in prompt
     assert "reference solution" not in prompt.lower()
+
+
+def test_answer_blind_cache_builder_never_receives_reference_solution() -> None:
+    prompt = _cache_builder_chat_prompt(
+        _CharacterTokenizer(),
+        "Find x.",
+        "PRIVATE REFERENCE ANSWER",
+        answer_blind=True,
+    )
+
+    assert "Find x." in prompt
+    assert "PRIVATE REFERENCE ANSWER" not in prompt
+    assert "Construct a fresh" in prompt
 
 
 def test_critic_is_privileged_but_requires_answer_masked_json_revision() -> None:

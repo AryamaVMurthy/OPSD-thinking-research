@@ -10,6 +10,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from .answer_masking import (
+    contains_explicit_numerical_result,
+    contains_reference_answer,
+)
 from .generation_common import extract_last_boxed
 
 
@@ -152,8 +156,10 @@ def parse_answer_masked_graph(
         normalized = _normalise(field)
         if "\\boxed" in field or "final answer" in normalized:
             raise ValueError("graph contains an answer-format leak")
-        if answer and re.search(rf"(?<![A-Za-z0-9]){re.escape(answer)}(?![A-Za-z0-9])", field):
+        if answer and contains_reference_answer(field, answer):
             raise ValueError("graph contains the reference answer")
+        if contains_explicit_numerical_result(field):
+            raise ValueError("graph contains an explicit numerical result")
         if check_reference_fragments and any(
             fragment and fragment in normalized for fragment in fragments
         ):

@@ -25,6 +25,71 @@ class GrafGraphTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "answer"):
             parse_answer_masked_graph(leaked, problem="Solve x.", reference_solution="First factor carefully. Therefore \\boxed{7}.")
 
+    def test_graph_rejects_equivalent_latex_fraction_answer(self):
+        leaked = self.payload()
+        leaked["forks"][0]["actions"][0]["validation_test"] = (
+            "Ensure the resulting volume is 4/3."
+        )
+
+        with self.assertRaisesRegex(ValueError, "reference answer"):
+            parse_answer_masked_graph(
+                leaked,
+                problem="Find the volume.",
+                reference_solution=r"The volume is therefore \boxed{\frac{4}{3}}.",
+            )
+
+    def test_graph_rejects_explicit_numerical_intermediate_result(self):
+        leaked = self.payload()
+        leaked["forks"][0]["actions"][0]["validation_test"] = (
+            "Ensure the dot product is 8 before continuing."
+        )
+
+        with self.assertRaisesRegex(ValueError, "numerical result"):
+            parse_answer_masked_graph(
+                leaked,
+                problem="Find the volume of a tetrahedron with the stated vertices.",
+                reference_solution=r"The final volume is \boxed{\frac{4}{3}}.",
+            )
+
+    def test_graph_rejects_fraction_equivalent_to_decimal_answer(self):
+        leaked = self.payload()
+        leaked["forks"][0]["actions"][0]["description"] = (
+            "Try 1/2 as the candidate before checking the constraints."
+        )
+
+        with self.assertRaisesRegex(ValueError, "reference answer"):
+            parse_answer_masked_graph(
+                leaked,
+                problem="Find the requested value.",
+                reference_solution=r"The value is \boxed{0.5}.",
+            )
+
+    def test_graph_rejects_unicode_square_root_answer_alias(self):
+        leaked = self.payload()
+        leaked["forks"][0]["actions"][0]["description"] = (
+            "Try √2 as the candidate before checking the constraints."
+        )
+
+        with self.assertRaisesRegex(ValueError, "reference answer"):
+            parse_answer_masked_graph(
+                leaked,
+                problem="Find the requested value.",
+                reference_solution=r"The value is \boxed{\sqrt{2}}.",
+            )
+
+    def test_graph_rejects_unbraced_latex_fraction_answer_alias(self):
+        leaked = self.payload()
+        leaked["forks"][0]["actions"][0]["description"] = (
+            "Try 0.5 as the candidate before checking the constraints."
+        )
+
+        with self.assertRaisesRegex(ValueError, "reference answer"):
+            parse_answer_masked_graph(
+                leaked,
+                problem="Find the requested value.",
+                reference_solution=r"The value is \boxed{\frac12}.",
+            )
+
     def test_copy_only_graph_can_be_structurally_checked_before_sanitizing(self):
         copied = self.payload()
         copied["forks"][0]["actions"][0]["description"] = (

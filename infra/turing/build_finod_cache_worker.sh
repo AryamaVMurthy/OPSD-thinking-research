@@ -19,6 +19,7 @@ python3 -m opsd_research.build_graf_cache \
   --limit "${FINOD_GRAPH_LIMIT}" \
   --attempts 3 \
   --tensor-parallel-size 1 \
+  --answer-blind \
   --seed 42 \
   --selection-seed "${FINOD_SELECTION_SEED}" \
   --shard-id "${SLURM_PROCID}" \

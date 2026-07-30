@@ -435,6 +435,8 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
     if data.get("graph_mode") == "finod_scaffold":
         max_records = data.get("finod_max_records")
         selection_seed = data.get("finod_selection_seed")
+        guidance_protocol = data.get("finod_guidance_input_protocol")
+        leakage_protocol = data.get("finod_answer_leakage_protocol")
         if max_records is not None:
             if (
                 not isinstance(max_records, int)
@@ -456,6 +458,18 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         elif selection_seed is not None:
             raise ConfigError(
                 f"{source}: finod_selection_seed requires finod_max_records"
+            )
+        if guidance_protocol is not None and (
+            not isinstance(guidance_protocol, str) or not guidance_protocol
+        ):
+            raise ConfigError(
+                f"{source}: finod_guidance_input_protocol must be a nonempty string"
+            )
+        if leakage_protocol is not None and (
+            not isinstance(leakage_protocol, str) or not leakage_protocol
+        ):
+            raise ConfigError(
+                f"{source}: finod_answer_leakage_protocol must be a nonempty string"
             )
         positions = data.get("finod_positions_per_rollout")
         if (

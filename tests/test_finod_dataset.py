@@ -56,6 +56,26 @@ def test_semantic_answer_leak_is_still_rejected_after_identifier_removal():
         )
 
 
+def test_finod_row_rejects_equivalent_latex_fraction_answer():
+    with pytest.raises(ValueError, match="reference answer"):
+        finod_training_row(
+            question="Find the volume.",
+            reference_solution=r"A private derivation ends with \boxed{\frac{4}{3}}.",
+            answer_masked_guide="Compute both triple products; ensure the volume is 4/3.",
+            source_index=36,
+        )
+
+
+def test_finod_row_rejects_explicit_numerical_intermediate_result():
+    with pytest.raises(ValueError, match="numerical result"):
+        finod_training_row(
+            question="Find the volume.",
+            reference_solution=r"A private derivation ends with \boxed{\frac{4}{3}}.",
+            answer_masked_guide="Compute the triple product; verify that it is 8.",
+            source_index=37,
+        )
+
+
 def test_representative_selection_is_exact_stratified_and_reproducible():
     rows = []
     for source in ("olympiads", "aops_forum", "cn_contest"):
