@@ -107,10 +107,17 @@ def _validate_eval(data: dict[str, Any], source: str) -> None:
                     f"{source}: full-context development evaluation requires "
                     "max_model_len=40960"
                 )
+        elif protocol == "six_sample_32k":
+            expected_samples, expected_tokens = 6, 32768
+            if data.get("max_model_len") != 40960:
+                raise ConfigError(
+                    f"{source}: six-sample 32k math evaluation requires "
+                    "max_model_len=40960"
+                )
         else:
             raise ConfigError(
                 f"{source}: evaluation_protocol must be official, development, "
-                "or development_full_context"
+                "development_full_context, or six_sample_32k"
             )
         if samples != expected_samples:
             raise ConfigError(

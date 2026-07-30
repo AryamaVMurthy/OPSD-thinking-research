@@ -59,6 +59,25 @@ class ConfigTests(unittest.TestCase):
 
         validate_config(changed)
 
+    def test_math_six_sample_32k_protocol_matches_requested_screen(self):
+        data = load_config(
+            ROOT
+            / "reproductions/06_graf_opsd/configs/qwen3-4b-aime24-dev.yaml"
+        ).data
+        changed = copy.deepcopy(data)
+        changed.update(
+            evaluation_protocol="six_sample_32k",
+            samples_per_problem=6,
+            max_new_tokens=32768,
+            max_model_len=40960,
+        )
+
+        validate_config(changed)
+
+        changed["max_model_len"] = 32768
+        with self.assertRaisesRegex(ConfigError, "six-sample 32k"):
+            validate_config(changed)
+
     def test_hmmt_non_aime_screen_is_full_context_and_not_locked(self):
         data = load_config(
             ROOT
