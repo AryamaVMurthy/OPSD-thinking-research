@@ -5,7 +5,7 @@
 #SBATCH --partition=u22
 #SBATCH --qos=high
 #SBATCH --nodelist=node10
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=2
 #SBATCH --mem=16G
 #SBATCH --time=00:30:00
 #SBATCH --output=logs/%x-%j.out
