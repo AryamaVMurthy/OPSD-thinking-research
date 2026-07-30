@@ -51,6 +51,18 @@ import sys
 print(load_config(sys.argv[1]).data["max_sequence_length"])
 PY
 )"
+variant="$(python3 - "${FINOD_CONFIG}" <<'PY'
+from opsd_research.config import load_config
+import sys
+print(load_config(sys.argv[1]).data["variant"].replace("_", "-"))
+PY
+)"
+representative_records="$(python3 - "${FINOD_CONFIG}" <<'PY'
+from opsd_research.config import load_config
+import sys
+print(load_config(sys.argv[1]).data.get("finod_max_records", ""))
+PY
+)"
 
 if [[ "${FINOD_MAX_STEPS}" == 1 || "${FINOD_MAX_STEPS}" == 5 ]]; then
   export GRAF_SMOKE_MAX_STEPS="${FINOD_MAX_STEPS}"
@@ -62,13 +74,16 @@ export OPSD_TAIL_LOGITS_ONLY=1
 export OPSD_ADAPTER_STABILITY_INTERVAL=1
 
 vllm_utilization="${FINOD_VLLM_GPU_MEMORY_UTILIZATION:-0.32}"
-run_name="finod-g1-128-${FINOD_MAX_STEPS}-${SLURM_JOB_ID}"
+run_name="${FINOD_RUN_NAME:-${variant}-${FINOD_MAX_STEPS}-${SLURM_JOB_ID}}"
 output_dir="${TRAIN_ROOT}/${run_name}"
 training_log="${SLURM_SUBMIT_DIR}/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out"
 mkdir -p "${output_dir}" logs
 cp "${FINOD_CONFIG}" "${output_dir}/config.yaml"
 cp "${GRAF_GRAPH_CACHE_MANIFEST}" "${output_dir}/graph-cache-manifest.json"
 export OPSD_TRAINING_PARTITION_MANIFEST="${output_dir}/training-partition.json"
+if [[ -n "${representative_records}" ]]; then
+  export OPSD_FINOD_SELECTION_MANIFEST="${output_dir}/finod-representative-selection.json"
+fi
 printf 'method=finod\nmax_steps=%s\nnum_gpus=8\ngradient_accumulation_steps=4\neffective_batch_size=32\nseed=%s\ndata_seed=%s\nvllm_gpu_memory_utilization=%s\nmax_sequence_length=%s\nmax_grad_norm=0.1\n' \
   "${FINOD_MAX_STEPS}" "${seed}" "${seed}" "${vllm_utilization}" \
   "${max_sequence_length}" > "${output_dir}/runtime-overrides.txt"
@@ -123,6 +138,13 @@ accelerate launch \
   --data_seed "${seed}" \
   --report_to wandb \
   --wandb_project FiNOD-autoresearch
+
+if [[ -n "${representative_records}" ]]; then
+  test -s "${OPSD_FINOD_SELECTION_MANIFEST}"
+  record_run_manifest \
+    "${output_dir}" runtime-overrides.txt graph-cache-manifest.json \
+    finod-representative-selection.json
+fi
 
 python3 -m opsd_research.summarize_training \
   --training-dir "${output_dir}" \

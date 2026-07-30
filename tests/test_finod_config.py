@@ -21,3 +21,17 @@ def test_finod_screen_config_is_a_valid_eight_gpu_graf_candidate():
     )
     assert config["finod_positions_per_rollout"] == 32
     assert config["finod_max_target_kl"] == 0.01
+
+
+def test_finod_representative_config_registers_exact_one_epoch_scale():
+    config = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "finod-g1-representative-1024.yaml"
+    ).data
+
+    assert config["finod_max_records"] == 1024
+    assert config["finod_selection_seed"] == 73
+    assert config["max_completion_length"] == 4096
+    assert config["max_steps"] == 32
+    assert config["save_steps"] == 32

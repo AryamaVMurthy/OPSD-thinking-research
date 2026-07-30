@@ -197,13 +197,53 @@ def main() -> None:
             flush=True,
         )
     elif config["graph_mode"] == "finod_scaffold":
-        from .finod_dataset import install_finod_dataset_redirect
+        from .finod_dataset import (
+            install_finod_dataset_redirect,
+            select_representative_finod_indices,
+        )
         from .graf_scaffold_dataset import accepted_scaffolds
 
         available = accepted_scaffolds(
             os.environ["GRAF_GRAPH_CACHE_MANIFEST"]
         )
         eligible = sorted(set(available).intersection(train_index_set))
+        selection_manifest = None
+        max_records = config.get("finod_max_records")
+        if max_records is not None:
+            eligible, selection_manifest = (
+                select_representative_finod_indices(
+                    raw_dataset,
+                    eligible_indices=eligible,
+                    limit=int(max_records),
+                    seed=int(config["finod_selection_seed"]),
+                )
+            )
+            selection_path = os.environ.get(
+                "OPSD_FINOD_SELECTION_MANIFEST"
+            )
+            if not selection_path:
+                raise SystemExit(
+                    "representative FiNOD runs require "
+                    "OPSD_FINOD_SELECTION_MANIFEST"
+                )
+            if is_primary:
+                Path(selection_path).write_text(
+                    json.dumps(
+                        selection_manifest, indent=2, sort_keys=True
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                print(
+                    json.dumps(
+                        {
+                            "event": "finod_representative_selection",
+                            **selection_manifest,
+                        },
+                        separators=(",", ":"),
+                    ),
+                    flush=True,
+                )
         records = install_finod_dataset_redirect(
             os.environ["GRAF_GRAPH_CACHE_MANIFEST"],
             source_indices=eligible,
@@ -216,6 +256,9 @@ def main() -> None:
                     "student_answer_context": False,
                     "guide_answer_masked": True,
                     "answer_control_isolated": True,
+                    "representative_selection": (
+                        selection_manifest is not None
+                    ),
                 },
                 separators=(",", ":"),
             ),

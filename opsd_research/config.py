@@ -284,8 +284,10 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         raise ConfigError(
             f"{source}: max_completion_length must be 1024, 2048, or 4096"
         )
-    if data.get("max_steps") not in {5, 12, 25, 50, 200}:
-        raise ConfigError(f"{source}: max_steps must be 5, 12, 25, 50, or 200")
+    if data.get("max_steps") not in {5, 12, 25, 32, 50, 200}:
+        raise ConfigError(
+            f"{source}: max_steps must be 5, 12, 25, 32, 50, or 200"
+        )
     save_steps = data.get("save_steps")
     checkpointed_confirmation = (
         data.get("max_steps") == 50 and save_steps == 25
@@ -431,6 +433,30 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
     ):
         raise ConfigError(f"{source}: branch settings require graph_mode=viability_routed")
     if data.get("graph_mode") == "finod_scaffold":
+        max_records = data.get("finod_max_records")
+        selection_seed = data.get("finod_selection_seed")
+        if max_records is not None:
+            if (
+                not isinstance(max_records, int)
+                or isinstance(max_records, bool)
+                or not 32 <= max_records <= 4096
+            ):
+                raise ConfigError(
+                    f"{source}: finod_max_records must be in [32, 4096]"
+                )
+            if (
+                not isinstance(selection_seed, int)
+                or isinstance(selection_seed, bool)
+                or selection_seed < 0
+            ):
+                raise ConfigError(
+                    f"{source}: representative FiNOD selection requires a "
+                    "nonnegative integer finod_selection_seed"
+                )
+        elif selection_seed is not None:
+            raise ConfigError(
+                f"{source}: finod_selection_seed requires finod_max_records"
+            )
         positions = data.get("finod_positions_per_rollout")
         if (
             not isinstance(positions, int)

@@ -5,6 +5,7 @@ import pytest
 from opsd_research.finod_dataset import (
     finod_training_row,
     remove_graph_identifiers,
+    select_representative_finod_indices,
 )
 
 
@@ -52,4 +53,71 @@ def test_semantic_answer_leak_is_still_rejected_after_identifier_removal():
             reference_solution=r"A private derivation ends with \boxed{4}.",
             answer_masked_guide="Test 4 as the final candidate.",
             source_index=35,
+        )
+
+
+def test_representative_selection_is_exact_stratified_and_reproducible():
+    rows = []
+    for source in ("olympiads", "aops_forum", "cn_contest"):
+        for length in range(1, 41):
+            rows.append(
+                {
+                    "data_source": source,
+                    "question": f"{source}-question-{length}",
+                    "response": "x" * length,
+                    "response_length": length,
+                }
+            )
+    eligible = [index for index in range(len(rows)) if index % 7 != 0]
+
+    selected_one, manifest_one = select_representative_finod_indices(
+        rows,
+        eligible_indices=eligible,
+        limit=60,
+        seed=73,
+    )
+    selected_two, manifest_two = select_representative_finod_indices(
+        rows,
+        eligible_indices=reversed(eligible),
+        limit=60,
+        seed=73,
+    )
+
+    assert selected_one == selected_two
+    assert manifest_one == manifest_two
+    assert len(selected_one) == 60
+    assert len(set(selected_one)) == 60
+    assert set(selected_one).issubset(eligible)
+    assert set(manifest_one["selected_by_data_source"]) == {
+        "aops_forum",
+        "cn_contest",
+        "olympiads",
+    }
+    assert all(
+        count > 0
+        for count in manifest_one["selected_by_data_source"].values()
+    )
+    assert all(
+        count > 0
+        for count in manifest_one["selected_by_length_stratum"].values()
+    )
+    assert len(manifest_one["selected_indices_sha256"]) == 64
+
+
+def test_representative_selection_refuses_insufficient_eligible_rows():
+    rows = [
+        {
+            "data_source": "olympiads",
+            "question": f"q-{index}",
+            "response": "solution",
+        }
+        for index in range(8)
+    ]
+
+    with pytest.raises(ValueError, match="eligible"):
+        select_representative_finod_indices(
+            rows,
+            eligible_indices=range(8),
+            limit=9,
+            seed=73,
         )

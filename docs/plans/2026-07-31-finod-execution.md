@@ -62,3 +62,11 @@ source problems stratified by available mathematical topic metadata and
 length/difficulty proxies. Preserve six rollouts per evaluation problem.
 Locked AIME-2025 and AIME-2026 are evaluated once, with the same 32,768-token
 budget, only after the larger run and an independent AIME-2024 confirmation.
+
+The registered representative run uses exactly 1,024 accepted, non-held-out
+records and 32 optimizer steps at effective batch size 32, giving one complete
+pass without replacement. Selection is deterministic and stratified jointly
+by the dataset's native `data_source` family and response-length quartile. Its
+source indices, per-stratum counts, and checksum are saved with the training
+artifacts. The rollout cap is 4,096 because 159 of 160 five-step-screen
+rollouts reached the original 2,048-token cap.
