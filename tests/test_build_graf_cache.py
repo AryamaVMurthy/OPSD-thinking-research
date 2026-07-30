@@ -5,6 +5,7 @@ from opsd_research.build_graf_cache import (
     MAX_MODEL_LEN,
     _builder_chat_prompt,
     _critic_chat_prompt,
+    _representative_source_indices,
     _sanitizer_chat_prompt,
     _bounded_builder_prompt,
     _json_object,
@@ -66,3 +67,28 @@ def test_critic_is_privileged_but_requires_answer_masked_json_revision() -> None
     assert "Private reference reasoning." in prompt
     assert "do not copy it into JSON" in prompt
     assert "Return JSON with only `forks`" in prompt
+
+
+def test_representative_hash_selection_is_deterministic_and_shard_complete() -> None:
+    rows = [
+        {"question": f"problem {index}", "response": f"solution {index}"}
+        for index in range(100)
+    ]
+
+    selected = _representative_source_indices(rows, limit=40, seed=73)
+    shards = [
+        _representative_source_indices(
+            rows,
+            limit=40,
+            seed=73,
+            shard_id=shard,
+            num_shards=4,
+        )
+        for shard in range(4)
+    ]
+
+    assert len(selected) == len(set(selected)) == 40
+    assert selected != list(range(40))
+    assert sorted(index for shard in shards for index in shard) == sorted(selected)
+    assert all(len(shard) == 10 for shard in shards)
+    assert _representative_source_indices(rows, limit=40, seed=74) != selected

@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,38 @@ TRAINING_DATASET_REVISION = "1435fb21d4fecc8ad4966a26f22a874cf2b527f1"
 MAX_MODEL_LEN = 40960
 MAX_COMPLETION_TOKENS = 1024
 CHAT_TEMPLATE_RESERVE_TOKENS = 256
+
+
+def _representative_source_indices(
+    rows: Sequence[dict[str, Any]],
+    *,
+    limit: int,
+    seed: int,
+    shard_id: int = 0,
+    num_shards: int = 1,
+) -> list[int]:
+    """Select a reproducible uniform content-hash sample and one balanced shard."""
+    if not 1 <= limit <= len(rows):
+        raise ValueError("representative limit must be in [1, number of rows]")
+    if num_shards < 1 or not 0 <= shard_id < num_shards:
+        raise ValueError("shard_id must be in [0, num_shards)")
+    ranked = []
+    for index, row in enumerate(rows):
+        payload = json.dumps(
+            {
+                "question": str(row["question"]),
+                "response": str(row["response"]),
+                "selection_seed": int(seed),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        ranked.append(
+            (hashlib.sha256(payload.encode("utf-8")).hexdigest(), index)
+        )
+    selected = [index for _digest, index in sorted(ranked)[:limit]]
+    return selected[shard_id::num_shards]
 
 
 def _json_object(text: str) -> dict[str, Any]:
@@ -151,6 +184,9 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--max-actions-per-fork", type=int, default=6)
     parser.add_argument("--graph-budget", type=int, default=24)
     parser.add_argument("--teacher-critique", action="store_true")
+    parser.add_argument("--selection-seed", type=int)
+    parser.add_argument("--shard-id", type=int, default=0)
+    parser.add_argument("--num-shards", type=int, default=1)
     return parser.parse_args()
 
 
@@ -161,6 +197,8 @@ def main() -> None:
         or args.max_actions_per_fork < 2 or args.graph_budget < 2
     ):
         raise SystemExit("cache limits, graph action limits, and graph budget must be positive")
+    if args.num_shards < 1 or not 0 <= args.shard_id < args.num_shards:
+        raise SystemExit("shard-id must be in [0, num-shards)")
     if args.model != DEFAULT_MODEL or args.model_revision != DEFAULT_MODEL_REVISION:
         raise SystemExit("GRAF cache building is pinned to Qwen3-4B@1cfa9a7")
     if args.output.exists():
@@ -171,7 +209,26 @@ def main() -> None:
     from vllm import LLM, SamplingParams
     from .training_data import load_math_cot_20k
 
-    rows = load_math_cot_20k()["train"].select(range(args.limit))
+    all_rows = load_math_cot_20k()["train"]
+    if args.limit > len(all_rows):
+        raise SystemExit(
+            f"cache limit {args.limit} exceeds dataset size {len(all_rows)}"
+        )
+    if args.selection_seed is None:
+        source_indices = list(range(args.limit))[
+            args.shard_id :: args.num_shards
+        ]
+        selection_protocol = "source-prefix-v1"
+    else:
+        source_indices = _representative_source_indices(
+            all_rows,
+            limit=args.limit,
+            seed=args.selection_seed,
+            shard_id=args.shard_id,
+            num_shards=args.num_shards,
+        )
+        selection_protocol = "content-hash-uniform-v1"
+    rows = all_rows.select(source_indices)
     llm = LLM(
         model=args.model,
         revision=args.model_revision,
@@ -219,7 +276,7 @@ def main() -> None:
             response = str(row["response"])
             record: dict[str, Any] = {
                 "schema_version": 1,
-                "example_index": index,
+                "example_index": source_indices[index],
                 "problem_sha256": hashlib.sha256(question.encode("utf-8")).hexdigest(),
                 "builder_model": args.model,
                 "builder_model_revision": args.model_revision,
@@ -301,7 +358,7 @@ def main() -> None:
                 )
                 records[index] = {
                     "schema_version": 1,
-                    "example_index": index,
+                    "example_index": source_indices[index],
                     "problem_sha256": hashlib.sha256(question.encode("utf-8")).hexdigest(),
                     "builder_model": args.model,
                     "builder_model_revision": args.model_revision,
@@ -325,7 +382,7 @@ def main() -> None:
         question = str(row["question"])
         records[index] = {
             "schema_version": 1,
-            "example_index": index,
+            "example_index": source_indices[index],
             "problem_sha256": hashlib.sha256(question.encode("utf-8")).hexdigest(),
             "builder_model": args.model,
             "builder_model_revision": args.model_revision,
@@ -391,7 +448,12 @@ def main() -> None:
         "schema_version": 1,
         "cache": str(args.output),
         "cache_sha256": digest,
-        "requested_examples": args.limit,
+        "requested_examples": len(rows),
+        "requested_global_examples": args.limit,
+        "selection_protocol": selection_protocol,
+        "selection_seed": args.selection_seed,
+        "shard_id": args.shard_id,
+        "num_shards": args.num_shards,
         "accepted_examples": accepted,
         "rejected_examples": rejected,
         "builder_model": args.model,
