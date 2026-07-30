@@ -14,6 +14,7 @@
 set -euo pipefail
 module load u22/cuda/12.4
 source "${HOME}/OPSD-thinking-research/infra/turing/common.sh"
+cd "${PROJECT_SOURCE}"
 
 : "${CONFIG:?set CONFIG to a repository-relative YAML path}"
 : "${EVAL_MODULE:?set EVAL_MODULE to math_eval or lcb_eval}"
