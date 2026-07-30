@@ -25,7 +25,7 @@ mkdir -p "${root}" "${cache_dir}"
 git clone \
   --recurse-submodules \
   --branch autoresearch/2026-07-31-finod \
-  git@github.com:AryamaVMurthy/OPSD-thinking-research.git \
+  https://github.com/AryamaVMurthy/OPSD-thinking-research.git \
   "${source_dir}"
 test "$(git -C "${source_dir}" rev-parse HEAD)" = "${FINOD_EXPECTED_COMMIT}"
 test -z "$(git -C "${source_dir}" status --short)"
