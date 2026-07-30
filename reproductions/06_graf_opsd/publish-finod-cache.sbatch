@@ -18,6 +18,7 @@ destination="${HOME}/OPSD-thinking-research/artifacts/finod-cache-${FINOD_CACHE_
 
 test -s "${source_dir}/graphs.jsonl"
 test -s "${source_dir}/manifest.json"
+test -s "${source_dir}/audit.json"
 test -s "${source_dir}/source-commit.txt"
 if [[ -e "${destination}" ]]; then
   echo "Refusing to overwrite published cache ${destination}" >&2
@@ -26,6 +27,7 @@ fi
 mkdir -p "${destination}"
 cp "${source_dir}/graphs.jsonl" "${destination}/graphs.jsonl"
 cp "${source_dir}/manifest.json" "${destination}/manifest.json"
+cp "${source_dir}/audit.json" "${destination}/audit.json"
 cp "${source_dir}/source-commit.txt" "${destination}/source-commit.txt"
 sed -i \
   "s#\"cache\": \".*\"#\"cache\": \"${destination}/graphs.jsonl\"#" \
@@ -39,7 +41,7 @@ test "$(sha256sum "${destination}/graphs.jsonl" | awk '{print $1}')" = \
   "${expected_sha}"
 (
   cd "${destination}"
-  sha256sum graphs.jsonl manifest.json source-commit.txt \
+  sha256sum graphs.jsonl manifest.json audit.json source-commit.txt \
     > artifact-manifest.sha256
 )
 accepted="$(

@@ -44,9 +44,13 @@ python3 -m opsd_research.merge_graf_cache \
   --manifest "${manifests[@]}" \
   --output "${FINOD_CACHE_ROOT}/graphs.jsonl" \
   --manifest-output "${FINOD_CACHE_ROOT}/manifest.json"
+python3 -m opsd_research.audit_finod_cache \
+  --manifest "${FINOD_CACHE_ROOT}/manifest.json" \
+  --output "${FINOD_CACHE_ROOT}/audit.json"
 sha256sum \
   "${FINOD_CACHE_ROOT}/graphs.jsonl" \
   "${FINOD_CACHE_ROOT}/manifest.json" \
+  "${FINOD_CACHE_ROOT}/audit.json" \
   "${FINOD_CACHE_ROOT}/source-commit.txt" \
   > "${FINOD_CACHE_ROOT}/artifact-manifest.sha256"
 printf 'GRAF_GRAPH_CACHE_MANIFEST=%s\n' \
