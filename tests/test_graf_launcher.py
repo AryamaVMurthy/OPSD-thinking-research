@@ -109,6 +109,37 @@ class GrafLauncherTests(unittest.TestCase):
 
         self.assertEqual(len(trainer.callbacks), 1)
 
+    def test_trainer_initialization_is_seeded_before_model_construction(self):
+        events = []
+
+        class FakeTrainer:
+            def __init__(self, *args, **kwargs):
+                events.append("trainer_init")
+
+        fake_opsd = types.SimpleNamespace(OPSDTrainer=FakeTrainer)
+        fake_transformers = types.SimpleNamespace(
+            set_seed=lambda seed: events.append(("seed", seed))
+        )
+        training_args = types.SimpleNamespace(seed=73)
+        with mock.patch.dict(
+            sys.modules,
+            {
+                "opsd_trainer": fake_opsd,
+                "transformers": fake_transformers,
+            },
+        ), mock.patch.object(
+            launch_official_opsd,
+            "configure_structured_dataset_args",
+            side_effect=lambda args: events.append("configure"),
+        ):
+            launch_official_opsd._install_structured_dataset_compat()
+            FakeTrainer(args=training_args)
+
+        self.assertEqual(
+            events,
+            ["configure", ("seed", 73), "trainer_init"],
+        )
+
     def test_context_dossier_requires_its_teacher_only_manifest(self):
         arguments = [
             "launch_graf_opsd", "--model_name_or_path", "Qwen/Qwen3-4B",

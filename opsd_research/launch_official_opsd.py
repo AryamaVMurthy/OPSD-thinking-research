@@ -102,6 +102,12 @@ def _install_structured_dataset_compat() -> None:
         if training_args is None:
             raise RuntimeError("OPSDTrainer was initialized without training arguments")
         configure_structured_dataset_args(training_args)
+        # SFTTrainer may construct the model and PEFT adapters before the
+        # base Trainer seeds its runtime. Seed here so LoRA initialization is
+        # controlled by the registered experiment seed across separate jobs.
+        from transformers import set_seed
+
+        set_seed(int(training_args.seed))
         return original_init(self, *args, **kwargs)
 
     opsd_trainer.OPSDTrainer.__init__ = compatible_init
