@@ -2,11 +2,12 @@
 
 ## Registered hypothesis
 
-An answer-masked procedural guide contains both useful procedural steering and
-answer-control-aligned steering. At student rollout prefixes, removing only
-positive Fisher alignment with a matched destination-only control should
-retain a nonzero, reachable procedural target and avoid the trajectory damage
-seen in the previous full-context teacher objectives.
+A problem-only procedural guide can induce both useful procedural steering and
+destination-like steering after it is inserted into the frozen teacher. At
+student rollout prefixes, removing only positive Fisher alignment with a
+matched destination-only control should retain a nonzero, reachable procedural
+target and avoid the trajectory damage seen in the previous full-context
+teacher objectives.
 
 The first candidate is fixed before GPU inspection:
 
@@ -21,6 +22,29 @@ The first candidate is fixed before GPU inspection:
 - AdamW through the pinned upstream Trainer, learning rate `5e-6`;
 - global gradient clipping at `0.1`;
 - DP8, gradient accumulation 4, effective batch 32.
+
+## Answer-blind protocol correction
+
+The first five-step optimization probe used historical G1 scaffolds generated
+with access to a reference solution. A subsequent semantic audit found an
+accepted guide containing `4/3` when the boxed reference used
+`\frac{4}{3}`. Consequently, that probe and its paired AIME-2024 evaluation
+are behavioral diagnostics only; they cannot support an answer-free claim.
+
+Every cache used for the representative run is instead built under
+`problem-only-v1`: the guide generator receives the problem and no reference
+answer or solution. Privileged teacher critique is forbidden. The reference is
+used only after generation by a rejecting audit. The audit canonicalizes
+common LaTeX, Unicode, fraction, decimal, and percent aliases; rejects asserted
+numerical results; verifies the immutable cache, graph, and problem hashes;
+and replays every accepted scaffold through the exact training-row adapter.
+The cache manifest and every record must declare
+`surface-equivalence-and-result-claim-v2`, and the representative launcher
+refuses any other provenance.
+
+This construction establishes that no privileged reference entered the guide
+generator. It does not claim that a model shown the problem cannot itself
+derive the answer; that would be neither possible nor desirable.
 
 ## Stage 1: one-step engineering smoke
 
