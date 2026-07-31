@@ -1,5 +1,5 @@
 kind: graf_train
-variant: fisher_consensus_s1_answer_free_contest_prefix
+variant: fisher_consensus_s1_answer_free_contest_prefix_1024
 model: Qwen/Qwen3-4B
 model_revision: 1cfa9a7208912126459214e8b04321603b3df60c
 dataset: jasonrqh/Math-CoT-20k
@@ -13,7 +13,7 @@ per_device_train_batch_size: 1
 gradient_accumulation_steps: 4
 num_gpus: 8
 learning_rate: 5.0e-6
-max_completion_length: 4096
+max_completion_length: 1024
 max_sequence_length: 20000
 max_steps: 5
 save_steps: 5

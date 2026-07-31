@@ -374,8 +374,8 @@ The new builder:
   in the builder process;
 - creates three separately sampled plans with different seeds and planning
   lenses;
-- assigns one primary standard AIME domain using a separate deterministic
-  problem-only classification prompt;
+- assigns one primary standard AIME domain from problem-only structural cues,
+  with a separately pinned problem-only model label used only as fallback;
 - rejects boxed expressions, answer/result claims, prompt injection, explicit
   numeric equalities, and numerals not already present in the problem;
 - stores no answer or reference field;
@@ -394,6 +394,18 @@ The training row contains exactly:
 `problem`, `solution` (guide zero for upstream compatibility),
 `fisher_guides`, `fisher_controls`, and `fisher_source_index`.
 
+The published schema-v3 cache at source commit `6c67ead` was rebuilt from
+1,536 problem-only candidates and contains 843 validated examples:
+221 algebra, 204 combinatorics, 272 geometry, and 146 number theory. The
+fixed 5% problem-hash holdout leaves 803 eligible records. The exact
+192-example screen contains 48 examples per domain, 28 AMC/AIME and 164 AoPS
+problems, with every source/domain cell split across four question-length
+quartiles. Its 576 plans have median 120 words and maximum pairwise trigram
+Jaccard similarity 0.429. Exact control reconstruction found no self-control,
+duplicate-control, source mismatch, or domain mismatch. The exact loader
+revalidated every problem hash, plan constraint, schema field, and records-file
+SHA-256 before the runtime smoke.
+
 ## 8. Screen and promotion rule
 
 The first screen uses:
@@ -407,10 +419,25 @@ The first screen uses:
 - linear decay over five steps with no warmup;
 - LoRA rank 64, alpha 128, all attention and MLP projections;
 - gradient norm cap 0.1;
-- 4,096-token on-policy training rollouts;
+- 1,024-token on-policy training rollouts, exactly matching the supervised
+  prefix (the runtime smoke showed every 4,096-token rollout capped, so the
+  extra 3,072 tokens were unused generation);
 - 32 Fisher positions in the first 1,024 tokens;
 - three guide/control pairs;
 - \(\eta_{\max}=0.25\), two-sided KL cap 0.01.
+
+The one-step DP8/GA4 runtime smoke completed at job `17358`. Across its four
+accumulation batches, Fisher loss was finite and nonzero
+(\(4.69\times10^{-4}\) to \(7.76\times10^{-4}\)); mean loss was
+\(6.21\times10^{-4}\). Agreement ranged from 0.512 to 0.576, the
+noncollapsed-token fraction ranged from 0.668 to 0.727, and only 1.95% to
+3.13% of tokens required trust-region clipping. Every recorded maximum
+two-sided target KL was at most 0.01. At initialization, student loss divided
+by frozen-anchor target KL was 1.000008 to 1.000011, the required identity for
+an exact base-initialized student. The optimizer saw gradient norm 0.0362
+under the 0.1 cap and produced adapter update norm 0.0404
+(\(5.51\times10^{-4}\) relative to parameter norm). Peak GPU memory was
+27.5 GiB, leaving substantial A100 headroom.
 
 Promotion requires all of the following:
 
