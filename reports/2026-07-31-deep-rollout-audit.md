@@ -539,6 +539,16 @@ Three-plan agreement, the strong target ceiling, two-sided KL cap, and
 frozen-policy proximal remain unchanged. Controls remain an audited placebo
 but cannot affect the barycenter target.
 
+Job `17391` validated the diagnosis. Positive-plan agreement rose to 0.725,
+post-initial Fisher alignment gain became \(2.56\times10^{-4}\), and alignment
+cosine became 0.0477. The post-initial target-loss ratio fell to 1.154, much
+closer to transfer than any residual target, but remained above one because
+student-anchor KL was \(6.29\times10^{-4}\). In the local quadratic regime,
+alignment gain scales linearly with displacement while anchor KL scales
+quadratically. Their ratio predicts that reducing displacement below about
+0.41 of its current size should make gain exceed drift. The next screen
+therefore changes only the frozen-policy proximal weight from 1 to 4.
+
 Promotion requires all of the following:
 
 1. finite, nonnegative loss and nonzero gradients;

@@ -248,3 +248,17 @@ def test_fisher_plan_barycenter_screen_is_registered_without_edge_gate():
     assert config["fisher_step_size"] == 1.0
     assert config["fisher_anchor_kl_weight"] == 1.0
     assert config["max_steps"] == 6
+
+
+def test_fisher_plan_barycenter_strong_proximal_matches_drift_prediction():
+    config = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s8-barycenter-prox4-6.yaml"
+    ).data
+
+    assert config["fisher_direction_mode"] == "positive_plan_barycenter"
+    assert config["fisher_anchor_kl_weight"] == 4.0
+    assert config["fisher_step_size"] == 1.0
+    assert config["fisher_cross_problem_edge"] is False
+    assert config["max_steps"] == 6
