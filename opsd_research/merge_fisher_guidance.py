@@ -15,6 +15,7 @@ _IDENTITY_FIELDS = (
     "answer_access",
     "reference_solution_access",
     "guidance_input_protocol",
+    "domain_label_protocol",
     "plans_per_problem",
     "builder_model",
     "builder_model_revision",

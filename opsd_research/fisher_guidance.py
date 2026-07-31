@@ -13,7 +13,10 @@ from typing import Any
 
 GUIDANCE_INPUT_PROTOCOL = "problem-only-independent-v1"
 CACHE_KIND = "answer-free-guidance-ensemble"
-CACHE_SCHEMA_VERSION = 2
+CACHE_SCHEMA_VERSION = 3
+DOMAIN_LABEL_PROTOCOL = (
+    "structural-rules-with-problem-only-model-fallback-v1"
+)
 AIME_DOMAINS = (
     "algebra",
     "geometry",
@@ -54,10 +57,10 @@ _INJECTION = re.compile(
 
 _DOMAIN_PATTERNS = {
     "geometry": re.compile(
-        r"\b(?:triangle|circle|polygon|quadrilateral|rectangle|square|"
+        r"\b(?:triangle|circle|polygon|quadrilateral|rectang(?:le|ular)|square|"
         r"trapezoid|parallelogram|angle|perpendicular|parallel|tangent|"
         r"chord|radius|diameter|area|volume|coordinate|point|line|plane|"
-        r"ellipse|sphere|cube|prism|pyramid)\b",
+        r"ellipse|sphere|cube|prism|pyramid|polyhedron)\b",
         re.IGNORECASE,
     ),
     "combinatorics": re.compile(
@@ -94,21 +97,40 @@ _DOMAIN_PATTERNS = {
 def classify_problem_domain(question: str) -> str:
     """Assign a coarse AIME-relevant domain from problem text alone."""
     text = str(question)
-    # Geometry is checked before generic counting/algebra terms, while
-    # probability is checked before combinatorics because many probability
-    # statements contain "how many" subphrases.
+    # Strong structural cues precede generic counting phrases such as "how
+    # many", which also occur in algebraic root and Diophantine problems.
     order = (
         "geometry",
         "probability",
         "number_theory",
-        "combinatorics",
         "sequences",
         "algebra",
+        "combinatorics",
     )
     for domain in order:
         if _DOMAIN_PATTERNS[domain].search(text):
             return domain
     return "other"
+
+
+def resolve_aime_domain(question: str, model_label: str) -> str:
+    """Combine structural text cues with a problem-only model fallback.
+
+    The deterministic structural cues intentionally override a shallow model
+    label.  This prevents surface words such as ``integer``, ``ratio``, or
+    ``number`` from moving visibly geometric or algebraic problems into the
+    wrong AIME stratum.  The model is used only when no structural cue fires.
+    """
+    if model_label not in AIME_DOMAINS:
+        raise ValueError("model_label must be one standard AIME domain")
+    structural = classify_problem_domain(question)
+    if structural == "probability":
+        return "combinatorics"
+    if structural == "sequences":
+        return "algebra"
+    if structural in AIME_DOMAINS:
+        return structural
+    return model_label
 
 
 def enforce_guidance_capacity(
@@ -401,6 +423,7 @@ def load_guidance_ensemble(
         "answer_access": False,
         "reference_solution_access": False,
         "guidance_input_protocol": GUIDANCE_INPUT_PROTOCOL,
+        "domain_label_protocol": DOMAIN_LABEL_PROTOCOL,
     }
     for key, value in expected.items():
         if metadata.get(key) != value:

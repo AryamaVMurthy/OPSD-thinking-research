@@ -19,7 +19,9 @@ from .fisher_guidance import (
     AIME_DOMAINS,
     CACHE_KIND,
     CACHE_SCHEMA_VERSION,
+    DOMAIN_LABEL_PROTOCOL,
     GUIDANCE_INPUT_PROTOCOL,
+    resolve_aime_domain,
     validate_answer_free_plan,
     validate_guidance_ensemble,
 )
@@ -240,7 +242,10 @@ def main() -> None:
     domains: list[str | None] = [None] * len(selected)
     for row_index, output in enumerate(domain_outputs):
         try:
-            domains[row_index] = _parse_domain(output.outputs[0].text)
+            domains[row_index] = resolve_aime_domain(
+                str(selected[row_index]["question"]).strip(),
+                _parse_domain(output.outputs[0].text),
+            )
         except ValueError as error:
             errors[(row_index, -2)] = str(error)
 
@@ -288,6 +293,7 @@ def main() -> None:
         "answer_access": False,
         "reference_solution_access": False,
         "guidance_input_protocol": GUIDANCE_INPUT_PROTOCOL,
+        "domain_label_protocol": DOMAIN_LABEL_PROTOCOL,
         "plans_per_problem": args.plans_per_problem,
         "accepted_records": accepted,
         "accepted_by_domain": dict(sorted(accepted_by_domain.items())),

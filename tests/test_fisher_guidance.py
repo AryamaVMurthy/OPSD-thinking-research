@@ -11,6 +11,7 @@ from opsd_research.fisher_guidance import (
     classify_problem_domain,
     enforce_guidance_capacity,
     load_guidance_ensemble,
+    resolve_aime_domain,
     select_representative_fisher_indices,
     validate_answer_free_plan,
     validate_guidance_ensemble,
@@ -140,6 +141,45 @@ def test_problem_domain_classifier_uses_question_only(
     assert classify_problem_domain(question) == expected
 
 
+@pytest.mark.parametrize(
+    "question,model_label,expected",
+    [
+        (
+            "A rectangular field has a diagonal path. Find the integer ratio "
+            "of its length, width, and a segment on its south edge.",
+            "number_theory",
+            "geometry",
+        ),
+        (
+            "A square-based rectangular block has given volume and lateral "
+            "surface area. Find the sum of its edge lengths.",
+            "number_theory",
+            "geometry",
+        ),
+        (
+            "For how many integer pairs does the cubic Diophantine equation "
+            "have infinitely many integer solutions?",
+            "combinatorics",
+            "number_theory",
+        ),
+        (
+            "How many permutations avoid adjacent equal colors?",
+            "algebra",
+            "combinatorics",
+        ),
+        (
+            "A sequence satisfies a recurrence relation. Determine its term.",
+            "combinatorics",
+            "algebra",
+        ),
+    ],
+)
+def test_aime_domain_resolution_uses_solution_structure_not_surface_words(
+    question, model_label, expected
+):
+    assert resolve_aime_domain(question, model_label) == expected
+
+
 def test_fisher_selection_is_equal_across_aime_domains_without_responses():
     domains = {
         "geometry": "A triangle is inscribed in a circle.",
@@ -229,11 +269,14 @@ def test_cache_loader_checks_hash_and_never_requires_reference(tmp_path):
     manifest.write_text(
         json.dumps(
             {
-                "schema_version": 2,
+                "schema_version": 3,
                 "cache_kind": "answer-free-guidance-ensemble",
                 "answer_access": False,
                 "reference_solution_access": False,
                 "guidance_input_protocol": "problem-only-independent-v1",
+                "domain_label_protocol": (
+                    "structural-rules-with-problem-only-model-fallback-v1"
+                ),
                 "plans_per_problem": 3,
                 "accepted_records": 1,
                 "records_file": "plans.jsonl",
