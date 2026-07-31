@@ -62,6 +62,23 @@ The learned change is best described as a shift in the probability of entering
 particular reasoning basins, not acquisition of a general new mathematical
 skill.
 
+This signature survives an exact same-seed feature audit of all paired
+rollouts for FiNOD-5, FiNOD-32, and FRGD-v2 on both locked benchmarks:
+
+| Pair | Wrong→correct token delta | Wrong→correct cap delta | Correct→wrong token delta | Correct→wrong cap delta |
+|---|---:|---:|---:|---:|
+| FiNOD-5, AIME 2025 | -3,741 | -0.091 | +6,580 | +0.188 |
+| FiNOD-5, AIME 2026 | -8,022 | -0.400 | +3,796 | +0.133 |
+| FiNOD-32, AIME 2025 | -6,656 | -0.217 | +5,608 | +0.214 |
+| FiNOD-32, AIME 2026 | -6,501 | -0.273 | +1,019 | +0.067 |
+| FRGD-v2, AIME 2025 | -7,045 | -0.107 | +4,853 | +0.216 |
+| FRGD-v2, AIME 2026 | -6,128 | -0.139 | +7,536 | +0.200 |
+
+Successful flips also remove roughly 14–35 backtracking markers on average;
+regressions add roughly 6–24. Three-gram repetition moves in the same
+direction. These are descriptive consequences of the selected basin, not a
+license to optimize token count or suppress checking.
+
 ### 3.2 Exact AIME 2026 FiNOD regressions
 
 - Problem 10: base rollouts checked both rotations and the side condition and
