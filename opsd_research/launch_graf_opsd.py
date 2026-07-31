@@ -440,6 +440,9 @@ def main() -> None:
         opsd_trainer.OPSDTrainer._finod_projection_mode = config.get(
             "finod_projection_mode", "one-sided-positive-v1"
         )
+        opsd_trainer.OPSDTrainer._finod_nuisance_view = config.get(
+            "finod_nuisance_view", "answer"
+        )
         opsd_trainer.OPSDTrainer.compute_loss = compute_loss_with_finod
         print(
             json.dumps(
@@ -455,6 +458,9 @@ def main() -> None:
                     ),
                     "projection_mode": config.get(
                         "finod_projection_mode", "one-sided-positive-v1"
+                    ),
+                    "nuisance_view": config.get(
+                        "finod_nuisance_view", "answer"
                     ),
                 },
                 separators=(",", ":"),

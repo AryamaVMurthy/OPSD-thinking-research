@@ -67,3 +67,17 @@ def test_entropy_neutral_finod_config_is_registered():
     )
     assert config["finod_max_records"] == 1024
     assert config["max_steps"] == 32
+
+
+def test_fixed_anchor_style_residual_screen_is_registered():
+    config = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "finod-s1-style-fixed-1024.yaml"
+    ).data
+
+    assert config["finod_nuisance_view"] == "style"
+    assert config["finod_projection_mode"] == "signed-orthogonal-v1"
+    assert config["finod_max_records"] == 1024
+    assert config["max_steps"] == 5
+    assert config["save_steps"] == 5

@@ -185,7 +185,7 @@ def compute_loss_with_finod(
     return_outputs: bool = False,
     num_items_in_batch=None,
 ):
-    """Fit a clipped target after removing answer-control Fisher alignment."""
+    """Fit a frozen-anchor target after removing configured nuisance alignment."""
     student_prompt_width = int(inputs["student_prompt_length"])
     generation_ids = inputs["student_input_ids"][:, student_prompt_width:]
     generation_attention_mask = inputs["student_attention_mask"][
@@ -214,9 +214,10 @@ def compute_loss_with_finod(
         generation_ids=generation_ids,
         generation_attention_mask=generation_attention_mask,
     )
-    answer_ids, answer_mask, answer_width = _control_sequence(
+    nuisance_view = str(getattr(self, "_finod_nuisance_view", "answer"))
+    nuisance_ids, nuisance_mask, nuisance_width = _control_sequence(
         inputs,
-        name="answer",
+        name=nuisance_view,
         generation_ids=generation_ids,
         generation_attention_mask=generation_attention_mask,
     )
@@ -240,11 +241,11 @@ def compute_loss_with_finod(
         )
     empty_cache()
     with torch.no_grad(), _teacher_context(self, model):
-        answer_logits = _selected_logits(
+        nuisance_logits = _selected_logits(
             model,
-            input_ids=answer_ids,
-            attention_mask=answer_mask,
-            prompt_width=answer_width,
+            input_ids=nuisance_ids,
+            attention_mask=nuisance_mask,
+            prompt_width=nuisance_width,
             rollout_positions=rollout_positions,
         )
     empty_cache()
@@ -253,7 +254,7 @@ def compute_loss_with_finod(
         student_logits=student_logits,
         guide_logits=guide_logits,
         base_logits=base_logits,
-        nuisance_logits=answer_logits,
+        nuisance_logits=nuisance_logits,
         token_mask=selected_mask,
         step_size=float(self._finod_step_size),
         max_target_kl=float(self._finod_max_target_kl),
@@ -295,12 +296,12 @@ def compute_loss_with_finod(
         student_logits,
         base_logits,
         guide_logits,
-        answer_logits,
+        nuisance_logits,
         result,
         base_ids,
         base_mask,
-        answer_ids,
-        answer_mask,
+        nuisance_ids,
+        nuisance_mask,
     )
     empty_cache()
 

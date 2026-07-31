@@ -62,8 +62,8 @@ def test_entropy_neutral_projection_removes_only_concentration_direction():
     student = torch.tensor(
         [[2.0, 0.5, -1.0, -2.0]], dtype=torch.float64
     )
-    base = torch.zeros_like(student)
-    probability = student.softmax(dim=-1)
+    base = student.detach().clone()
+    probability = base.softmax(dim=-1)
 
     def center(direction):
         return direction - (probability * direction).sum(
@@ -78,7 +78,7 @@ def test_entropy_neutral_projection_removes_only_concentration_direction():
         (probability * raw_procedure * entropy_direction).sum(dim=-1)
         / (probability * entropy_direction.square()).sum(dim=-1)
     ).unsqueeze(-1) * entropy_direction
-    guide = procedure + 2.0 * entropy_direction
+    guide = base + procedure + 2.0 * entropy_direction
 
     ordinary = fisher_projected_target(
         student_logits=student,
@@ -208,6 +208,35 @@ def test_projected_distillation_has_nonzero_finite_student_gradient():
     assert torch.isfinite(student.grad).all()
     assert student.grad[0].abs().sum().item() > 0.0
     assert student.grad[1].abs().sum().item() == 0.0
+
+
+def test_target_is_anchored_to_frozen_base_not_moving_student():
+    base = torch.tensor([[0.7, -0.2, 0.1]], dtype=torch.float64)
+    guide = torch.tensor([[1.2, -0.5, 0.0]], dtype=torch.float64)
+    nuisance = torch.tensor([[0.6, 0.0, -0.1]], dtype=torch.float64)
+
+    first = fisher_projected_target(
+        student_logits=torch.tensor(
+            [[0.0, 0.0, 0.0]], dtype=torch.float64
+        ),
+        guide_logits=guide,
+        base_logits=base,
+        nuisance_logits=nuisance,
+        step_size=0.25,
+        nuisance_strength_threshold=1e-12,
+    )
+    second = fisher_projected_target(
+        student_logits=torch.tensor(
+            [[-2.0, 3.0, 0.5]], dtype=torch.float64
+        ),
+        guide_logits=guide,
+        base_logits=base,
+        nuisance_logits=nuisance,
+        step_size=0.25,
+        nuisance_strength_threshold=1e-12,
+    )
+
+    torch.testing.assert_close(first.target_probs, second.target_probs)
 
 
 def test_sparse_positions_span_the_valid_rollout_and_ignore_padding():

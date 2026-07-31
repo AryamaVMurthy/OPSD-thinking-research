@@ -15,9 +15,11 @@ def test_teacher_views_use_one_matched_wrapper_and_isolate_answer_content():
         answer="73",
     )
 
-    assert set(views) == {"base", "guide", "answer"}
+    assert set(views) == {"base", "guide", "style", "answer"}
     assert "73" not in views["base"]
     assert "73" not in views["guide"]
+    assert "73" not in views["style"]
+    assert "Check algebra, counting boundaries" in views["style"]
     assert "\\boxed{73}" in views["answer"]
     for text in views.values():
         assert "=== Auxiliary Context Begin ===" in text
@@ -78,9 +80,14 @@ def test_collator_attachment_replaces_teacher_with_matched_guide_view():
 
     assert result["teacher_prompt_length"] > 0
     assert result["finod_base_prompt_length"] > 0
+    assert result["finod_style_prompt_length"] > 0
     assert result["finod_answer_prompt_length"] > 0
     rendered = [batch[0] for batch in FakeCollator.tokenizer.rendered_batches]
     guide_prompt = next(text for text in rendered if "Use a parity split." in text)
+    style_prompt = next(
+        text for text in rendered if "Check algebra, counting boundaries" in text
+    )
     answer_prompt = next(text for text in rendered if "\\boxed{73}" in text)
     assert "73" not in guide_prompt
+    assert "73" not in style_prompt
     assert "Destination-only control" in answer_prompt

@@ -142,9 +142,9 @@ def fisher_projected_target(
         if student_logits.dtype == torch.float64
         else torch.float32
     )
-    student = student_logits.detach().to(work_dtype) / temperature
-    probability = student.softmax(dim=-1)
-    log_probability = student.log_softmax(dim=-1)
+    anchor = base_logits.detach().to(work_dtype) / temperature
+    probability = anchor.softmax(dim=-1)
+    log_probability = anchor.log_softmax(dim=-1)
     guide = (
         guide_logits.detach().to(work_dtype)
         - base_logits.detach().to(work_dtype)

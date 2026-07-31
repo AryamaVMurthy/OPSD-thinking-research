@@ -9,6 +9,11 @@ _FINAL_INSTRUCTION = (
     "Please reason step by step, and put your final answer within \\boxed{}."
 )
 
+GENERIC_STYLE_CONTROL = """Use a direct mathematical representation suited to the problem.
+Track every assumption and quantity consistently.
+Check algebra, counting boundaries, and geometric orientation before committing.
+If a check fails, retract the faulty step and try a genuinely different route."""
+
 
 def _teacher_view(problem: str, auxiliary_context: str) -> str:
     return (
@@ -27,7 +32,7 @@ def _teacher_view(problem: str, auxiliary_context: str) -> str:
 def build_finod_teacher_views(
     *, problem: str, guide: str, answer: str
 ) -> dict[str, str]:
-    """Return matched empty, procedural-guide, and destination-only views."""
+    """Return matched base, guide, generic-style, and answer-control views."""
     problem = str(problem).strip()
     guide = str(guide).strip()
     answer = str(answer).strip()
@@ -39,6 +44,7 @@ def build_finod_teacher_views(
             "No privileged auxiliary context is supplied for this view.",
         ),
         "guide": _teacher_view(problem, guide),
+        "style": _teacher_view(problem, GENERIC_STYLE_CONTROL),
         "answer": _teacher_view(
             problem,
             "Destination-only control: the reported final answer is "
@@ -67,10 +73,10 @@ def _encoded_view(tokenizer, prompts: list[str], max_length: int):
 
 
 def attach_finod_teacher_views(collator, features, result: dict) -> None:
-    """Replace the guide prompt and attach matched base/answer prompt tensors."""
+    """Replace the guide and attach matched base/style/answer tensors."""
     if collator.reason_first:
         raise RuntimeError("FiNOD requires reason_first=False")
-    view_text = {"base": [], "guide": [], "answer": []}
+    view_text = {"base": [], "guide": [], "style": [], "answer": []}
     for feature in features:
         if "finod_answer_control" not in feature:
             raise ValueError("FiNOD row lacks finod_answer_control")
@@ -89,7 +95,7 @@ def attach_finod_teacher_views(collator, features, result: dict) -> None:
             view_text[name].append(rendered)
 
     encoded = {}
-    for name in ("base", "guide", "answer"):
+    for name in ("base", "guide", "style", "answer"):
         encoded[name] = _encoded_view(
             collator.tokenizer, view_text[name], collator.max_length
         )
@@ -103,7 +109,7 @@ def attach_finod_teacher_views(collator, features, result: dict) -> None:
             "teacher_prompt_lengths_per_example": torch.tensor(guide_lengths),
         }
     )
-    for name in ("base", "answer"):
+    for name in ("base", "style", "answer"):
         tensors, lengths, width = encoded[name]
         result.update(
             {

@@ -125,6 +125,18 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "tail_logits_only"):
             validate_config(changed)
 
+    def test_finod_rejects_unknown_nuisance_view(self):
+        data = load_config(
+            ROOT
+            / "reproductions/06_graf_opsd/configs/"
+            "finod-s1-style-fixed-1024.yaml"
+        ).data
+        changed = copy.deepcopy(data)
+        changed["finod_nuisance_view"] = "reference_solution"
+
+        with self.assertRaisesRegex(ConfigError, "finod_nuisance_view"):
+            validate_config(changed)
+
     def test_graf_candidate_allows_longer_rollouts_but_not_protocol_drift(self):
         data = load_config(
             ROOT / "reproductions/06_graf_opsd/configs/c0-long-rollout.yaml"
