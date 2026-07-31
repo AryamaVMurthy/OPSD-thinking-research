@@ -17,6 +17,7 @@ from .fisher_guidance import (
     CACHE_KIND,
     GUIDANCE_INPUT_PROTOCOL,
     validate_answer_free_plan,
+    validate_guidance_ensemble,
 )
 
 
@@ -193,6 +194,13 @@ def main() -> None:
             if any(plan is None for plan in row_plans):
                 rejected += 1
                 continue
+            complete_plans = [str(plan) for plan in row_plans]
+            try:
+                validate_guidance_ensemble(problem, complete_plans)
+            except ValueError as error:
+                errors[(row_index, -1)] = str(error)
+                rejected += 1
+                continue
             source_index = int(selected[row_index]["_source_index"])
             record = {
                 "source_index": source_index,
@@ -200,7 +208,7 @@ def main() -> None:
                 "problem_sha256": hashlib.sha256(
                     problem.encode("utf-8")
                 ).hexdigest(),
-                "plans": row_plans,
+                "plans": complete_plans,
                 "seeds": [
                     args.seed + 1000 * pair
                     for pair in range(args.plans_per_problem)
@@ -236,7 +244,7 @@ def main() -> None:
         "rejection_reasons": {
             f"{row}:{pair}": reason
             for (row, pair), reason in sorted(errors.items())
-            if plans[row][pair] is None
+            if pair == -1 or plans[row][pair] is None
         },
     }
     args.manifest.write_text(

@@ -80,6 +80,42 @@ def validate_answer_free_plan(problem: str, plan: str) -> None:
         )
 
 
+def validate_guidance_ensemble(
+    problem: str, plans: Sequence[str]
+) -> None:
+    """Require separately useful plans rather than duplicated samples."""
+    if len(plans) < 2:
+        raise ValueError("guidance ensemble requires at least two plans")
+    normalized = []
+    shingles = []
+    for plan in plans:
+        validate_answer_free_plan(problem, plan)
+        words = re.findall(r"[a-z0-9]+", str(plan).lower())
+        normalized.append(" ".join(words))
+        shingles.append(
+            {
+                tuple(words[offset : offset + 3])
+                for offset in range(max(1, len(words) - 2))
+            }
+        )
+    for left in range(len(plans)):
+        for right in range(left + 1, len(plans)):
+            if normalized[left] == normalized[right]:
+                raise ValueError(
+                    "guidance plans must be independently distinct"
+                )
+            union = shingles[left] | shingles[right]
+            similarity = (
+                len(shingles[left] & shingles[right]) / len(union)
+                if union
+                else 1.0
+            )
+            if similarity > 0.8:
+                raise ValueError(
+                    "guidance plans must be independently distinct"
+                )
+
+
 def answer_free_guidance_row(
     *,
     question: str,
@@ -211,8 +247,7 @@ def load_guidance_ensemble(
             raise ValueError(
                 f"guidance line {line_number} must contain {pair_count} plans"
             )
-        for plan in plans:
-            validate_answer_free_plan(problem, plan)
+        validate_guidance_ensemble(problem, plans)
         ensembles[index] = [plan.strip() for plan in plans]
     if len(ensembles) != metadata.get("accepted_records"):
         raise ValueError("guidance accepted_records does not match records")

@@ -10,6 +10,7 @@ from opsd_research.fisher_guidance import (
     assign_matched_controls,
     load_guidance_ensemble,
     validate_answer_free_plan,
+    validate_guidance_ensemble,
 )
 
 
@@ -49,6 +50,18 @@ def test_numbers_already_in_problem_may_be_named_but_not_concluded():
         validate_answer_free_plan(
             "A 12-gon has side length 3.",
             "Therefore the answer is 12.",
+        )
+
+
+def test_guidance_ensemble_rejects_duplicate_or_near_duplicate_plans():
+    plan = (
+        "Represent the objects by a graph, compare degree constraints, and "
+        "check the surviving configurations against the boundary cases."
+    )
+    with pytest.raises(ValueError, match="independent"):
+        validate_guidance_ensemble(
+            "Count the configurations.",
+            [plan, plan, "Use a recurrence and check its base cases."],
         )
 
 
