@@ -37,3 +37,14 @@ def test_runner_uses_the_registered_config_seed() -> None:
     assert 'seed="$(python3 - "${GRAF_CANDIDATE_CONFIG}"' in script
     assert '--seed "${seed}" --data_seed "${seed}"' in script
     assert "--seed 42" not in script
+
+
+def test_runner_archives_fisher_manifest_and_exact_selection() -> None:
+    script = RUNNER.read_text(encoding="utf-8")
+
+    assert 'requires_fisher=0' in script
+    assert '[[ "${graph_mode}" == "fisher_consensus" ]] && requires_fisher=1' in script
+    assert ': "${FISHER_GUIDANCE_MANIFEST:?}"' in script
+    assert 'fisher-guidance-manifest.json' in script
+    assert 'OPSD_FISHER_SELECTION_MANIFEST' in script
+    assert 'fisher-representative-selection.json' in script

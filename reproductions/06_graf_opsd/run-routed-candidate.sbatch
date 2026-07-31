@@ -59,6 +59,7 @@ graph_modes_requiring_dossier=(
 requires_graph=0
 requires_viability=0
 requires_dossier=0
+requires_fisher=0
 for mode in "${graph_modes_requiring_graph[@]}"; do
   [[ "${graph_mode}" == "${mode}" ]] && requires_graph=1
 done
@@ -68,6 +69,7 @@ done
 for mode in "${graph_modes_requiring_dossier[@]}"; do
   [[ "${graph_mode}" == "${mode}" ]] && requires_dossier=1
 done
+[[ "${graph_mode}" == "fisher_consensus" ]] && requires_fisher=1
 if [[ "${requires_graph}" == 1 ]]; then
   : "${GRAF_GRAPH_CACHE_MANIFEST:?graph mode requires GRAF_GRAPH_CACHE_MANIFEST}"
 fi
@@ -76,6 +78,9 @@ if [[ "${requires_viability}" == 1 ]]; then
 fi
 if [[ "${requires_dossier}" == 1 ]]; then
   : "${CH_DOSSIER_MANIFEST:?teacher context requires CH_DOSSIER_MANIFEST}"
+fi
+if [[ "${requires_fisher}" == 1 ]]; then
+  : "${FISHER_GUIDANCE_MANIFEST:?}"
 fi
 if [[ "${GRAF_MAX_STEPS}" == 1 || "${GRAF_MAX_STEPS}" == 5 ]]; then
   export GRAF_SMOKE_MAX_STEPS="${GRAF_MAX_STEPS}"
@@ -115,6 +120,14 @@ if [[ "${requires_dossier}" == 1 ]]; then
   cp "${CH_DOSSIER_MANIFEST}" "${output_dir}/ch-dossier-manifest.json"
   manifest_inputs+=(ch-dossier-manifest.json)
 fi
+if [[ "${requires_fisher}" == 1 ]]; then
+  cp \
+    "${FISHER_GUIDANCE_MANIFEST}" \
+    "${output_dir}/fisher-guidance-manifest.json"
+  manifest_inputs+=(fisher-guidance-manifest.json)
+  export OPSD_FISHER_SELECTION_MANIFEST=\
+"${output_dir}/fisher-representative-selection.json"
+fi
 export OPSD_TRAINING_PARTITION_MANIFEST="${output_dir}/training-partition.json"
 export OPSD_ADAPTER_STABILITY_INTERVAL=1
 export OPSD_RECOMPUTE_DIVERGENCE_BACKWARD=1
@@ -125,4 +138,10 @@ accelerate launch --config_file third_party/opsd/accelerate.yaml --num_processes
   -m opsd_research.launch_graf_opsd --model_name_or_path Qwen/Qwen3-4B --model_revision 1cfa9a7208912126459214e8b04321603b3df60c --student_model_revision 1cfa9a7208912126459214e8b04321603b3df60c \
   --learning_rate 5e-6 --max_grad_norm 0.1 --per_device_train_batch_size 1 --gradient_checkpointing --gradient_accumulation_steps 8 --output_dir "${TRAIN_ROOT}" --run_config "${run_name}" --num_train_epochs 30 --max_steps "${GRAF_MAX_STEPS}" --max_completion_length "${completion_length}" --save_steps "${GRAF_MAX_STEPS}" --logging_steps 1 \
   --attn_implementation flash_attention_2 --torch_dtype bfloat16 --max_length "${max_sequence_length}" --beta 0 --use_vllm --vllm_mode colocate --vllm_gpu_memory_utilization "${vllm_utilization}" --vllm_tensor_parallel_size 1 --use_peft --lora_r 64 --lora_alpha 128 --lora_target_modules q_proj k_proj v_proj o_proj gate_proj up_proj down_proj --temperature 1.1 --top_p 0.95 --top_k 20 --lmbda 1 --fixed_teacher --student_thinking --teacher_thinking --jsd_token_clip "${jsd_token_clip}" --seed "${seed}" --data_seed "${seed}" --report_to wandb --wandb_project GRAF-OPSD-autoresearch
+if [[ "${requires_fisher}" == 1 ]]; then
+  test -s "${OPSD_FISHER_SELECTION_MANIFEST}"
+  record_run_manifest \
+    "${output_dir}" "${manifest_inputs[@]}" \
+    fisher-representative-selection.json
+fi
 python3 -m opsd_research.summarize_training --training-dir "${output_dir}" --training-log "${PROJECT_SOURCE}/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out" --telemetry "${TELEMETRY_ROOT}/${run_name}-${SLURM_JOB_ID}.csv" --output "${output_dir}/training-summary.json" --max-completion-length "${completion_length}"

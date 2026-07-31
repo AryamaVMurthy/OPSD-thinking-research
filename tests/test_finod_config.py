@@ -115,3 +115,24 @@ def test_answer_free_fisher_consensus_screen_is_registered():
     assert config["max_completion_length"] == 1024
     assert config["num_gpus"] == 8
     assert config["max_steps"] == 5
+
+
+def test_answer_free_fisher_consensus_four_gpu_fallback_preserves_batch():
+    config = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s1-contest-prefix-4gpu.yaml"
+    ).data
+
+    assert config["graph_mode"] == "fisher_consensus"
+    assert config["num_gpus"] == 4
+    assert config["gradient_accumulation_steps"] == 8
+    assert (
+        config["num_gpus"]
+        * config["per_device_train_batch_size"]
+        * config["gradient_accumulation_steps"]
+        == config["effective_batch_size"]
+        == 32
+    )
+    assert config["fisher_max_records"] == 192
+    assert config["max_completion_length"] == 1024
