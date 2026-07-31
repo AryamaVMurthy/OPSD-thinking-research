@@ -654,6 +654,7 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         if direction_mode not in {
             "matched_control_residual",
             "positive_plan_barycenter",
+            "entropy_neutral_plan_barycenter",
         }:
             raise ConfigError(
                 f"{source}: unsupported fisher_direction_mode"

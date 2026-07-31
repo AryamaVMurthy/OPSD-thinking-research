@@ -43,6 +43,14 @@ class RunReportTests(unittest.TestCase):
                     "mean_post_initial_alignment_gain": 0.00025,
                     "mean_post_initial_alignment_cosine_proxy": 0.05,
                     "max_student_anchor_forward_kl": 0.0008,
+                    "entropy_projection_events": 8,
+                    "entropy_projection_metrics_complete": True,
+                    "entropy_projection_all_finite": True,
+                    "mean_entropy_gradient_energy": 0.12,
+                    "mean_absolute_entropy_alignment_before": 0.03,
+                    "max_absolute_entropy_alignment_after": 2.0e-10,
+                    "mean_retained_direction_energy_fraction": 0.65,
+                    "mean_target_entropy_change": -0.001,
                 },
                 "gpu_telemetry": [{"gpu": 0, "mean_utilization_percent": 92.0, "max_memory_mib": 43000, "max_temperature_c": 60}],
             }
@@ -52,6 +60,8 @@ class RunReportTests(unittest.TestCase):
             markdown = (root / "report.md").read_text(encoding="utf-8")
             self.assertIn("Optimization trace", markdown)
             self.assertIn("Fisher guidance signal", markdown)
+            self.assertIn("Entropy projection events", markdown)
+            self.assertIn("Maximum residual entropy alignment", markdown)
             self.assertEqual(report["fisher_signal"]["events"], 8)
             self.assertIn("█▁", markdown)
             self.assertTrue((root / "report.json").is_file())

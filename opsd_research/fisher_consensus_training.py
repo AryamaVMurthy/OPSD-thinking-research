@@ -126,6 +126,12 @@ def _aggregate_consensus_metrics(
             total("fisher_alignment_cosine_proxy"),
             total("optimization_per_token"),
             boosted_optimization_total,
+            total("entropy_gradient_energy"),
+            total("entropy_alignment_before"),
+            total("entropy_alignment_after"),
+            total("first_order_entropy_change"),
+            total("retained_direction_energy_fraction"),
+            total("target_entropy_change"),
         ]
     )
     local_max = metrics["target_kl"][mask].detach().to(torch.float64).max()
@@ -175,6 +181,12 @@ def _aggregate_consensus_metrics(
         "fisher_alignment_cosine_proxy": average(18),
         "optimization_loss": average(19),
         "boosted_optimization_loss": average(20),
+        "entropy_gradient_energy": average(21),
+        "entropy_alignment_before": average(22),
+        "entropy_alignment_after": average(23),
+        "first_order_entropy_change": average(24),
+        "retained_direction_energy_fraction": average(25),
+        "target_entropy_change": average(26),
     }
 
 

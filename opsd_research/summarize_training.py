@@ -20,6 +20,14 @@ VLLM_RE = re.compile(
 LOSS_RE = re.compile(r"(\{'loss':.*?\})")
 STEP_FILE_RE = re.compile(r"generations_step_(\d+)\.json$")
 CHECKPOINT_RE = re.compile(r"checkpoint-(\d+)$")
+ENTROPY_PROJECTION_KEYS = (
+    "entropy_gradient_energy",
+    "entropy_alignment_before",
+    "entropy_alignment_after",
+    "first_order_entropy_change",
+    "retained_direction_energy_fraction",
+    "target_entropy_change",
+)
 
 
 def _directory_bytes(path: Path) -> int:
@@ -175,6 +183,11 @@ def summarize(
     losses, rollout_tokens = _parse_training_log(training_log)
     finod_events = _parse_finod_events(training_log)
     fisher_events = _parse_fisher_events(training_log)
+    entropy_projection_events = [
+        event
+        for event in fisher_events
+        if all(key in event for key in ENTROPY_PROJECTION_KEYS)
+    ]
     post_initial_fisher_events = [
         event
         for event in fisher_events
@@ -291,6 +304,18 @@ def summarize(
         "fisher_signal": {
             "events": len(fisher_events),
             "post_initial_events": len(post_initial_fisher_events),
+            "entropy_projection_events": len(entropy_projection_events),
+            "entropy_projection_metrics_complete": (
+                len(entropy_projection_events) == len(fisher_events)
+            ),
+            "entropy_projection_all_finite": all(
+                all(
+                    isinstance(event[key], (int, float))
+                    and float("-inf") < float(event[key]) < float("inf")
+                    for key in ENTROPY_PROJECTION_KEYS
+                )
+                for event in entropy_projection_events
+            ),
             "all_finite": all(
                 all(
                     isinstance(event.get(key), (int, float))
@@ -358,6 +383,46 @@ def summarize(
             "mean_consensus_energy": (
                 mean(float(event["consensus_energy"]) for event in fisher_events)
                 if fisher_events
+                else None
+            ),
+            "mean_entropy_gradient_energy": (
+                mean(
+                    float(event["entropy_gradient_energy"])
+                    for event in entropy_projection_events
+                )
+                if entropy_projection_events
+                else None
+            ),
+            "mean_absolute_entropy_alignment_before": (
+                mean(
+                    abs(float(event["entropy_alignment_before"]))
+                    for event in entropy_projection_events
+                )
+                if entropy_projection_events
+                else None
+            ),
+            "max_absolute_entropy_alignment_after": (
+                max(
+                    abs(float(event["entropy_alignment_after"]))
+                    for event in entropy_projection_events
+                )
+                if entropy_projection_events
+                else None
+            ),
+            "mean_retained_direction_energy_fraction": (
+                mean(
+                    float(event["retained_direction_energy_fraction"])
+                    for event in entropy_projection_events
+                )
+                if entropy_projection_events
+                else None
+            ),
+            "mean_target_entropy_change": (
+                mean(
+                    float(event["target_entropy_change"])
+                    for event in entropy_projection_events
+                )
+                if entropy_projection_events
                 else None
             ),
             "mean_clipped_target_fraction": (

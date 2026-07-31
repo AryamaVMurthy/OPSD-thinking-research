@@ -372,3 +372,197 @@ def test_positive_plan_barycenter_centers_guide_minus_base_scores():
     expected -= (probability * expected).sum(dim=-1, keepdim=True)
     assert result.metrics["agreement"].item() == pytest.approx(1.0)
     assert torch.allclose(result.consensus_direction, expected)
+
+
+def test_entropy_neutral_plan_barycenter_removes_entropy_tangent_only():
+    base = _logits([2.0, 0.5, -0.5, -1.0])
+    probability = base.softmax(dim=-1)
+    log_probability = base.log_softmax(dim=-1)
+    entropy_direction = log_probability - (
+        probability * log_probability
+    ).sum(dim=-1, keepdim=True)
+    procedure = _logits([0.0, 1.0, -2.0, 1.0])
+    procedure -= (probability * procedure).sum(dim=-1, keepdim=True)
+    procedure -= (
+        (probability * procedure * entropy_direction).sum(
+            dim=-1, keepdim=True
+        )
+        / (probability * entropy_direction.square()).sum(
+            dim=-1, keepdim=True
+        )
+    ) * entropy_direction
+    positive = base + procedure + 3.0 * entropy_direction
+    guides = torch.stack([positive, positive, positive])
+
+    result = fisher_consensus_target(
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=torch.randn_like(guides) * 100.0,
+        step_size=1.0,
+        max_target_kl=0.01,
+        direction_mode="entropy_neutral_plan_barycenter",
+    )
+
+    alignment = (
+        probability * result.consensus_direction * entropy_direction
+    ).sum(dim=-1)
+    centered = (probability * result.consensus_direction).sum(dim=-1)
+    assert alignment.item() == pytest.approx(0.0, abs=1e-12)
+    assert centered.item() == pytest.approx(0.0, abs=1e-12)
+    assert torch.allclose(result.consensus_direction, procedure)
+    assert result.metrics["entropy_alignment_before"].abs().item() > 0.0
+    assert result.metrics["entropy_alignment_after"].item() == pytest.approx(
+        0.0, abs=1e-12
+    )
+    assert 0.0 < result.metrics["retained_direction_energy_fraction"].item() < 1.0
+    assert result.metrics["target_kl"].item() <= 0.01000001
+
+
+def test_entropy_neutral_barycenter_is_identity_at_uniform_anchor():
+    base = _logits([0.0, 0.0, 0.0])
+    guides = torch.tensor(
+        [
+            [[1.0, -1.0, 0.0]],
+            [[0.8, -0.7, -0.1]],
+            [[1.2, -0.9, -0.3]],
+        ],
+        dtype=torch.float64,
+    )
+    controls = torch.randn_like(guides)
+
+    ordinary = fisher_consensus_target(
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=controls,
+        step_size=1.0,
+        max_target_kl=0.01,
+        direction_mode="positive_plan_barycenter",
+    )
+    neutral = fisher_consensus_target(
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=controls,
+        step_size=1.0,
+        max_target_kl=0.01,
+        direction_mode="entropy_neutral_plan_barycenter",
+    )
+
+    assert neutral.metrics["entropy_gradient_energy"].item() == pytest.approx(
+        0.0
+    )
+    assert torch.equal(neutral.consensus_direction, ordinary.consensus_direction)
+    assert torch.equal(neutral.target_probs, ordinary.target_probs)
+
+
+def test_entropy_neutral_barycenter_is_invariant_to_control_logits():
+    base = _logits([1.0, 0.1, -0.4])
+    guides = torch.tensor(
+        [
+            [[1.4, -0.2, 0.1]],
+            [[1.1, 0.0, -0.3]],
+            [[1.3, -0.1, -0.2]],
+        ],
+        dtype=torch.float64,
+    )
+
+    first = fisher_consensus_target(
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=torch.zeros_like(guides),
+        step_size=1.0,
+        max_target_kl=0.01,
+        direction_mode="entropy_neutral_plan_barycenter",
+    )
+    second = fisher_consensus_target(
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=torch.randn_like(guides) * 1000.0,
+        step_size=1.0,
+        max_target_kl=0.01,
+        direction_mode="entropy_neutral_plan_barycenter",
+    )
+
+    assert torch.equal(first.consensus_direction, second.consensus_direction)
+    assert torch.equal(first.target_probs, second.target_probs)
+
+
+def test_entropy_neutral_barycenter_preserves_an_already_neutral_direction():
+    base = _logits([2.0, 0.5, -0.5, -1.0])
+    probability = base.softmax(dim=-1)
+    log_probability = base.log_softmax(dim=-1)
+    entropy_direction = log_probability - (
+        probability * log_probability
+    ).sum(dim=-1, keepdim=True)
+    procedure = _logits([0.0, 1.0, -2.0, 1.0])
+    procedure -= (probability * procedure).sum(dim=-1, keepdim=True)
+    procedure -= (
+        (probability * procedure * entropy_direction).sum(
+            dim=-1, keepdim=True
+        )
+        / (probability * entropy_direction.square()).sum(
+            dim=-1, keepdim=True
+        )
+    ) * entropy_direction
+    guides = torch.stack([base + procedure] * 3)
+    controls = torch.randn_like(guides)
+
+    ordinary = fisher_consensus_target(
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=controls,
+        step_size=1.0,
+        max_target_kl=0.01,
+        direction_mode="positive_plan_barycenter",
+    )
+    neutral = fisher_consensus_target(
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=controls,
+        step_size=1.0,
+        max_target_kl=0.01,
+        direction_mode="entropy_neutral_plan_barycenter",
+    )
+
+    assert torch.allclose(
+        neutral.consensus_direction,
+        ordinary.consensus_direction,
+        atol=1e-12,
+        rtol=0.0,
+    )
+    assert torch.allclose(
+        neutral.target_probs,
+        ordinary.target_probs,
+        atol=1e-12,
+        rtol=0.0,
+    )
+
+
+def test_entropy_neutral_barycenter_rejects_nonfinite_active_logits():
+    base = _logits([1.0, 0.0, -1.0])
+    guides = torch.stack([base.clone(), base.clone(), base.clone()])
+    guides[1, 0, 1] = torch.nan
+
+    with pytest.raises(ValueError, match="nonfinite"):
+        fisher_consensus_target(
+            base_logits=base,
+            guide_logits=guides,
+            control_logits=torch.zeros_like(guides),
+            step_size=1.0,
+            max_target_kl=0.01,
+            direction_mode="entropy_neutral_plan_barycenter",
+        )
+
+
+def test_entropy_neutral_barycenter_rejects_nonfinite_trust_region():
+    base = _logits([1.0, 0.0, -1.0])
+    guides = torch.stack([base.clone(), base.clone(), base.clone()])
+
+    with pytest.raises(ValueError, match="finite"):
+        fisher_consensus_target(
+            base_logits=base,
+            guide_logits=guides,
+            control_logits=torch.zeros_like(guides),
+            step_size=float("nan"),
+            max_target_kl=0.01,
+            direction_mode="entropy_neutral_plan_barycenter",
+        )

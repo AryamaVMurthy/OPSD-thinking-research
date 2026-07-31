@@ -100,6 +100,12 @@ class TrainingSummaryTests(unittest.TestCase):
                         "student_anchor_forward_kl": 0.0005,
                         "fisher_alignment_gain": 0.0002,
                         "fisher_alignment_cosine_proxy": 0.04,
+                        "entropy_gradient_energy": 0.12,
+                        "entropy_alignment_before": -0.03,
+                        "entropy_alignment_after": 2.0e-10,
+                        "first_order_entropy_change": -2.0e-10,
+                        "retained_direction_energy_fraction": 0.65,
+                        "target_entropy_change": -0.001,
                     }
                 )
                 + "\n"
@@ -145,6 +151,20 @@ class TrainingSummaryTests(unittest.TestCase):
             self.assertEqual(fisher["mean_post_initial_relative_loss_to_anchor"], 1.1)
             self.assertEqual(fisher["mean_post_initial_alignment_gain"], 0.0002)
             self.assertEqual(fisher["mean_post_initial_alignment_cosine_proxy"], 0.04)
+            self.assertEqual(fisher["entropy_projection_events"], 1)
+            self.assertTrue(fisher["entropy_projection_metrics_complete"])
+            self.assertTrue(fisher["entropy_projection_all_finite"])
+            self.assertEqual(fisher["mean_entropy_gradient_energy"], 0.12)
+            self.assertEqual(
+                fisher["mean_absolute_entropy_alignment_before"], 0.03
+            )
+            self.assertEqual(
+                fisher["max_absolute_entropy_alignment_after"], 2.0e-10
+            )
+            self.assertEqual(
+                fisher["mean_retained_direction_energy_fraction"], 0.65
+            )
+            self.assertEqual(fisher["mean_target_entropy_change"], -0.001)
             gpu = result["gpu_telemetry"][0]
             self.assertEqual(gpu["mean_utilization_percent"], 90)
             self.assertEqual(gpu["max_memory_mib"], 35000)

@@ -59,6 +59,24 @@ def test_consensus_metrics_are_token_weighted_and_report_collapse():
         "optimization_per_token": torch.tensor(
             [[0.07, 99.0], [0.04, 0.0]]
         ),
+        "entropy_gradient_energy": torch.tensor(
+            [[2.0, 99.0], [4.0, 8.0]]
+        ),
+        "entropy_alignment_before": torch.tensor(
+            [[0.3, 99.0], [-0.2, 0.1]]
+        ),
+        "entropy_alignment_after": torch.tensor(
+            [[0.0, 99.0], [1.0e-9, -1.0e-9]]
+        ),
+        "first_order_entropy_change": torch.tensor(
+            [[0.0, 99.0], [-1.0e-9, 1.0e-9]]
+        ),
+        "retained_direction_energy_fraction": torch.tensor(
+            [[0.5, 99.0], [0.75, 1.0]]
+        ),
+        "target_entropy_change": torch.tensor(
+            [[0.01, 99.0], [-0.02, 0.03]]
+        ),
     }
     selected = torch.tensor([[True, False], [True, True]])
     trainer = SimpleNamespace(
@@ -98,6 +116,14 @@ def test_consensus_metrics_are_token_weighted_and_report_collapse():
         0.2 / 3
     )
     assert result["optimization_loss"] == pytest.approx(0.11 / 3)
+    assert result["entropy_gradient_energy"] == pytest.approx(14 / 3)
+    assert result["entropy_alignment_before"] == pytest.approx(0.2 / 3)
+    assert result["entropy_alignment_after"] == pytest.approx(0.0, abs=1e-12)
+    assert result["first_order_entropy_change"] == pytest.approx(
+        0.0, abs=1e-12
+    )
+    assert result["retained_direction_energy_fraction"] == pytest.approx(0.75)
+    assert result["target_entropy_change"] == pytest.approx(0.02 / 3)
 
 
 def test_distributed_fisher_edge_returns_the_local_rank_weight():

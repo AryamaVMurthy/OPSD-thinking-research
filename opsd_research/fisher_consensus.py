@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import torch
@@ -169,17 +170,26 @@ def fisher_consensus_target(
         raise ValueError("guide/control trailing dimensions must match base")
     if guide_logits.shape[0] < 2:
         raise ValueError("Fisher consensus requires at least two guide pairs")
-    if temperature <= 0.0:
-        raise ValueError("temperature must be positive")
-    if step_size < 0.0:
-        raise ValueError("step_size must be nonnegative")
-    if max_target_kl <= 0.0:
-        raise ValueError("max_target_kl must be positive")
+    if not math.isfinite(temperature) or temperature <= 0.0:
+        raise ValueError("temperature must be finite and positive")
+    if not math.isfinite(step_size) or step_size < 0.0:
+        raise ValueError("step_size must be finite and nonnegative")
+    if not math.isfinite(max_target_kl) or max_target_kl <= 0.0:
+        raise ValueError("max_target_kl must be finite and positive")
     if direction_mode not in {
         "matched_control_residual",
         "positive_plan_barycenter",
+        "entropy_neutral_plan_barycenter",
     }:
         raise ValueError("unsupported Fisher consensus direction mode")
+    if not bool(torch.isfinite(base_logits).all().item()):
+        raise ValueError("base logits are nonfinite")
+    if not bool(torch.isfinite(guide_logits).all().item()):
+        raise ValueError("guide logits are nonfinite")
+    if direction_mode == "matched_control_residual" and not bool(
+        torch.isfinite(control_logits).all().item()
+    ):
+        raise ValueError("control logits are nonfinite")
 
     dtype = _work_dtype(base_logits)
     anchor = base_logits.detach().to(dtype) / temperature
@@ -216,6 +226,83 @@ def fisher_consensus_target(
     consensus = consensus - (
         probability * consensus
     ).sum(dim=-1, keepdim=True)
+    entropy_direction = log_probability - (
+        probability * log_probability
+    ).sum(dim=-1, keepdim=True)
+    entropy_energy = (
+        probability * entropy_direction.square()
+    ).sum(dim=-1)
+    entropy_alignment_before = (
+        probability * consensus * entropy_direction
+    ).sum(dim=-1)
+    consensus_energy_before_projection = (
+        probability * consensus.square()
+    ).sum(dim=-1)
+    if direction_mode == "entropy_neutral_plan_barycenter":
+        entropy_active = entropy_energy > torch.finfo(dtype).eps
+        entropy_coefficient = torch.where(
+            entropy_active,
+            entropy_alignment_before
+            / entropy_energy.clamp_min(torch.finfo(dtype).eps),
+            torch.zeros_like(entropy_alignment_before),
+        )
+        projected_consensus = consensus - (
+            entropy_coefficient.unsqueeze(-1) * entropy_direction
+        )
+        projected_consensus = projected_consensus - (
+            probability * projected_consensus
+        ).sum(dim=-1, keepdim=True)
+        consensus = torch.where(
+            entropy_active.unsqueeze(-1),
+            projected_consensus,
+            consensus,
+        )
+    entropy_alignment_after = (
+        probability * consensus * entropy_direction
+    ).sum(dim=-1)
+    consensus_energy_after_projection = (
+        probability * consensus.square()
+    ).sum(dim=-1)
+    if direction_mode == "entropy_neutral_plan_barycenter":
+        numerical_scale = 128.0 * torch.finfo(dtype).eps
+        centering_residual = (probability * consensus).sum(dim=-1).abs()
+        centering_tolerance = numerical_scale * (
+            1.0 + consensus_energy_after_projection.sqrt()
+        )
+        alignment_tolerance = numerical_scale * (
+            1.0
+            + (
+                entropy_energy * consensus_energy_after_projection
+            ).clamp_min(0.0).sqrt()
+        )
+        projection_values = torch.stack(
+            [
+                entropy_energy,
+                entropy_alignment_before,
+                entropy_alignment_after,
+                consensus_energy_after_projection,
+                centering_residual,
+            ]
+        )
+        if not bool(torch.isfinite(projection_values).all().item()):
+            raise RuntimeError("entropy-neutral Fisher projection is nonfinite")
+        if bool((centering_residual > centering_tolerance).any().item()):
+            raise RuntimeError("entropy-neutral Fisher direction is uncentered")
+        if bool(
+            (
+                entropy_active
+                & (entropy_alignment_after.abs() > alignment_tolerance)
+            ).any().item()
+        ):
+            raise RuntimeError(
+                "entropy-neutral Fisher projection exceeds alignment tolerance"
+            )
+    retained_direction_energy_fraction = torch.where(
+        consensus_energy_before_projection > tiny,
+        consensus_energy_after_projection
+        / consensus_energy_before_projection.clamp_min(tiny),
+        torch.ones_like(consensus_energy_before_projection),
+    ).clamp(min=0.0, max=1.0)
 
     def tilted(scale: torch.Tensor):
         target_log = (
@@ -256,6 +343,23 @@ def fisher_consensus_target(
     target_log, target, forward_kl, reverse_kl, worst_kl = tilted(
         effective_step
     )
+    target_values = torch.stack(
+        [
+            forward_kl,
+            reverse_kl,
+            worst_kl,
+            effective_step,
+        ]
+    )
+    if not bool(torch.isfinite(target).all().item()) or not bool(
+        torch.isfinite(target_values).all().item()
+    ):
+        raise RuntimeError("Fisher consensus target is nonfinite")
+    kl_tolerance = max(1e-7, 128.0 * torch.finfo(dtype).eps)
+    if bool(
+        (worst_kl > float(max_target_kl) + kl_tolerance).any().item()
+    ):
+        raise RuntimeError("Fisher consensus target exceeds KL trust region")
     consensus_energy = (
         probability * consensus.square()
     ).sum(dim=-1)
@@ -282,6 +386,19 @@ def fisher_consensus_target(
             "target_reverse_kl": reverse_kl.detach(),
             "target_kl": worst_kl.detach(),
             "effective_step_size": effective_step.detach(),
+            "entropy_gradient_energy": entropy_energy.detach(),
+            "entropy_alignment_before": entropy_alignment_before.detach(),
+            "entropy_alignment_after": entropy_alignment_after.detach(),
+            "first_order_entropy_change": (
+                -entropy_alignment_after
+            ).detach(),
+            "retained_direction_energy_fraction": (
+                retained_direction_energy_fraction.detach()
+            ),
+            "target_entropy_change": (
+                -(target * target_log).sum(dim=-1)
+                + (probability * log_probability).sum(dim=-1)
+            ).detach(),
         },
     )
 

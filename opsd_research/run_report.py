@@ -251,6 +251,26 @@ def _training_markdown(report: dict[str, Any]) -> str:
             ("Post-initial target / anchor loss", fisher.get("mean_post_initial_relative_loss_to_anchor")),
             ("Post-initial alignment gain", fisher.get("mean_post_initial_alignment_gain")),
             ("Post-initial alignment cosine", fisher.get("mean_post_initial_alignment_cosine_proxy")),
+            ("Entropy projection events", fisher.get("entropy_projection_events")),
+            (
+                "Entropy metrics complete / finite",
+                f"{fisher.get('entropy_projection_metrics_complete')} / "
+                f"{fisher.get('entropy_projection_all_finite')}",
+            ),
+            ("Mean entropy-gradient energy", fisher.get("mean_entropy_gradient_energy")),
+            (
+                "Mean initial entropy alignment",
+                fisher.get("mean_absolute_entropy_alignment_before"),
+            ),
+            (
+                "Maximum residual entropy alignment",
+                fisher.get("max_absolute_entropy_alignment_after"),
+            ),
+            (
+                "Mean retained direction energy",
+                fisher.get("mean_retained_direction_energy_fraction"),
+            ),
+            ("Mean target entropy change", fisher.get("mean_target_entropy_change")),
         ]), "",
         "## Rollouts and integrity", "",
         *_table([

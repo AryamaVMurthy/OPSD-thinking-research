@@ -370,3 +370,27 @@ def test_barycenter_prefix512_global_batch_combines_only_screened_axes():
         for key, value in prefix512_sequential.items()
         if key not in grouping_fields
     }
+
+
+def test_entropy_neutral_barycenter_changes_only_fisher_projection():
+    baseline = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s10-barycenter-prefix512-6.yaml"
+    ).data
+    candidate = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s13-entropy-neutral-prefix512-6.yaml"
+    ).data
+
+    assert (
+        candidate["fisher_direction_mode"]
+        == "entropy_neutral_plan_barycenter"
+    )
+    ignored = {"variant", "fisher_direction_mode"}
+    assert {
+        key: value for key, value in candidate.items() if key not in ignored
+    } == {
+        key: value for key, value in baseline.items() if key not in ignored
+    }
