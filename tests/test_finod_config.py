@@ -205,3 +205,17 @@ def test_fisher_consensus_proximal_screen_uses_frozen_policy_kl():
     assert config["fisher_anchor_kl_weight"] == 1.0
     assert config["fisher_max_records"] == 192
     assert config["max_steps"] == 12
+
+
+def test_fisher_consensus_stronger_target_keeps_hard_kl_cap():
+    config = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s5-strong-proximal-6.yaml"
+    ).data
+
+    assert config["graph_mode"] == "fisher_consensus"
+    assert config["fisher_step_size"] == 1.0
+    assert config["fisher_max_target_kl"] == 0.01
+    assert config["fisher_anchor_kl_weight"] == 1.0
+    assert config["max_steps"] == config["save_steps"] == 6

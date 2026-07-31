@@ -283,9 +283,14 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         raise ConfigError(
             f"{source}: max_completion_length must be 1024, 2048, or 4096"
         )
-    if data.get("max_steps") not in {5, 12, 25, 32, 50, 200}:
+    allowed_steps = {5, 12, 25, 32, 50, 200}
+    if data.get("graph_mode") == "fisher_consensus":
+        # Six effective-batch updates are one exact pass over the registered
+        # 192-example equal-domain Fisher screen.
+        allowed_steps.add(6)
+    if data.get("max_steps") not in allowed_steps:
         raise ConfigError(
-            f"{source}: max_steps must be 5, 12, 25, 32, 50, or 200"
+            f"{source}: max_steps is not registered for this GRAF mode"
         )
     save_steps = data.get("save_steps")
     checkpointed_confirmation = (

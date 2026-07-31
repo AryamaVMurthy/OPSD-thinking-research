@@ -480,6 +480,41 @@ residual instead of normalizing it almost entirely by its own tiny second
 moment. A one-step calibration must first show an appropriately smaller
 adapter displacement; only then is the full 12-step screen justified.
 
+The one-step calibration, job `17381`, reduced adapter update norm from
+0.00812 to 0.000354 (23-fold) without eliminating the Fisher loss. However,
+the complete 12-step control, job `17382`, showed that parameter-space norm
+was not the governing failure. Epoch-one and epoch-two mean target-loss
+ratios were 1.91 and 2.15, with student-anchor KL again approximately equal
+to one target radius and alignment near zero. A small number of
+high-sensitivity LoRA directions can therefore create the same
+function-space displacement despite a much smaller Euclidean parameter norm.
+
+The next screen adds the missing policy-space constraint directly:
+\[
+\mathcal L_{\mathrm{prox}}
+=D_{\mathrm{KL}}(q\|p_\theta)
++\lambda D_{\mathrm{KL}}(p_0\|p_\theta),\qquad \lambda=1.
+\]
+The second term uses the already-computed frozen deploy distribution at the
+same on-policy prefix positions. It accesses no answer, label, verifier, or
+reference solution. Target-fitting loss, frozen-policy KL, and the combined
+optimization objective are logged separately so an apparently improving
+regularized scalar cannot hide failure to learn the guidance direction.
+
+Job `17385` showed that the proximal geometry helped but was insufficient at
+the original target scale. Relative to its optimizer-matched control, its
+mean target-loss ratio improved from 1.91 to 1.895 in epoch one and from 2.153
+to 2.106 in epoch two. Alignment gain became positive
+(\(5.68\times10^{-5}\), then \(3.32\times10^{-5}\)), but remained only about
+one tenth of student-anchor KL, so target loss never beat the frozen anchor.
+The checkpoint is not promoted.
+
+The next one-epoch diagnostic raises only the exponential-tilt ceiling
+\(\eta\) from 0.25 to 1.0. The two-sided per-token KL cap remains exactly
+0.01, and the \(\lambda=1\) frozen-policy proximal remains active. This
+distinguishes a sub-noise Fisher target from a fundamentally
+non-transferable direction without relaxing the function-space safety bound.
+
 Promotion requires all of the following:
 
 1. finite, nonnegative loss and nonzero gradients;
