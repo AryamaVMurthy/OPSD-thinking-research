@@ -197,7 +197,8 @@ def summarize(
     self_information_candidates = [
         event
         for event in fisher_events
-        if event.get("retraction_mode") == "self_information_mixture"
+        if event.get("retraction_mode")
+        in {"self_information_mixture", "self_information_exponential"}
     ]
     self_information_events = [
         event

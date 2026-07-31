@@ -186,14 +186,16 @@ def fisher_consensus_target(
     if retraction_mode not in {
         "exponential",
         "self_information_mixture",
+        "self_information_exponential",
     }:
         raise ValueError("unsupported Fisher consensus retraction mode")
     if (
-        retraction_mode == "self_information_mixture"
+        retraction_mode
+        in {"self_information_mixture", "self_information_exponential"}
         and direction_mode != "entropy_neutral_plan_barycenter"
     ):
         raise ValueError(
-            "self-information mixture requires entropy-neutral direction"
+            "self-information retraction requires entropy-neutral direction"
         )
     if not bool(torch.isfinite(base_logits).all().item()):
         raise ValueError("base logits are nonfinite")
@@ -205,9 +207,13 @@ def fisher_consensus_target(
         raise ValueError("control logits are nonfinite")
 
     dtype = _work_dtype(base_logits)
+    preserves_self_information = retraction_mode in {
+        "self_information_mixture",
+        "self_information_exponential",
+    }
     anchor = base_logits.detach().to(dtype) / temperature
     probability = anchor.softmax(dim=-1)
-    if retraction_mode == "self_information_mixture":
+    if preserves_self_information:
         probability = probability / probability.sum(
             dim=-1,
             keepdim=True,
@@ -222,7 +228,7 @@ def fisher_consensus_target(
         keepdim: bool = False,
     ) -> torch.Tensor:
         product = weight * value
-        if retraction_mode == "self_information_mixture":
+        if preserves_self_information:
             return product.sum(
                 dim=-1,
                 keepdim=keepdim,
@@ -363,6 +369,94 @@ def fisher_consensus_target(
     else:
         effective_step = requested_step
 
+    def corrected_exponential(scale: torch.Tensor):
+        """Return the self-information I-projection at a fixed tangent scale."""
+        beta = torch.zeros_like(scale)
+        moment_tolerance = max(1e-12, 32.0 * torch.finfo(dtype).eps)
+
+        def distribution(multiplier: torch.Tensor):
+            corrected_log = (
+                log_probability
+                + scale.unsqueeze(-1) * consensus
+                + multiplier.unsqueeze(-1) * entropy_direction
+            ).log_softmax(dim=-1)
+            corrected = corrected_log.exp()
+            corrected_normalizer = corrected.sum(
+                dim=-1,
+                keepdim=True,
+                dtype=torch.float64,
+            ).to(dtype)
+            corrected = corrected / corrected_normalizer
+            corrected_log = corrected_log - corrected_normalizer.log()
+            moment = weighted_sum(corrected, entropy_direction)
+            centered_information = entropy_direction - moment.unsqueeze(-1)
+            variance = weighted_sum(
+                corrected,
+                centered_information.square(),
+            )
+            return corrected_log, corrected, moment, variance
+
+        # The scalar moment is monotone in beta. Newton converges rapidly in
+        # the small KL ball; bounded updates avoid a rare skewed-tail jump.
+        for _ in range(12):
+            _, _, moment, variance = distribution(beta)
+            update = torch.where(
+                entropy_active,
+                moment / variance.clamp_min(torch.finfo(dtype).eps),
+                torch.zeros_like(moment),
+            ).clamp(min=-4.0, max=4.0)
+            beta = beta - update
+
+        corrected_log, corrected, moment, _ = distribution(beta)
+        unresolved = entropy_active & (moment.abs() > moment_tolerance)
+        if bool(unresolved.any().item()):
+            radius = torch.ones_like(beta)
+            lower = beta - radius
+            upper = beta + radius
+            for _ in range(16):
+                *_, lower_moment, _ = distribution(lower)
+                *_, upper_moment, _ = distribution(upper)
+                bracketed = (lower_moment <= 0.0) & (upper_moment >= 0.0)
+                expand = unresolved & ~bracketed
+                radius = torch.where(expand, radius * 2.0, radius)
+                lower = torch.where(expand, beta - radius, lower)
+                upper = torch.where(expand, beta + radius, upper)
+            *_, lower_moment, _ = distribution(lower)
+            *_, upper_moment, _ = distribution(upper)
+            if bool(
+                (
+                    unresolved
+                    & ((lower_moment > 0.0) | (upper_moment < 0.0))
+                )
+                .any()
+                .item()
+            ):
+                raise RuntimeError(
+                    "self-information exponential failed to bracket moment"
+                )
+            for _ in range(64):
+                midpoint = (lower + upper) / 2.0
+                *_, midpoint_moment, _ = distribution(midpoint)
+                lower = torch.where(
+                    unresolved & (midpoint_moment < 0.0),
+                    midpoint,
+                    lower,
+                )
+                upper = torch.where(
+                    unresolved & (midpoint_moment >= 0.0),
+                    midpoint,
+                    upper,
+                )
+            beta = torch.where(unresolved, (lower + upper) / 2.0, beta)
+            corrected_log, corrected, moment, _ = distribution(beta)
+        if bool(
+            (entropy_active & (moment.abs() > moment_tolerance)).any().item()
+        ):
+            raise RuntimeError(
+                "self-information exponential moment solve did not converge"
+            )
+        return corrected_log, corrected, beta, moment
+
     def retracted(scale: torch.Tensor):
         if retraction_mode == "self_information_mixture":
             mixture_ratio = 1.0 + scale.unsqueeze(-1) * consensus
@@ -379,12 +473,25 @@ def fisher_consensus_target(
                 - normalizer.log()
             )
             minimum_ratio = mixture_ratio.min(dim=-1).values
+            information_multiplier = torch.zeros_like(scale)
+            information_moment = weighted_sum(target, entropy_direction)
+        elif retraction_mode == "self_information_exponential":
+            (
+                target_log,
+                target,
+                information_multiplier,
+                information_moment,
+            ) = corrected_exponential(scale)
+            log_ratio = target_log - log_probability
+            minimum_ratio = log_ratio.amin(dim=-1).exp().clamp_min(tiny)
         else:
             target_log = (
                 log_probability + scale.unsqueeze(-1) * consensus
             ).log_softmax(dim=-1)
             target = target_log.exp()
             minimum_ratio = torch.ones_like(scale)
+            information_multiplier = torch.zeros_like(scale)
+            information_moment = weighted_sum(target, entropy_direction)
         forward_kl = weighted_sum(
             probability,
             log_probability - target_log,
@@ -400,23 +507,42 @@ def fisher_consensus_target(
             reverse_kl,
             torch.maximum(forward_kl, reverse_kl),
             minimum_ratio,
+            information_multiplier,
+            information_moment,
         )
 
-    target_log, target, forward_kl, reverse_kl, worst_kl, minimum_ratio = retracted(
-        effective_step
-    )
+    (
+        target_log,
+        target,
+        forward_kl,
+        reverse_kl,
+        worst_kl,
+        minimum_ratio,
+        information_multiplier,
+        information_moment,
+    ) = retracted(effective_step)
     needs_clip = worst_kl > float(max_target_kl)
     lower = torch.zeros_like(effective_step)
     upper = effective_step
-    for _ in range(32):
-        midpoint = (lower + upper) / 2
-        *_, midpoint_kl, _ = retracted(midpoint)
-        lower = torch.where(
-            midpoint_kl <= float(max_target_kl), midpoint, lower
-        )
-        upper = torch.where(
-            midpoint_kl > float(max_target_kl), midpoint, upper
-        )
+    if bool(needs_clip.any().item()):
+        for _ in range(32):
+            midpoint = (lower + upper) / 2
+            evaluated_scale = torch.where(
+                needs_clip,
+                midpoint,
+                effective_step,
+            )
+            *_, midpoint_kl, _, _, _ = retracted(evaluated_scale)
+            lower = torch.where(
+                needs_clip & (midpoint_kl <= float(max_target_kl)),
+                midpoint,
+                lower,
+            )
+            upper = torch.where(
+                needs_clip & (midpoint_kl > float(max_target_kl)),
+                midpoint,
+                upper,
+            )
     effective_step = torch.where(needs_clip, lower, effective_step)
     (
         target_log,
@@ -425,6 +551,8 @@ def fisher_consensus_target(
         reverse_kl,
         worst_kl,
         minimum_ratio,
+        information_multiplier,
+        information_moment,
     ) = retracted(effective_step)
     base_cross_entropy_change = -weighted_sum(
         target,
@@ -443,6 +571,8 @@ def fisher_consensus_target(
             minimum_ratio,
             base_cross_entropy_change,
             target_entropy_change,
+            information_multiplier,
+            information_moment,
         ]
     )
     if not bool(torch.isfinite(target).all().item()) or not bool(
@@ -454,7 +584,7 @@ def fisher_consensus_target(
         (worst_kl > float(max_target_kl) + kl_tolerance).any().item()
     ):
         raise RuntimeError("Fisher consensus target exceeds KL trust region")
-    if retraction_mode == "self_information_mixture":
+    if preserves_self_information:
         information_tolerance = max(
             1e-12,
             128.0
@@ -465,19 +595,22 @@ def fisher_consensus_target(
             ),
         )
         if bool((minimum_ratio <= 0.0).any().item()):
-            raise RuntimeError("self-information mixture is not positive")
+            raise RuntimeError("self-information retraction is not positive")
         if bool(
             (base_cross_entropy_change.abs() > information_tolerance)
             .any()
             .item()
         ):
             raise RuntimeError(
-                "self-information mixture violates base cross entropy"
+                "self-information retraction violates base cross entropy: "
+                f"max residual={base_cross_entropy_change.abs().max().item():.6g}, "
+                f"tolerance={information_tolerance:.6g}, "
+                f"max moment={information_moment.abs().max().item():.6g}"
             )
         if bool(
             (target_entropy_change > information_tolerance).any().item()
         ):
-            raise RuntimeError("self-information mixture increases entropy")
+            raise RuntimeError("self-information retraction increases entropy")
     consensus_energy = weighted_sum(probability, consensus.square())
     pair_cosine_to_mean = (
         weighted_sum(
@@ -507,6 +640,8 @@ def fisher_consensus_target(
             "effective_step_size": effective_step.detach(),
             "positivity_limited": positivity_limited.to(dtype).detach(),
             "minimum_mixture_ratio": minimum_ratio.detach(),
+            "self_information_multiplier": information_multiplier.detach(),
+            "self_information_moment": information_moment.detach(),
             "base_cross_entropy_change": (
                 base_cross_entropy_change.detach()
             ),

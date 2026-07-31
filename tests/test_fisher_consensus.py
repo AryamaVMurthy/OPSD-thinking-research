@@ -494,6 +494,97 @@ def test_self_information_mixture_stays_inside_positivity_boundary():
     assert result.target_probs.min().item() > 0.0
 
 
+def test_self_information_exponential_preserves_cross_entropy_with_full_support():
+    base = _logits([2.0, 0.5, -0.5, -1.0])
+    probability = base.softmax(dim=-1)
+    log_probability = base.log_softmax(dim=-1)
+    entropy_direction = log_probability - (
+        probability * log_probability
+    ).sum(dim=-1, keepdim=True)
+    procedure = _logits([-10.0, 4.0, 3.0, 3.0])
+    procedure -= (probability * procedure).sum(dim=-1, keepdim=True)
+    procedure -= (
+        (probability * procedure * entropy_direction).sum(
+            dim=-1, keepdim=True
+        )
+        / (probability * entropy_direction.square()).sum(
+            dim=-1, keepdim=True
+        )
+    ) * entropy_direction
+    guides = torch.stack([base + procedure] * 3)
+
+    result = fisher_consensus_target(
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=torch.randn_like(guides),
+        step_size=1.0,
+        max_target_kl=100.0,
+        direction_mode="entropy_neutral_plan_barycenter",
+        retraction_mode="self_information_exponential",
+    )
+
+    target = result.target_probs
+    base_cross_entropy = -(probability * log_probability).sum(dim=-1)
+    target_cross_entropy = -(target * log_probability).sum(dim=-1)
+    assert torch.allclose(
+        target.sum(dim=-1),
+        torch.ones_like(target.sum(dim=-1)),
+        atol=1e-12,
+    )
+    assert target.min().item() > 0.0
+    assert result.metrics["positivity_limited"].item() == 0.0
+    assert result.metrics["effective_step_size"].item() == pytest.approx(1.0)
+    assert torch.allclose(
+        target_cross_entropy,
+        base_cross_entropy,
+        atol=1e-11,
+        rtol=0.0,
+    )
+    assert result.metrics["target_entropy_change"].item() == pytest.approx(
+        -result.metrics["target_reverse_kl"].item(),
+        abs=1e-11,
+    )
+    assert result.metrics["base_cross_entropy_change"].item() == pytest.approx(
+        0.0,
+        abs=1e-11,
+    )
+
+
+def test_self_information_exponential_has_same_local_fisher_tangent():
+    base = _logits([1.8, 0.4, -0.2, -1.2])
+    probability = base.softmax(dim=-1)
+    log_probability = base.log_softmax(dim=-1)
+    entropy_direction = log_probability - (
+        probability * log_probability
+    ).sum(dim=-1, keepdim=True)
+    procedure = _logits([0.2, 1.1, -0.9, -0.4])
+    procedure -= (probability * procedure).sum(dim=-1, keepdim=True)
+    procedure -= (
+        (probability * procedure * entropy_direction).sum(
+            dim=-1, keepdim=True
+        )
+        / (probability * entropy_direction.square()).sum(
+            dim=-1, keepdim=True
+        )
+    ) * entropy_direction
+    guides = torch.stack([base + procedure] * 3)
+    epsilon = 1e-5
+
+    result = fisher_consensus_target(
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=torch.zeros_like(guides),
+        step_size=epsilon,
+        max_target_kl=0.01,
+        direction_mode="entropy_neutral_plan_barycenter",
+        retraction_mode="self_information_exponential",
+    )
+
+    derivative = (result.target_probs - probability) / epsilon
+    expected = probability * result.consensus_direction
+    assert torch.allclose(derivative, expected, atol=2e-6, rtol=2e-5)
+
+
 def test_entropy_neutral_barycenter_is_identity_at_uniform_anchor():
     base = _logits([0.0, 0.0, 0.0])
     guides = torch.tensor(

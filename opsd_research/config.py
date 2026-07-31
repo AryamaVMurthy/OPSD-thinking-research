@@ -666,16 +666,18 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         if retraction_mode not in {
             "exponential",
             "self_information_mixture",
+            "self_information_exponential",
         }:
             raise ConfigError(
                 f"{source}: unsupported fisher_retraction_mode"
             )
         if (
-            retraction_mode == "self_information_mixture"
+            retraction_mode
+            in {"self_information_mixture", "self_information_exponential"}
             and direction_mode != "entropy_neutral_plan_barycenter"
         ):
             raise ConfigError(
-                f"{source}: self-information mixture requires an "
+                f"{source}: self-information retraction requires an "
                 "entropy-neutral Fisher direction"
             )
         if (
