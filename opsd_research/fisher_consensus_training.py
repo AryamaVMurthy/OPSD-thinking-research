@@ -261,6 +261,7 @@ def compute_loss_with_fisher_consensus(
         max_target_kl=float(self._fisher_max_target_kl),
         temperature=float(self.temperature),
         anchor_kl_weight=float(self._fisher_anchor_kl_weight),
+        direction_mode=str(self._fisher_direction_mode),
     )
     boost_weights = torch.ones(
         student_logits.shape[0],
@@ -339,6 +340,7 @@ def compute_loss_with_fisher_consensus(
                     "cross_problem_edge": bool(
                         self._fisher_cross_problem_edge
                     ),
+                    "direction_mode": str(self._fisher_direction_mode),
                     **edge_metrics,
                     **metrics,
                 },

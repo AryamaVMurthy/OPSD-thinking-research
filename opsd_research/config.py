@@ -630,6 +630,17 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
                 f"{source}: Fisher edge boosting requires at least three "
                 "data-parallel problems and per-device batch one"
             )
+        direction_mode = data.get(
+            "fisher_direction_mode",
+            "matched_control_residual",
+        )
+        if direction_mode not in {
+            "matched_control_residual",
+            "positive_plan_barycenter",
+        }:
+            raise ConfigError(
+                f"{source}: unsupported fisher_direction_mode"
+            )
         if (
             not isinstance(selection_seed, int)
             or isinstance(selection_seed, bool)

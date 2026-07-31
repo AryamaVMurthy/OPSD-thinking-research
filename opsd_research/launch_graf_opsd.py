@@ -630,6 +630,12 @@ def main() -> None:
         opsd_trainer.OPSDTrainer._fisher_edge_threshold = float(
             config.get("fisher_edge_threshold", 0.0)
         )
+        opsd_trainer.OPSDTrainer._fisher_direction_mode = str(
+            config.get(
+                "fisher_direction_mode",
+                "matched_control_residual",
+            )
+        )
         opsd_trainer.OPSDTrainer._fisher_consensus_energy_threshold = float(
             config["fisher_consensus_energy_threshold"]
         )
@@ -661,6 +667,12 @@ def main() -> None:
                     ),
                     "edge_threshold": float(
                         config.get("fisher_edge_threshold", 0.0)
+                    ),
+                    "direction_mode": str(
+                        config.get(
+                            "fisher_direction_mode",
+                            "matched_control_residual",
+                        )
                     ),
                     "answer_access": False,
                     "reference_solution_access": False,

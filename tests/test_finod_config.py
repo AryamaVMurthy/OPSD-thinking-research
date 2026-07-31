@@ -234,3 +234,17 @@ def test_fisher_edge_boosting_screen_requires_cross_problem_dp_batch():
     assert config["num_gpus"] == 8
     assert config["per_device_train_batch_size"] == 1
     assert config["max_steps"] == 6
+
+
+def test_fisher_plan_barycenter_screen_is_registered_without_edge_gate():
+    config = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s7-plan-barycenter-6.yaml"
+    ).data
+
+    assert config["fisher_direction_mode"] == "positive_plan_barycenter"
+    assert config["fisher_cross_problem_edge"] is False
+    assert config["fisher_step_size"] == 1.0
+    assert config["fisher_anchor_kl_weight"] == 1.0
+    assert config["max_steps"] == 6

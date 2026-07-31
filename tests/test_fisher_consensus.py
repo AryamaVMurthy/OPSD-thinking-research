@@ -314,3 +314,61 @@ def test_positive_fisher_edges_are_normalized_to_global_mean_one():
     assert result.active_fraction.item() == pytest.approx(2 / 3)
     assert result.weights.mean().item() == pytest.approx(1.0)
     assert result.weights[-1].item() == pytest.approx(0.0)
+
+
+def test_positive_plan_barycenter_is_invariant_to_control_logits():
+    base = _logits([0.2, -0.1, 0.0])
+    guides = torch.tensor(
+        [
+            [[1.0, -1.0, 0.0]],
+            [[0.8, -0.7, -0.1]],
+            [[1.2, -0.9, -0.3]],
+        ],
+        dtype=torch.float64,
+    )
+    controls_a = torch.zeros_like(guides)
+    controls_b = torch.randn_like(guides) * 100.0
+
+    first = fisher_consensus_target(
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=controls_a,
+        step_size=1.0,
+        max_target_kl=0.01,
+        direction_mode="positive_plan_barycenter",
+    )
+    second = fisher_consensus_target(
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=controls_b,
+        step_size=1.0,
+        max_target_kl=0.01,
+        direction_mode="positive_plan_barycenter",
+    )
+
+    assert torch.equal(first.target_probs, second.target_probs)
+    assert torch.equal(
+        first.consensus_direction,
+        second.consensus_direction,
+    )
+
+
+def test_positive_plan_barycenter_centers_guide_minus_base_scores():
+    base = _logits([0.2, -0.1, 0.0])
+    positive = _logits([0.8, -0.4, 0.1])
+    guides = torch.stack([positive, positive, positive])
+
+    result = fisher_consensus_target(
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=torch.zeros_like(guides),
+        step_size=0.25,
+        max_target_kl=0.01,
+        direction_mode="positive_plan_barycenter",
+    )
+
+    expected = positive - base
+    probability = base.softmax(dim=-1)
+    expected -= (probability * expected).sum(dim=-1, keepdim=True)
+    assert result.metrics["agreement"].item() == pytest.approx(1.0)
+    assert torch.allclose(result.consensus_direction, expected)

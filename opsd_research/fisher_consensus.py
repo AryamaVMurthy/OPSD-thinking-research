@@ -143,6 +143,7 @@ def fisher_consensus_target(
     step_size: float,
     max_target_kl: float,
     temperature: float = 1.0,
+    direction_mode: str = "matched_control_residual",
 ) -> FisherConsensusTarget:
     """Construct a frozen-anchor target from agreement among contrastive guides.
 
@@ -174,15 +175,26 @@ def fisher_consensus_target(
         raise ValueError("step_size must be nonnegative")
     if max_target_kl <= 0.0:
         raise ValueError("max_target_kl must be positive")
+    if direction_mode not in {
+        "matched_control_residual",
+        "positive_plan_barycenter",
+    }:
+        raise ValueError("unsupported Fisher consensus direction mode")
 
     dtype = _work_dtype(base_logits)
     anchor = base_logits.detach().to(dtype) / temperature
     probability = anchor.softmax(dim=-1)
     log_probability = anchor.log_softmax(dim=-1)
-    contrast = (
-        guide_logits.detach().to(dtype)
-        - control_logits.detach().to(dtype)
-    ) / temperature
+    if direction_mode == "matched_control_residual":
+        contrast = (
+            guide_logits.detach().to(dtype)
+            - control_logits.detach().to(dtype)
+        ) / temperature
+    else:
+        contrast = (
+            guide_logits.detach().to(dtype)
+            - base_logits.detach().to(dtype).unsqueeze(0)
+        ) / temperature
 
     pair_probability = probability.unsqueeze(0)
     contrast = contrast - (
@@ -285,6 +297,7 @@ def fisher_consensus_loss(
     max_target_kl: float,
     temperature: float = 1.0,
     anchor_kl_weight: float = 0.0,
+    direction_mode: str = "matched_control_residual",
 ) -> tuple[torch.Tensor, FisherConsensusTarget]:
     """Fit the detached target with an optional frozen-policy KL proximal."""
     if student_logits.shape != base_logits.shape:
@@ -304,6 +317,7 @@ def fisher_consensus_loss(
         step_size=step_size,
         max_target_kl=max_target_kl,
         temperature=temperature,
+        direction_mode=direction_mode,
     )
     dtype = _work_dtype(student_logits)
     student_log = (

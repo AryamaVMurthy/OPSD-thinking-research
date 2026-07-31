@@ -515,6 +515,30 @@ The next one-epoch diagnostic raises only the exponential-tilt ceiling
 distinguishes a sub-noise Fisher target from a fundamentally
 non-transferable direction without relaxing the function-space safety bound.
 
+The strong-target job `17387` completed safely and reduced the mean
+target-loss ratio to 1.254, but did not cross below one. Only 14.3% of target
+tokens hit the two-sided 0.01 KL cap. Thus target scale was part of the
+optimization mismatch, but not the source of transfer.
+
+Job `17389` then tested leave-one-out Fisher-edge boosting across the eight
+problems in each global data-parallel microbatch. The edge was nondegenerate:
+54.7% of examples were active and positive edge averaged 0.0495. Nevertheless
+the mean ratio worsened to 1.277 and alignment became slightly negative. A
+shared vocabulary score is therefore not a useful proxy for parameter-space
+transfer in this setting.
+
+These failures expose a more basic cancellation error. Both a problem's
+answer-free plans and unrelated control plans contain generic contest-solving
+procedure. Guide-minus-control subtraction removes that shared procedural
+component and leaves a problem-specific residual. The next screen uses the
+Fisher barycenter of positive plans relative to the frozen base:
+\[
+u_k=(z_k^+-z_0)-\mathbb E_{p_0}[z_k^+-z_0].
+\]
+Three-plan agreement, the strong target ceiling, two-sided KL cap, and
+frozen-policy proximal remain unchanged. Controls remain an audited placebo
+but cannot affect the barycenter target.
+
 Promotion requires all of the following:
 
 1. finite, nonnegative loss and nonzero gradients;
