@@ -602,6 +602,29 @@ The next one-variable screen uses the same adapter weights at LoRA scale
 the earlier Fisher three-point prediction that alignment should dominate
 quadratic anchor drift below roughly 0.41 of the learned displacement.
 
+The \(3/8\) evaluation completed in job `17413`:
+
+| Metric | Frozen base | \(3/8\) barycenter | Delta |
+|---|---:|---:|---:|
+| rollout accuracy | 133/180 (73.89%) | 134/180 (74.44%) | +0.56 pp |
+| majority accuracy | 23/30 (76.67%) | 24/30 (80.00%) | +3.33 pp |
+| pass@6 | 26/30 (86.67%) | 25/30 (83.33%) | -3.33 pp |
+| 32k cutoffs | 10/180 | 12/180 | +2 |
+| mean output tokens | 14,582 | 15,222 | +640 |
+
+There were 11 improvements and 10 regressions. Improvements shortened by
+4,983 tokens on average and removed three cutoffs; regressions grew by 9,673
+tokens and introduced three cutoffs. The interpolation preserved and even
+strengthened the AIME I problem 13 gain to 5/6, but the sole correct AIME II
+problem 8 path still changed from 127 to the unsupported answer 7. It also
+introduced new losses on AIME II problems 2, 5, 7, and 14.
+
+Thus direct displacement shrinkage reduces aggregate drift but does not
+remove the unstable basin-selection mechanism. It fails the pass@6 and cutoff
+gates and is rejected. The next isolated screen shortens only the supervised
+Fisher horizon from 1,024 to 512 tokens while preserving the 32k inference
+budget.
+
 ## 9. Preliminary novelty boundary
 
 The closest current papers solve materially different problems:

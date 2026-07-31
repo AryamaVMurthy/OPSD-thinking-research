@@ -151,3 +151,19 @@ Promote the interpolation only if it retains a positive average or majority
 signal while restoring pass@6 and eliminating the material cutoff increase.
 If it erases both gains and regressions, reject post-hoc scaling and test the
 separate early-prefix hypothesis.
+
+The \(3/8\) screen falsified displacement magnitude as a sufficient
+explanation. Average accuracy moved only from 73.89% to 74.44%, majority from
+76.67% to 80.00%, pass@6 still fell from 86.67% to 83.33%, and cutoffs still
+rose from 10 to 12. The smaller adapter preserved the AIME I problem 13 gain
+at 5/6, but introduced different regressions on AIME II problems 2, 5, 7, and
+14. Correct-to-wrong flips remained 9,673 tokens longer on average.
+
+The next test therefore leaves adapter scale, target geometry, optimizer, and
+data unchanged and restricts Fisher supervision from the first 1,024 rollout
+tokens to the first 512. The causal hypothesis is that plan conditioning is
+useful while selecting and instantiating an approach, but its later tokenwise
+effect teaches continued reconsideration after the route should already be
+committed. This is distinct from optimizing for short outputs: inference
+retains the full 32k budget, and the loss still contains no answer, reward,
+verifier, length penalty, or termination label.
