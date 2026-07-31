@@ -606,7 +606,9 @@ def main() -> None:
             compute_loss_with_fisher_consensus,
         )
 
-        install_fisher_consensus_collator()
+        install_fisher_consensus_collator(
+            plan_core_sentences=config.get("fisher_plan_core_sentences")
+        )
         import opsd_trainer
 
         opsd_trainer.OPSDTrainer._fisher_positions_per_rollout = int(
@@ -654,6 +656,9 @@ def main() -> None:
                     "event": "fisher_consensus_loss_enabled",
                     "plans_per_problem": int(
                         config["fisher_plans_per_problem"]
+                    ),
+                    "plan_core_sentences": config.get(
+                        "fisher_plan_core_sentences"
                     ),
                     "positions_per_rollout": int(
                         config["fisher_positions_per_rollout"]

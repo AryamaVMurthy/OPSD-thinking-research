@@ -438,3 +438,24 @@ def test_self_information_exponential_changes_only_fisher_retraction():
     } == {
         key: value for key, value in baseline.items() if key not in ignored
     }
+
+
+def test_decisive_core_screen_changes_only_plan_span():
+    baseline = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s10-barycenter-prefix512-6.yaml"
+    ).data
+    candidate = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s16-decisive-core-prefix512-6.yaml"
+    ).data
+
+    assert candidate["fisher_plan_core_sentences"] == 2
+    ignored = {"variant", "fisher_plan_core_sentences"}
+    assert {
+        key: value for key, value in candidate.items() if key not in ignored
+    } == {
+        key: value for key, value in baseline.items() if key not in ignored
+    }

@@ -2,14 +2,41 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 
 import torch
+
+from .fisher_guidance import validate_answer_free_procedure
 
 
 _FINAL_INSTRUCTION = (
     "Please reason step by step, and put your final answer within \\boxed{}."
 )
+
+_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+")
+
+
+def decisive_plan_core(plan: str, *, sentences: int) -> str:
+    """Return exactly the first complete procedural sentences of a plan."""
+    if (
+        not isinstance(sentences, int)
+        or isinstance(sentences, bool)
+        or sentences < 1
+    ):
+        raise ValueError("plan core sentences must be a positive integer")
+    parts = [
+        part.strip()
+        for part in _SENTENCE_BOUNDARY.split(str(plan).strip())
+        if part.strip()
+    ]
+    if len(parts) < sentences:
+        raise ValueError(
+            f"decisive plan core requires at least {sentences} sentences"
+        )
+    core = " ".join(parts[:sentences])
+    validate_answer_free_procedure(core)
+    return core
 
 
 def _plan_view(problem: str, plan: str) -> str:
@@ -30,6 +57,7 @@ def build_fisher_consensus_views(
     problem: str,
     guides: Sequence[str],
     controls: Sequence[str],
+    plan_core_sentences: int | None = None,
 ) -> dict[str, object]:
     """Build the deploy anchor and exactly matched positive/control views."""
     problem = str(problem).strip()
@@ -41,6 +69,21 @@ def build_fisher_consensus_views(
         raise ValueError("Fisher consensus views require matched plan pairs")
     if any(not plan for plan in [*guides, *controls]):
         raise ValueError("Fisher consensus views require nonempty plans")
+    if plan_core_sentences is not None:
+        guides = [
+            decisive_plan_core(plan, sentences=plan_core_sentences)
+            for plan in guides
+        ]
+        controls = [
+            decisive_plan_core(plan, sentences=plan_core_sentences)
+            for plan in controls
+        ]
+        normalized = [" ".join(plan.lower().split()) for plan in guides]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("decisive guide plan cores must be distinct")
+        normalized = [" ".join(plan.lower().split()) for plan in controls]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("decisive control plan cores must be distinct")
     return {
         "base": f"Problem: {problem}\n\n{_FINAL_INSTRUCTION}",
         "guides": [_plan_view(problem, plan) for plan in guides],
@@ -79,7 +122,13 @@ def _attach_encoded(result: dict, name: str, encoded) -> None:
     )
 
 
-def attach_fisher_consensus_views(collator, features, result: dict) -> None:
+def attach_fisher_consensus_views(
+    collator,
+    features,
+    result: dict,
+    *,
+    plan_core_sentences: int | None = None,
+) -> None:
     """Attach K positive/control views without constructing an answer view."""
     if collator.reason_first:
         raise RuntimeError("Fisher consensus requires reason_first=False")
@@ -88,6 +137,7 @@ def attach_fisher_consensus_views(collator, features, result: dict) -> None:
             problem=feature["problem"],
             guides=feature["fisher_guides"],
             controls=feature["fisher_controls"],
+            plan_core_sentences=plan_core_sentences,
         )
         for feature in features
     ]
@@ -143,7 +193,9 @@ def attach_fisher_consensus_views(collator, features, result: dict) -> None:
     )
 
 
-def install_fisher_consensus_collator() -> None:
+def install_fisher_consensus_collator(
+    *, plan_core_sentences: int | None = None
+) -> None:
     """Install answer-free plan views into the upstream collator."""
     from data_collator import SelfDistillationDataCollator
 
@@ -153,7 +205,12 @@ def install_fisher_consensus_collator() -> None:
 
     def call_with_fisher_consensus_views(self, features):
         result = original_call(self, features)
-        attach_fisher_consensus_views(self, features, result)
+        attach_fisher_consensus_views(
+            self,
+            features,
+            result,
+            plan_core_sentences=plan_core_sentences,
+        )
         return result
 
     call_with_fisher_consensus_views._fisher_consensus_wrapper = True

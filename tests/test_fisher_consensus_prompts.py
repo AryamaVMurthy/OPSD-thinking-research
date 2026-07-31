@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import pytest
 import torch
 
 from opsd_research.fisher_consensus_prompts import (
     attach_fisher_consensus_views,
     build_fisher_consensus_views,
+    decisive_plan_core,
 )
 
 
@@ -25,6 +27,64 @@ def test_views_have_exact_deploy_anchor_and_matched_plan_wrappers():
     assert "correct" not in views["guides"][0].lower()
     assert "reported answer" not in views["guides"][0].lower()
     assert "reference" not in views["guides"][0].lower()
+
+
+def test_decisive_plan_core_keeps_exactly_first_two_sentences():
+    plan = (
+        "Introduce coordinates. Derive the invariant from equal lengths. "
+        "Verify every sign. If this route fails, try an alternative."
+    )
+
+    assert decisive_plan_core(plan, sentences=2) == (
+        "Introduce coordinates. Derive the invariant from equal lengths."
+    )
+
+
+def test_decisive_core_is_applied_symmetrically_to_guides_and_controls():
+    views = build_fisher_consensus_views(
+        problem="Find the requested integer.",
+        guides=[
+            "Factor the polynomial. Compare multiplicities. Use a fallback.",
+            "Introduce a recurrence. Solve its fixed point. Check another route.",
+        ],
+        controls=[
+            "Draw the altitude. Apply similarity. Verify with coordinates.",
+            "Count complements. Use inclusion-exclusion. Try an alternative.",
+        ],
+        plan_core_sentences=2,
+    )
+
+    rendered = "\n".join([*views["guides"], *views["controls"]]).lower()
+    assert "factor the polynomial. compare multiplicities." in rendered
+    assert "draw the altitude. apply similarity." in rendered
+    assert "fallback" not in rendered
+    assert "verify" not in rendered
+    assert "alternative" not in rendered
+
+
+def test_decisive_core_rejects_short_or_duplicate_plan_cores():
+    with pytest.raises(ValueError, match="at least 2 sentences"):
+        decisive_plan_core("Only one sentence.", sentences=2)
+
+    with pytest.raises(ValueError, match="distinct"):
+        build_fisher_consensus_views(
+            problem="Find the requested integer.",
+            guides=[
+                "Use symmetry. Count orbits. First fallback.",
+                "Use symmetry. Count orbits. Second fallback.",
+            ],
+            controls=[
+                "Factor first. Compare roots. Check signs.",
+                "Use coordinates. Eliminate a variable. Verify.",
+            ],
+            plan_core_sentences=2,
+        )
+
+    with pytest.raises(ValueError, match="answer claim"):
+        decisive_plan_core(
+            "Factor the expression. The final answer is boxed here.",
+            sentences=2,
+        )
 
 
 def test_collator_attaches_all_pairs_without_answer_view():

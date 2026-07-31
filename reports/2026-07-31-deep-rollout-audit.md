@@ -733,9 +733,134 @@ shows:
 
 The exact conservation law is working, but the positivity boundary makes the
 target roughly half as strong while the learned student drift remains near
-S13's scale. Per the preregistered design, AIME-2026 is the first strict task
-screen. It is running in job `17545`; no AIME-2025 evaluation is spent unless
-AIME-2026 preserves average, majority, pass@6, and cutoffs.
+S13's scale. Per the preregistered design, AIME-2026 was the first strict task
+screen. Generation job `17545` completed in 34:02 and paired comparison job
+`17546` completed in eight seconds. Average accuracy fell from 123/180
+(68.33%) to 118/180 (65.56%), a -2.78-point change with paired
+problem-clustered interval [-7.78, +2.78] points. Majority stayed 22/30, but
+pass@6 fell from 26/30 to 24/30 and cutoffs rose from 14 to 16. There were 18
+correct-to-wrong and 13 wrong-to-correct transitions.
+
+The exact flips reject a length-only explanation. Problem 11 improved from
+2/6 to 5/6 by recovering the degree-weighted checkerboard extremum 3,896;
+problem 18 improved from 1/6 to 3/6 by deriving the correct coordinate-area
+congruence and 503 admissible lengths. Conversely, problem 9 lost its only
+correct 9/20 conditional-counting path and replaced it with an incorrect
+12/125 case split; problem 17 lost its sole correct 243 path for an unsupported
+perfect-square guess; and problem 26 fell from 4/6 to 2/6. In the latter,
+candidate paths abandoned an exact factorization and enumeration proving
+`n=132` for invalid floor or speculative quartic arguments yielding 285 or
+300. Problems 9 and 17 account for both pass@6 losses. Newly capped degraded
+paths occur on problems 12 and 24, while problem 29 adds two more cutoffs.
+
+S14 is therefore rejected and receives no AIME-2025 evaluation. Exact
+self-information conservation prevents aggregate migration toward unlikely
+frozen tokens, but it cannot distinguish checked reasoning from a confident
+invalid route. The registered full-support I-projection contingency S15 is the
+last isolated retraction test; if it fails, the target semantics/localization,
+not the finite information geometry, becomes the leading cause.
+
+### 8.9 Procedural-plan style audit
+
+The selected training manifest was joined exactly to all 192 selected source
+indices, preserving 48 examples per domain and yielding 576 actual guide
+plans. Their builder prompt explicitly requests falsification checks and a
+fallback. In the selected plans, 56.9% mention an alternative, 44.6% mention
+verification, 28.8% contain `fallback`, 25.5% contain `critical check`, and
+21.2% use the exact phrase `if this route fails`. This is not an unused-cache
+artifact: the counts are over the plans consumed by S10--S14.
+
+That semantic pattern matches the task evidence. Correct-to-wrong transitions
+are commonly longer or end in speculative route changes, while improvements
+often shorten after finding a decisive invariant. S14's AIME-2026 degraded
+transitions add 4,945 tokens on average and three cutoffs; improved transitions
+remove 6,316 tokens and two cutoffs. Retraction geometry can control how far a
+plan-conditioned distribution moves, but cannot remove fallback/restart style
+embedded in the direction itself. If S15 fails, the next one-variable screen
+must localize or remove recovery-style guidance rather than add another
+retraction constraint.
+
+### 8.10 Full-support self-information I-projection (S15)
+
+S15 replaces only the S13/S14 finite retraction with
+
+\[
+q_{\alpha,\beta}(a)\propto
+p_0(a)\exp\{\alpha r_\perp(a)+\beta h(a)\},
+\quad
+h=\log p_0-\mathbb E_{p_0}\log p_0,
+\]
+
+where the scalar `beta` is solved so that
+`E_q h = 0`. The moment is monotone with derivative `Var_q(h)`, giving a
+unique root for nonuniform anchors. Since `r_perp` is Fisher-orthogonal to
+`h`, `beta'(0)=0`; S15 has exactly the same local tangent as S13/S14 while
+preserving frozen cross entropy and satisfying
+`H(q)-H(p) = -KL(q||p)` at finite scale. Unlike S14 it has no positivity step
+boundary.
+
+Implementation commit `a938647` passes 318 tests plus 69 subtests. Production
+float32 stress at vocabulary size 151,936 caught and fixed a target
+renormalization error before cluster use; subsequent scale-1, scale-8, and
+scale-25 cases respect the 0.01 two-sided KL cap with cross-entropy residuals
+at or below `9.54e-7` and finite targets.
+
+The eight-A100 one-step smoke, job `17556`, completed in 2:50. It produced
+finite nonzero loss 0.0019, gradient norm 0.0542, four positive Fisher events,
+maximum target KL 0.01, zero positivity limiting, maximum mean absolute
+cross-entropy residual `1.17e-8`, and maximum entropy/KL identity residual
+`9.78e-9`. Its LoRA-B update has 70,718,445/70,778,880 nonzero entries, L2
+0.000420, maximum absolute value `8.75e-7`, and SHA-256
+`68cc925a2ea33a208ca24efc0ead03528e7bcb2ef5f3e5f9e3c689370017cecd`.
+The first six-step attempt, job `17560`, reached the final optimizer step but
+hard-failed before checkpoint publication. One rank encountered a nearly
+uniform frozen distribution whose entropy variance was below the projection
+activity threshold; the implementation therefore treated it as exactly
+uniform even though the finite tilted distribution had self-information
+moment 0.00120, above the `3.74e-5` tolerance. No partial checkpoint is used.
+
+The corrected implementation separates entropy-projection activity from
+moment-solve activity using the range of centered self-information. It also
+uses a scale-aware monotone bracket centered at zero for rare low-variance
+roots. A dedicated near-uniform regression fails on the old implementation
+and passes after the fix. The full suite now has 319 tests plus 69 subtests;
+production-shaped near-uniform float32 stress at vocabulary size 151,936 has
+zero reported cross-entropy residual, maximum target KL 0.01, and finite
+multiplier 48.2. Fix commit `58ecd85` completed the clean six-step retry, job
+`17562`, in 7:08; the failed directory is preserved separately and was never
+resumed.
+
+The retry audit has 24/24 finite positive Fisher events, maximum target KL
+0.01, zero positivity limiting, maximum mean absolute cross-entropy residual
+`2.08e-8`, and maximum entropy/KL identity residual `1.11e-8`. Mean target
+entropy change is -0.001903. Post-initial target-loss/frozen-anchor ratio is
+1.2484, alignment gain `1.92e-4`, and cosine 0.0230. Gradient norms are
+0.0542--0.1438; the registered 0.1 cap is active on the final two steps. All
+252 LoRA-B tensors and all 70,778,880 entries are nonzero, adapter L2 is
+0.001060, maximum absolute value is `2.71e-6`, and SHA-256 is
+`4a81f8031bb1487cf9b7901c36522fcad961953aae89f2eeb7703a138595d879`.
+The exact 192-example selection remains 48 examples per domain with selection
+SHA-256 `fdca7d7b30ed95e36f6be6032ea6727d55937587a940aceb76069d2b197890b9`.
+Its AIME-2026 gate is running in job `17568`, with automatic paired comparison
+job `17569`.
+
+### 8.11 Decisive-core semantic contingency (S16)
+
+S16 is implemented but remains conditional on S15 failing its strict
+AIME-2026 gate. It returns to S10's positive-plan barycenter, exponential
+retraction, prefix-512 horizon, and six-step optimizer schedule; the only
+configuration change is `fisher_plan_core_sentences: 2`. Before rendering,
+both guide and matched-control plans are reduced to their first two complete
+sentences. Short, answer-claim, and within-ensemble duplicate cores hard fail.
+
+The complete suite passes 323 tests plus 70 subtests. An exact integration
+audit over the immutable selected cache validated all 192 examples and all
+1,152 guide/control views. Every example retains three distinct guide cores
+and three distinct control cores; the selection remains exactly 48 examples
+per algebra, geometry, number theory, and combinatorics. Guide cores average
+337.4 characters, with range 182--562, matching the preregistered semantic
+audit. No S16 training or benchmark evaluation is launched unless S15 fails,
+so it remains an isolated contingency rather than a combined method.
 
 ## 9. Preliminary novelty boundary
 

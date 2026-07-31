@@ -718,6 +718,15 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
             raise ConfigError(
                 f"{source}: fisher_plans_per_problem must be in [2, 5]"
             )
+        plan_core_sentences = data.get("fisher_plan_core_sentences")
+        if plan_core_sentences is not None and (
+            not isinstance(plan_core_sentences, int)
+            or isinstance(plan_core_sentences, bool)
+            or not 1 <= plan_core_sentences <= 5
+        ):
+            raise ConfigError(
+                f"{source}: fisher_plan_core_sentences must be in [1, 5]"
+            )
         positions = data.get("fisher_positions_per_rollout")
         if (
             not isinstance(positions, int)

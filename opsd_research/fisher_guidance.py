@@ -319,6 +319,19 @@ def validate_answer_free_plan(problem: str, plan: str) -> None:
     """
     problem = str(problem).strip()
     plan = str(plan).strip()
+    validate_answer_free_procedure(plan)
+    problem_numbers = _normalized_numbers(problem)
+    novel_numbers = _normalized_numbers(plan) - problem_numbers
+    if novel_numbers:
+        raise ValueError(
+            "answer-free plan contains a derived numerical result: "
+            + ", ".join(sorted(novel_numbers))
+        )
+
+
+def validate_answer_free_procedure(plan: str) -> None:
+    """Reject conclusion, calculation, or injection content without a problem."""
+    plan = str(plan).strip()
     if not plan:
         raise ValueError("answer-free plan is empty")
     if len(plan) > 2400:
@@ -329,13 +342,6 @@ def validate_answer_free_plan(problem: str, plan: str) -> None:
         raise ValueError("answer-free plan contains an answer claim")
     if _NUMERIC_CLAIM.search(plan):
         raise ValueError("answer-free plan contains a derived numerical claim")
-    problem_numbers = _normalized_numbers(problem)
-    novel_numbers = _normalized_numbers(plan) - problem_numbers
-    if novel_numbers:
-        raise ValueError(
-            "answer-free plan contains a derived numerical result: "
-            + ", ".join(sorted(novel_numbers))
-        )
 
 
 def validate_guidance_ensemble(
@@ -395,12 +401,7 @@ def answer_free_guidance_row(
         # Controls describe other problems, so their original problem numerals
         # were validated when the cache was built.  Here we recheck only the
         # conclusion/injection constraints by preserving their own numerals.
-        if _INJECTION.search(plan):
-            raise ValueError("guidance row contains an injection pattern")
-        if _ANSWER_CLAIM.search(plan):
-            raise ValueError("guidance row contains an answer claim")
-        if _NUMERIC_CLAIM.search(plan):
-            raise ValueError("guidance row contains a derived numerical claim")
+        validate_answer_free_procedure(plan)
     return {
         "problem": problem,
         "solution": normalized_guides[0],
