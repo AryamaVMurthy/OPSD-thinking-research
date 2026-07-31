@@ -40,3 +40,15 @@ def test_finod_representative_config_registers_exact_one_epoch_scale():
     assert config["max_completion_length"] == 4096
     assert config["max_steps"] == 32
     assert config["save_steps"] == 32
+
+
+def test_signed_orthogonal_finod_config_is_registered():
+    config = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "finod-g2-orthogonal-representative-1024.yaml"
+    ).data
+
+    assert config["finod_projection_mode"] == "signed-orthogonal-v1"
+    assert config["finod_max_records"] == 1024
+    assert config["max_steps"] == 32

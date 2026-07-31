@@ -437,6 +437,9 @@ def main() -> None:
         opsd_trainer.OPSDTrainer._finod_residual_energy_threshold = float(
             config["finod_residual_energy_threshold"]
         )
+        opsd_trainer.OPSDTrainer._finod_projection_mode = config.get(
+            "finod_projection_mode", "one-sided-positive-v1"
+        )
         opsd_trainer.OPSDTrainer.compute_loss = compute_loss_with_finod
         print(
             json.dumps(
@@ -449,6 +452,9 @@ def main() -> None:
                     "max_target_kl": float(config["finod_max_target_kl"]),
                     "nuisance_strength_threshold": float(
                         config["finod_nuisance_strength_threshold"]
+                    ),
+                    "projection_mode": config.get(
+                        "finod_projection_mode", "one-sided-positive-v1"
                     ),
                 },
                 separators=(",", ":"),

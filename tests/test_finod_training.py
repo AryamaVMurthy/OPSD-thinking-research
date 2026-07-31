@@ -62,6 +62,7 @@ def test_finod_telemetry_is_token_weighted_and_reduced_across_ranks():
     assert result["max_observed_target_kl"] == pytest.approx(0.003)
     assert result["active_projection_fraction"] == pytest.approx(2 / 3)
     assert result["collapsed_residual_fraction"] == pytest.approx(1 / 3)
+    assert result["absolute_alignment_after"] == pytest.approx(2.0e-5 / 3)
     assert result["positive_alignment_after_fraction"] == 0.0
     assert result["clipped_target_fraction"] == 1.0
 
@@ -92,3 +93,4 @@ def test_finod_telemetry_reports_alignment_on_active_nuisance():
     )
 
     assert result["positive_alignment_after_fraction"] == 1.0
+    assert result["absolute_alignment_after"] == pytest.approx(2.0e-5)

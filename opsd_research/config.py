@@ -437,6 +437,9 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         selection_seed = data.get("finod_selection_seed")
         guidance_protocol = data.get("finod_guidance_input_protocol")
         leakage_protocol = data.get("finod_answer_leakage_protocol")
+        projection_mode = data.get(
+            "finod_projection_mode", "one-sided-positive-v1"
+        )
         if max_records is not None:
             if (
                 not isinstance(max_records, int)
@@ -470,6 +473,14 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         ):
             raise ConfigError(
                 f"{source}: finod_answer_leakage_protocol must be a nonempty string"
+            )
+        if projection_mode not in {
+            "one-sided-positive-v1",
+            "signed-orthogonal-v1",
+        }:
+            raise ConfigError(
+                f"{source}: unsupported finod_projection_mode "
+                f"{projection_mode!r}"
             )
         positions = data.get("finod_positions_per_rollout")
         if (

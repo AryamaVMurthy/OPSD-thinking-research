@@ -34,6 +34,30 @@ def test_projection_removes_answer_direction_but_retains_procedural_signal():
     assert not torch.allclose(result.target_probs, student.softmax(dim=-1))
 
 
+def test_signed_projection_removes_anti_aligned_answer_direction():
+    student = torch.zeros(1, 3, dtype=torch.float64)
+    base = torch.zeros_like(student)
+    answer = torch.tensor([[1.0, -1.0, 0.0]], dtype=torch.float64)
+    procedure = torch.tensor([[1.0, 1.0, -2.0]], dtype=torch.float64)
+    guide = procedure - answer
+
+    result = fisher_projected_target(
+        student_logits=student,
+        guide_logits=guide,
+        base_logits=base,
+        nuisance_logits=answer,
+        step_size=0.25,
+        nuisance_strength_threshold=1e-12,
+        projection_mode="signed-orthogonal-v1",
+    )
+
+    torch.testing.assert_close(result.residual_direction, procedure)
+    assert result.metrics["projection_coefficient"].item() < 0.0
+    assert abs(result.metrics["residual_nuisance_alignment"].item()) < 1e-12
+    assert result.metrics["residual_energy"].item() > 0.0
+    assert result.metrics["target_kl"].item() > 0.0
+
+
 def test_target_kl_is_clipped_without_changing_residual_direction():
     student = torch.zeros(1, 4, dtype=torch.float64)
     base = torch.zeros_like(student)

@@ -45,6 +45,7 @@ def fisher_projected_loss(
     token_mask: torch.Tensor,
     step_size: float,
     nuisance_strength_threshold: float,
+    projection_mode: str = "one-sided-positive-v1",
     max_target_kl: float | None = None,
     temperature: float = 1.0,
 ) -> tuple[torch.Tensor, FisherProjectedTarget]:
@@ -56,6 +57,7 @@ def fisher_projected_loss(
         nuisance_logits=nuisance_logits,
         step_size=step_size,
         nuisance_strength_threshold=nuisance_strength_threshold,
+        projection_mode=projection_mode,
         max_target_kl=max_target_kl,
         temperature=temperature,
     )
@@ -97,14 +99,16 @@ def fisher_projected_target(
     nuisance_logits: torch.Tensor,
     step_size: float,
     nuisance_strength_threshold: float,
+    projection_mode: str = "one-sided-positive-v1",
     max_target_kl: float | None = None,
     temperature: float = 1.0,
 ) -> FisherProjectedTarget:
-    """Build a one-sided Fisher-projected exponential-tilt target.
+    """Build a Fisher-projected exponential-tilt target.
 
     The guide and nuisance directions are measured relative to the same
-    unprivileged frozen-teacher view. Positive Fisher alignment with the
-    nuisance direction is removed; anti-alignment is left unchanged.
+    unprivileged frozen-teacher view. ``one-sided-positive-v1`` removes
+    positive Fisher alignment and preserves anti-alignment.
+    ``signed-orthogonal-v1`` removes the full signed nuisance component.
     """
     if not (
         student_logits.shape
@@ -121,6 +125,11 @@ def fisher_projected_target(
         raise ValueError("step_size must be nonnegative")
     if nuisance_strength_threshold < 0.0:
         raise ValueError("nuisance_strength_threshold must be nonnegative")
+    if projection_mode not in {
+        "one-sided-positive-v1",
+        "signed-orthogonal-v1",
+    }:
+        raise ValueError(f"unsupported FiNOD projection_mode {projection_mode!r}")
     if max_target_kl is not None and max_target_kl <= 0.0:
         raise ValueError("max_target_kl must be positive when provided")
 
@@ -150,11 +159,15 @@ def fisher_projected_target(
     nuisance_energy = (probability * nuisance.square()).sum(dim=-1)
     alignment = (probability * guide * nuisance).sum(dim=-1)
     active = nuisance_energy > nuisance_strength_threshold
+    projected_alignment = (
+        alignment
+        if projection_mode == "signed-orthogonal-v1"
+        else torch.relu(alignment)
+    )
     coefficient = torch.where(
         active,
-        torch.relu(alignment) / nuisance_energy.clamp_min(
-            torch.finfo(work_dtype).tiny
-        ),
+        projected_alignment
+        / nuisance_energy.clamp_min(torch.finfo(work_dtype).tiny),
         torch.zeros_like(alignment),
     )
     residual = guide - coefficient.unsqueeze(-1) * nuisance

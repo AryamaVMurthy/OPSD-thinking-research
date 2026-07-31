@@ -107,6 +107,7 @@ def _aggregate_finod_metrics(
             (residual <= residual_energy_threshold).to(torch.float64).sum(),
             total("guide_nuisance_alignment"),
             alignment_after.sum(),
+            alignment_after.abs().sum(),
             (
                 (alignment_after > 1e-5) & active.to(torch.bool)
             ).to(torch.float64).sum(),
@@ -144,10 +145,11 @@ def _aggregate_finod_metrics(
         "collapsed_residual_fraction": average(10),
         "alignment_before": average(11),
         "alignment_after": average(12),
+        "absolute_alignment_after": average(13),
         "positive_alignment_after_fraction": (
-            values[13] / values[9] if values[9] > 0 else 0.0
+            values[14] / values[9] if values[9] > 0 else 0.0
         ),
-        "clipped_target_fraction": average(14),
+        "clipped_target_fraction": average(15),
         "max_observed_target_kl": float(max_kl.detach().cpu()),
     }
 
@@ -234,6 +236,7 @@ def compute_loss_with_finod(
         nuisance_strength_threshold=float(
             self._finod_nuisance_strength_threshold
         ),
+        projection_mode=str(self._finod_projection_mode),
         temperature=float(self.temperature),
     )
     metrics = _aggregate_finod_metrics(
@@ -257,6 +260,7 @@ def compute_loss_with_finod(
                     "retained_energy_fraction": metrics["residual_energy"]
                     / max(metrics["guide_energy"], 1e-12),
                     "max_target_kl": float(self._finod_max_target_kl),
+                    "projection_mode": str(self._finod_projection_mode),
                 },
                 separators=(",", ":"),
             ),
