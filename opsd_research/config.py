@@ -286,8 +286,9 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
     allowed_steps = {5, 12, 25, 32, 50, 200}
     if data.get("graph_mode") == "fisher_consensus":
         # Six effective-batch updates are one exact pass over the registered
-        # 192-example equal-domain Fisher screen.
-        allowed_steps.add(6)
+        # 192-example screen; sixteen are one pass over the promoted
+        # 512-example equal-domain scale-up.
+        allowed_steps.update({6, 16})
     if data.get("max_steps") not in allowed_steps:
         raise ConfigError(
             f"{source}: max_steps is not registered for this GRAF mode"

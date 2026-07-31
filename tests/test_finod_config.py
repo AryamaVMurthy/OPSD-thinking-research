@@ -262,3 +262,17 @@ def test_fisher_plan_barycenter_strong_proximal_matches_drift_prediction():
     assert config["fisher_step_size"] == 1.0
     assert config["fisher_cross_problem_edge"] is False
     assert config["max_steps"] == 6
+
+
+def test_promoted_barycenter_scaleup_is_exactly_domain_balanced():
+    config = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s9-barycenter-balanced-512.yaml"
+    ).data
+
+    assert config["fisher_direction_mode"] == "positive_plan_barycenter"
+    assert config["fisher_max_records"] == 512
+    assert config["fisher_max_records"] // 4 == 128
+    assert config["max_steps"] == config["save_steps"] == 16
+    assert config["fisher_anchor_kl_weight"] == 1.0
