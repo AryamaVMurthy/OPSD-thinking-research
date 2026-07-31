@@ -74,6 +74,11 @@ class TrainingSummaryTests(unittest.TestCase):
             checkpoint.mkdir()
             (checkpoint / "adapter_model.safetensors").write_bytes(b"adapter")
             (checkpoint / "trainer_state.json").write_text("{}", encoding="utf-8")
+            derived_checkpoint = root / "checkpoint-5-scaled-3of8"
+            derived_checkpoint.mkdir()
+            (derived_checkpoint / "adapter_model.safetensors").write_bytes(
+                b"derived adapter"
+            )
             log = root / "train.log"
             log.write_text(
                 "\r  2%| | 4/200 [00:10]\n"
@@ -126,6 +131,7 @@ class TrainingSummaryTests(unittest.TestCase):
             self.assertEqual(result["vllm_rollout_calls"]["at_completion_cap"], 1)
             self.assertTrue(result["checkpoints"][0]["adapter_present"])
             self.assertTrue(result["checkpoints"][0]["trainer_state_present"])
+            self.assertEqual(len(result["checkpoints"]), 1)
             self.assertTrue(
                 result["rollout_dump_integrity"]["covers_latest_checkpoint"]
             )

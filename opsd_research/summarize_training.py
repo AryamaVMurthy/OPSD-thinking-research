@@ -182,9 +182,14 @@ def summarize(
     ]
 
     checkpoint_records = []
+    checkpoint_paths = [
+        path
+        for path in training_dir.glob("checkpoint-*")
+        if CHECKPOINT_RE.fullmatch(path.name) is not None
+    ]
     for path in sorted(
-        training_dir.glob("checkpoint-*"),
-        key=lambda item: int(CHECKPOINT_RE.search(item.name).group(1)),
+        checkpoint_paths,
+        key=lambda item: int(CHECKPOINT_RE.fullmatch(item.name).group(1)),
     ):
         match = CHECKPOINT_RE.search(path.name)
         if match is None:
