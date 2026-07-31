@@ -307,7 +307,8 @@ This is intentionally one mechanism, not a mixture:
 The new builder:
 
 - receives only `question`, `data_source`, and source index;
-- drops the dataset response column before constructing prompts;
+- uses PyArrow column projection so the response column is never materialized
+  in the builder process;
 - creates three separately sampled plans with different seeds and planning
   lenses;
 - rejects boxed expressions, answer/result claims, prompt injection, explicit

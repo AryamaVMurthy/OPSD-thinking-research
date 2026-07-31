@@ -127,3 +127,33 @@ def load_math_cot_20k(
         "train": dataset.select(train),
         "heldout_diagnostic": dataset.select(heldout),
     })
+
+
+def load_math_cot_questions_only(
+    revision: str = DATASET_REVISION,
+) -> Any:
+    """Load only public problem/provenance columns from the pinned Parquet.
+
+    PyArrow column projection happens while reading the file.  The response
+    column is therefore never materialized in the guidance-builder process.
+    """
+    from datasets import Dataset
+    from huggingface_hub import hf_hub_download
+    from pyarrow import parquet
+
+    path = hf_hub_download(
+        repo_id=DATASET_ID,
+        filename=DATASET_FILE,
+        repo_type="dataset",
+        revision=revision,
+    )
+    columns = ["question", "data_source"]
+    table = parquet.read_table(path, columns=columns).replace_schema_metadata(
+        None
+    )
+    dataset = Dataset(table)
+    if dataset.column_names != columns:
+        raise RuntimeError(
+            "problem-only dataset projection returned unexpected columns"
+        )
+    return dataset

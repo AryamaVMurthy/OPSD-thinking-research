@@ -112,15 +112,12 @@ def main() -> None:
 
     from vllm import LLM, SamplingParams
 
-    from .training_data import load_math_cot_20k
+    from .training_data import load_math_cot_questions_only
 
-    # Drop the response column before any prompt is constructed.  Nothing
-    # below this point can index a solution or answer.
-    rows = load_math_cot_20k(heldout_fraction=0.0)["train"]
+    # PyArrow projects only these columns while reading the source Parquet;
+    # the response is never materialized in this process.
+    rows = load_math_cot_questions_only()
     rows = rows.add_column("_source_index", list(range(len(rows))))
-    rows = rows.select_columns(
-        ["question", "data_source", "_source_index"]
-    )
     requested_sources = set(args.data_sources)
     if requested_sources:
         rows = rows.filter(
