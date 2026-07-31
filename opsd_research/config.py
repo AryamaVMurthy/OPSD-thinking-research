@@ -352,6 +352,7 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         "fluid_context_dossier",
         "context_dossier",
         "finod_scaffold",
+        "fisher_consensus",
     }:
         raise ConfigError(f"{source}: unsupported graph_mode")
     for key in ("branch_loss_weight", "entropy_floor_weight"):
@@ -555,6 +556,104 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
                 raise ConfigError(
                     f"{source}: {key} must be finite and nonnegative"
                 )
+    if data.get("graph_mode") == "fisher_consensus":
+        max_records = data.get("fisher_max_records")
+        selection_seed = data.get("fisher_selection_seed")
+        if (
+            not isinstance(max_records, int)
+            or isinstance(max_records, bool)
+            or not 32 <= max_records <= 4096
+        ):
+            raise ConfigError(
+                f"{source}: fisher_max_records must be in [32, 4096]"
+            )
+        if (
+            not isinstance(selection_seed, int)
+            or isinstance(selection_seed, bool)
+            or selection_seed < 0
+        ):
+            raise ConfigError(
+                f"{source}: fisher_selection_seed must be nonnegative"
+            )
+        if (
+            data.get("fisher_guidance_input_protocol")
+            != "problem-only-independent-v1"
+        ):
+            raise ConfigError(
+                f"{source}: Fisher guidance must use the registered "
+                "problem-only protocol"
+            )
+        data_sources = data.get("fisher_data_sources")
+        if (
+            not isinstance(data_sources, list)
+            or not data_sources
+            or any(
+                not isinstance(item, str) or not item
+                for item in data_sources
+            )
+            or len(set(data_sources)) != len(data_sources)
+        ):
+            raise ConfigError(
+                f"{source}: fisher_data_sources must be unique strings"
+            )
+        pair_count = data.get("fisher_plans_per_problem")
+        if (
+            not isinstance(pair_count, int)
+            or isinstance(pair_count, bool)
+            or not 2 <= pair_count <= 5
+        ):
+            raise ConfigError(
+                f"{source}: fisher_plans_per_problem must be in [2, 5]"
+            )
+        positions = data.get("fisher_positions_per_rollout")
+        if (
+            not isinstance(positions, int)
+            or isinstance(positions, bool)
+            or not 1 <= positions <= 256
+        ):
+            raise ConfigError(
+                f"{source}: fisher_positions_per_rollout must be in [1, 256]"
+            )
+        prefix_tokens = data.get("fisher_position_prefix_tokens")
+        if (
+            not isinstance(prefix_tokens, int)
+            or isinstance(prefix_tokens, bool)
+            or not 1
+            <= prefix_tokens
+            <= int(data["max_completion_length"])
+        ):
+            raise ConfigError(
+                f"{source}: fisher_position_prefix_tokens must be in "
+                "[1, max_completion_length]"
+            )
+        bounded_positive = {
+            "fisher_step_size": 2.0,
+            "fisher_max_target_kl": 0.1,
+        }
+        for key, upper in bounded_positive.items():
+            value = data.get(key)
+            if (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not math.isfinite(float(value))
+                or not 0.0 < float(value) <= upper
+            ):
+                raise ConfigError(
+                    f"{source}: {key} must be finite in (0, {upper}]"
+                )
+        energy_threshold = data.get(
+            "fisher_consensus_energy_threshold"
+        )
+        if (
+            not isinstance(energy_threshold, (int, float))
+            or isinstance(energy_threshold, bool)
+            or not math.isfinite(float(energy_threshold))
+            or float(energy_threshold) < 0.0
+        ):
+            raise ConfigError(
+                f"{source}: fisher_consensus_energy_threshold must be "
+                "finite and nonnegative"
+            )
 
 
 def _validate_graf_autoresearch(data: dict[str, Any], source: str) -> None:

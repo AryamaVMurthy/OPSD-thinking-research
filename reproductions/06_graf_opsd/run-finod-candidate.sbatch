@@ -19,7 +19,6 @@ cd "${PROJECT_SOURCE}"
 : "${FINOD_CONFIG:?}"
 : "${FINOD_MAX_STEPS:?}"
 : "${FINOD_PORT:?}"
-: "${GRAF_GRAPH_CACHE_MANIFEST:?}"
 
 python3 -m opsd_research.cli validate-config "${FINOD_CONFIG}"
 python3 - "${FINOD_CONFIG}" <<'PY'
@@ -27,11 +26,27 @@ from opsd_research.config import load_config
 import sys
 
 config = load_config(sys.argv[1]).data
-if config["graph_mode"] != "finod_scaffold":
-    raise SystemExit("FiNOD runner requires graph_mode=finod_scaffold")
+if config["graph_mode"] not in {"finod_scaffold", "fisher_consensus"}:
+    raise SystemExit("guidance runner requires FiNOD or Fisher consensus")
 if config["num_gpus"] != 8 or config["gradient_accumulation_steps"] != 4:
     raise SystemExit("FiNOD runner requires the registered DP8/GA4 recipe")
 PY
+
+graph_mode="$(python3 - "${FINOD_CONFIG}" <<'PY'
+from opsd_research.config import load_config
+import sys
+print(load_config(sys.argv[1]).data["graph_mode"])
+PY
+)"
+if [[ "${graph_mode}" == "fisher_consensus" ]]; then
+  : "${FISHER_GUIDANCE_MANIFEST:?}"
+  input_manifest="${FISHER_GUIDANCE_MANIFEST}"
+  copied_manifest="fisher-guidance-manifest.json"
+else
+  : "${GRAF_GRAPH_CACHE_MANIFEST:?}"
+  input_manifest="${GRAF_GRAPH_CACHE_MANIFEST}"
+  copied_manifest="graph-cache-manifest.json"
+fi
 
 completion_length="$(python3 - "${FINOD_CONFIG}" <<'PY'
 from opsd_research.config import load_config
@@ -60,7 +75,8 @@ PY
 representative_records="$(python3 - "${FINOD_CONFIG}" <<'PY'
 from opsd_research.config import load_config
 import sys
-print(load_config(sys.argv[1]).data.get("finod_max_records", ""))
+config = load_config(sys.argv[1]).data
+print(config.get("finod_max_records", config.get("fisher_max_records", "")))
 PY
 )"
 
@@ -79,16 +95,19 @@ output_dir="${TRAIN_ROOT}/${run_name}"
 training_log="${SLURM_SUBMIT_DIR}/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out"
 mkdir -p "${output_dir}" logs
 cp "${FINOD_CONFIG}" "${output_dir}/config.yaml"
-cp "${GRAF_GRAPH_CACHE_MANIFEST}" "${output_dir}/graph-cache-manifest.json"
+cp "${input_manifest}" "${output_dir}/${copied_manifest}"
 export OPSD_TRAINING_PARTITION_MANIFEST="${output_dir}/training-partition.json"
-if [[ -n "${representative_records}" ]]; then
+if [[ "${graph_mode}" == "fisher_consensus" ]]; then
+  export OPSD_FISHER_SELECTION_MANIFEST="${output_dir}/fisher-representative-selection.json"
+elif [[ -n "${representative_records}" ]]; then
   export OPSD_FINOD_SELECTION_MANIFEST="${output_dir}/finod-representative-selection.json"
 fi
-printf 'method=finod\nmax_steps=%s\nnum_gpus=8\ngradient_accumulation_steps=4\neffective_batch_size=32\nseed=%s\ndata_seed=%s\nvllm_gpu_memory_utilization=%s\nmax_sequence_length=%s\nmax_grad_norm=0.1\n' \
+printf 'method=%s\nmax_steps=%s\nnum_gpus=8\ngradient_accumulation_steps=4\neffective_batch_size=32\nseed=%s\ndata_seed=%s\nvllm_gpu_memory_utilization=%s\nmax_sequence_length=%s\nmax_grad_norm=0.1\n' \
+  "${graph_mode}" \
   "${FINOD_MAX_STEPS}" "${seed}" "${seed}" "${vllm_utilization}" \
   "${max_sequence_length}" > "${output_dir}/runtime-overrides.txt"
 record_run_manifest \
-  "${output_dir}" runtime-overrides.txt graph-cache-manifest.json
+  "${output_dir}" runtime-overrides.txt "${copied_manifest}"
 
 start_gpu_telemetry "${run_name}"
 trap stop_gpu_telemetry EXIT
@@ -139,10 +158,15 @@ accelerate launch \
   --report_to wandb \
   --wandb_project FiNOD-autoresearch
 
-if [[ -n "${representative_records}" ]]; then
+if [[ "${graph_mode}" == "fisher_consensus" ]]; then
+  test -s "${OPSD_FISHER_SELECTION_MANIFEST}"
+  record_run_manifest \
+    "${output_dir}" runtime-overrides.txt "${copied_manifest}" \
+    fisher-representative-selection.json
+elif [[ -n "${representative_records}" ]]; then
   test -s "${OPSD_FINOD_SELECTION_MANIFEST}"
   record_run_manifest \
-    "${output_dir}" runtime-overrides.txt graph-cache-manifest.json \
+    "${output_dir}" runtime-overrides.txt "${copied_manifest}" \
     finod-representative-selection.json
 fi
 

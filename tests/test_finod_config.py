@@ -95,3 +95,22 @@ def test_contest_prefix_screen_is_registered():
     assert config["finod_nuisance_view"] == "style"
     assert config["finod_projection_mode"] == "signed-orthogonal-v1"
     assert config["max_steps"] == 5
+
+
+def test_answer_free_fisher_consensus_screen_is_registered():
+    config = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s1-contest-prefix.yaml"
+    ).data
+
+    assert config["graph_mode"] == "fisher_consensus"
+    assert config["fisher_data_sources"] == ["amc_aime", "aops_forum"]
+    assert config["fisher_guidance_input_protocol"] == (
+        "problem-only-independent-v1"
+    )
+    assert config["fisher_plans_per_problem"] == 3
+    assert config["fisher_max_records"] == 192
+    assert config["fisher_position_prefix_tokens"] == 1024
+    assert config["num_gpus"] == 8
+    assert config["max_steps"] == 5

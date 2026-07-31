@@ -92,9 +92,33 @@ def _validate_invocation() -> dict[str, object]:
             accepted_teacher_dossiers(manifest)
         except ValueError as error:
             raise SystemExit(f"invalid CH dossier cache: {error}") from error
+    if config["graph_mode"] == "fisher_consensus":
+        manifest = os.environ.get("FISHER_GUIDANCE_MANIFEST")
+        if not manifest:
+            raise SystemExit(
+                "Fisher consensus requires FISHER_GUIDANCE_MANIFEST"
+            )
+        from .fisher_guidance import load_guidance_ensemble
+
+        try:
+            _ensembles, guidance_manifest = load_guidance_ensemble(manifest)
+        except ValueError as error:
+            raise SystemExit(
+                f"invalid Fisher guidance cache: {error}"
+            ) from error
+        if (
+            guidance_manifest.get("guidance_input_protocol")
+            != config["fisher_guidance_input_protocol"]
+        ):
+            raise SystemExit("Fisher guidance protocol does not match config")
+        if (
+            guidance_manifest.get("plans_per_problem")
+            != config["fisher_plans_per_problem"]
+        ):
+            raise SystemExit("Fisher guidance pair count does not match config")
     # GRAF-Lite routing is enabled only after a graph-cache manifest exists.
     # C0 uses the same reliable upstream objective with a longer rollout.
-    if config["graph_mode"] not in {
+    elif config["graph_mode"] not in {
         "disabled",
         "context_dossier",
     }:
@@ -218,6 +242,66 @@ def main() -> None:
             ),
             flush=True,
         )
+    elif config["graph_mode"] == "fisher_consensus":
+        from .finod_dataset import (
+            filter_finod_indices_by_sources,
+            select_representative_finod_indices,
+        )
+        from .fisher_guidance import (
+            install_fisher_guidance_dataset_redirect,
+            load_guidance_ensemble,
+        )
+
+        available, guidance_metadata = load_guidance_ensemble(
+            os.environ["FISHER_GUIDANCE_MANIFEST"]
+        )
+        eligible = sorted(set(available).intersection(train_index_set))
+        eligible = filter_finod_indices_by_sources(
+            raw_dataset,
+            eligible_indices=eligible,
+            data_sources=config["fisher_data_sources"],
+        )
+        eligible, selection_manifest = select_representative_finod_indices(
+            raw_dataset,
+            eligible_indices=eligible,
+            limit=int(config["fisher_max_records"]),
+            seed=int(config["fisher_selection_seed"]),
+        )
+        selection_path = os.environ.get(
+            "OPSD_FISHER_SELECTION_MANIFEST"
+        )
+        if not selection_path:
+            raise SystemExit(
+                "Fisher consensus requires OPSD_FISHER_SELECTION_MANIFEST"
+            )
+        if is_primary:
+            Path(selection_path).write_text(
+                json.dumps(selection_manifest, indent=2, sort_keys=True)
+                + "\n",
+                encoding="utf-8",
+            )
+        records = install_fisher_guidance_dataset_redirect(
+            os.environ["FISHER_GUIDANCE_MANIFEST"],
+            source_indices=eligible,
+        )
+        if is_primary:
+            print(
+                json.dumps(
+                    {
+                        "event": "fisher_consensus_dataset_enabled",
+                        "records": records,
+                        "plans_per_problem": guidance_metadata[
+                            "plans_per_problem"
+                        ],
+                        "data_sources": config["fisher_data_sources"],
+                        "answer_access": False,
+                        "reference_solution_access": False,
+                        **selection_manifest,
+                    },
+                    separators=(",", ":"),
+                ),
+                flush=True,
+            )
     elif config["graph_mode"] == "finod_scaffold":
         from .finod_dataset import (
             filter_finod_indices_by_sources,
@@ -488,6 +572,59 @@ def main() -> None:
                     "nuisance_view": config.get(
                         "finod_nuisance_view", "answer"
                     ),
+                },
+                separators=(",", ":"),
+            ),
+            flush=True,
+        )
+    elif config["graph_mode"] == "fisher_consensus":
+        from .fisher_consensus_prompts import (
+            install_fisher_consensus_collator,
+        )
+        from .fisher_consensus_training import (
+            compute_loss_with_fisher_consensus,
+        )
+
+        install_fisher_consensus_collator()
+        import opsd_trainer
+
+        opsd_trainer.OPSDTrainer._fisher_positions_per_rollout = int(
+            config["fisher_positions_per_rollout"]
+        )
+        opsd_trainer.OPSDTrainer._fisher_position_prefix_tokens = int(
+            config["fisher_position_prefix_tokens"]
+        )
+        opsd_trainer.OPSDTrainer._fisher_step_size = float(
+            config["fisher_step_size"]
+        )
+        opsd_trainer.OPSDTrainer._fisher_max_target_kl = float(
+            config["fisher_max_target_kl"]
+        )
+        opsd_trainer.OPSDTrainer._fisher_consensus_energy_threshold = float(
+            config["fisher_consensus_energy_threshold"]
+        )
+        opsd_trainer.OPSDTrainer.compute_loss = (
+            compute_loss_with_fisher_consensus
+        )
+        print(
+            json.dumps(
+                {
+                    "event": "fisher_consensus_loss_enabled",
+                    "plans_per_problem": int(
+                        config["fisher_plans_per_problem"]
+                    ),
+                    "positions_per_rollout": int(
+                        config["fisher_positions_per_rollout"]
+                    ),
+                    "position_prefix_tokens": int(
+                        config["fisher_position_prefix_tokens"]
+                    ),
+                    "step_size": float(config["fisher_step_size"]),
+                    "max_target_kl": float(
+                        config["fisher_max_target_kl"]
+                    ),
+                    "answer_access": False,
+                    "reference_solution_access": False,
                 },
                 separators=(",", ":"),
             ),
