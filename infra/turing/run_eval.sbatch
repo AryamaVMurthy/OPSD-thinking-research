@@ -33,18 +33,29 @@ ADAPTER_SHA256=""
 manifest_extras=()
 if [[ -n "${ADAPTER}" ]]; then
   adapter_file="${ADAPTER}/adapter_model.safetensors"
-  if [[ ! -f "${adapter_file}" ]]; then
-    echo "Missing LoRA adapter: ${adapter_file}" >&2
+  adapter_config_file="${ADAPTER}/adapter_config.json"
+  if [[ ! -f "${adapter_file}" || ! -f "${adapter_config_file}" ]]; then
+    echo "Missing LoRA adapter weights or config in: ${ADAPTER}" >&2
     exit 1
   fi
   ADAPTER_SHA256="$(sha256sum "${adapter_file}" | awk '{print $1}')"
+  adapter_config_sha256="$(
+    sha256sum "${adapter_config_file}" | awk '{print $1}'
+  )"
   {
     printf 'adapter_path=%s\n' "${ADAPTER}"
     printf 'adapter_sha256=%s\n' "${ADAPTER_SHA256}"
+    printf 'adapter_config_sha256=%s\n' "${adapter_config_sha256}"
     printf 'method=%s\n' "${METHOD}"
     printf 'checkpoint=%s\n' "${CHECKPOINT}"
   } > "${OUTPUT_DIR}/adapter-metadata.txt"
   manifest_extras+=(adapter-metadata.txt)
+  if [[ -f "${ADAPTER}/zero-control-manifest.json" ]]; then
+    cp \
+      "${ADAPTER}/zero-control-manifest.json" \
+      "${OUTPUT_DIR}/zero-control-manifest.json"
+    manifest_extras+=(zero-control-manifest.json)
+  fi
 fi
 record_run_manifest "${OUTPUT_DIR}" "${manifest_extras[@]}"
 export CONFIG EVAL_MODULE RUN_NAME ADAPTER ADAPTER_SHA256 METHOD CHECKPOINT

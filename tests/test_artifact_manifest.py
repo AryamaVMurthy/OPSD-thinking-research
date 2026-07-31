@@ -35,3 +35,10 @@ def test_turing_math_jobs_use_isolated_official_scorer_and_final_manifest() -> N
     assert 'summarize_math' not in evaluation
     assert 'artifact_manifest.sh' in evaluation
     assert 'artifact_manifest.sh' in lcb_score
+
+
+def test_eval_manifest_identifies_adapter_config_and_zero_control() -> None:
+    evaluation = Path("infra/turing/run_eval.sbatch").read_text(encoding="utf-8")
+
+    assert "adapter_config_sha256=" in evaluation
+    assert "zero-control-manifest.json" in evaluation
