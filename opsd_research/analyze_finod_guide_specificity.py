@@ -109,12 +109,18 @@ def load_audit_samples(
     graphs_jsonl: Path,
     generations_dir: Path,
     samples_per_group: int,
+    categories: tuple[str, ...] = ("boxed", "unfinished"),
 ) -> list[AuditSample]:
     rows = load_math_cot_20k(heldout_fraction=0.0)["train"]
-    question_rows = {
-        str(row["question"]).strip(): (index, row)
-        for index, row in enumerate(rows)
-    }
+    if not categories or any(
+        category not in {"boxed", "unfinished"} for category in categories
+    ):
+        raise ValueError("categories must contain boxed and/or unfinished")
+    question_rows: dict[str, list[tuple[int, dict[str, Any]]]] = {}
+    for index, row in enumerate(rows):
+        question_rows.setdefault(str(row["question"]).strip(), []).append(
+            (index, row)
+        )
     guides: dict[int, str] = {}
     for line in graphs_jsonl.read_text(encoding="utf-8").splitlines():
         record = json.loads(line)
@@ -132,22 +138,33 @@ def load_audit_samples(
         payload = json.loads(path.read_text(encoding="utf-8"))
         for record in payload["generations"]:
             problem = _question_from_prompt(str(record["prompt"]))
-            source_index, row = question_rows[problem]
+            matching_rows = [
+                item
+                for item in question_rows[problem]
+                if item[0] in guides
+            ]
+            if not matching_rows:
+                raise ValueError(
+                    "recorded rollout has no accepted guide for its dataset "
+                    f"row: {problem[:120]!r}"
+                )
+            source_index, row = min(matching_rows, key=lambda item: item[0])
             completion = str(record["completion"])
             category = _completion_category(completion, str(row["response"]))
-            candidates[category].append(
-                AuditSample(
-                    source_index=source_index,
-                    category=category,
-                    problem=problem,
-                    guide=guides[source_index],
-                    completion=completion,
+            if category in categories:
+                candidates[category].append(
+                    AuditSample(
+                        source_index=source_index,
+                        category=category,
+                        problem=problem,
+                        guide=guides[source_index],
+                        completion=completion,
+                    )
                 )
-            )
 
     selected: list[AuditSample] = []
-    for category in ("boxed", "unfinished"):
-        ordered = sorted(
+    for category in categories:
+        ordered_with_repeats = sorted(
             candidates[category],
             key=lambda item: (
                 hashlib.sha256(
@@ -156,6 +173,13 @@ def load_audit_samples(
                 item.source_index,
             ),
         )
+        ordered: list[AuditSample] = []
+        seen_source_indices: set[int] = set()
+        for item in ordered_with_repeats:
+            if item.source_index in seen_source_indices:
+                continue
+            seen_source_indices.add(item.source_index)
+            ordered.append(item)
         if len(ordered) < samples_per_group:
             raise ValueError(
                 f"need {samples_per_group} {category} samples, found {len(ordered)}"
@@ -247,16 +271,24 @@ def _residual_fraction(
     signal: torch.Tensor,
     nuisance: torch.Tensor,
 ) -> torch.Tensor:
+    residual = _fisher_residual(probability, signal, nuisance)
+    signal_energy = _fisher_inner(probability, signal, signal)
+    residual_energy = _fisher_inner(probability, residual, residual)
+    return residual_energy / signal_energy.clamp_min(1e-30)
+
+
+def _fisher_residual(
+    probability: torch.Tensor,
+    signal: torch.Tensor,
+    nuisance: torch.Tensor,
+) -> torch.Tensor:
     nuisance_energy = _fisher_inner(probability, nuisance, nuisance)
     coefficient = _fisher_inner(
         probability, signal, nuisance
     ) / nuisance_energy.clamp_min(1e-30)
-    residual = _center(
+    return _center(
         probability, signal - coefficient.unsqueeze(-1) * nuisance
     )
-    signal_energy = _fisher_inner(probability, signal, signal)
-    residual_energy = _fisher_inner(probability, residual, residual)
-    return residual_energy / signal_energy.clamp_min(1e-30)
 
 
 def _mean(values: list[float]) -> float:
@@ -337,6 +369,12 @@ def run_audit(args: argparse.Namespace) -> dict[str, Any]:
         shuffled_direction = _center(
             probability, shuffled_logits - base_logits
         )
+        true_style_residual = _fisher_residual(
+            probability, true_direction, generic_direction
+        )
+        shuffled_style_residual = _fisher_residual(
+            probability, shuffled_direction, generic_direction
+        )
         true_energy = _fisher_inner(
             probability, true_direction, true_direction
         )
@@ -370,6 +408,13 @@ def run_audit(args: argparse.Namespace) -> dict[str, Any]:
                             shuffled_direction[offset : offset + 1],
                         )[0]
                     ),
+                    "style_residual_shuffled_cosine": float(
+                        _cosine(
+                            probability[offset : offset + 1],
+                            true_style_residual[offset : offset + 1],
+                            shuffled_style_residual[offset : offset + 1],
+                        )[0]
+                    ),
                     "generic_residual_fraction": float(
                         _residual_fraction(
                             probability[offset : offset + 1],
@@ -389,6 +434,11 @@ def run_audit(args: argparse.Namespace) -> dict[str, Any]:
                     ),
                     "actual_token_shift": float(
                         true_direction[offset, actual_tokens[offset]]
+                    ),
+                    "actual_token_style_residual_shift": float(
+                        true_style_residual[
+                            offset, actual_tokens[offset]
+                        ]
                     ),
                     "top_positive_tokens": [
                         {
@@ -421,9 +471,11 @@ def run_audit(args: argparse.Namespace) -> dict[str, Any]:
                     "true_energy",
                     "true_generic_cosine",
                     "true_shuffled_cosine",
+                    "style_residual_shuffled_cosine",
                     "generic_residual_fraction",
                     "shuffled_residual_fraction",
                     "actual_token_shift",
+                    "actual_token_style_residual_shift",
                 )
             },
         }
