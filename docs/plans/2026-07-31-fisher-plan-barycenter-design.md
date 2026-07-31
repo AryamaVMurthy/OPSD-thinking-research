@@ -240,3 +240,36 @@ already useful; it does not assert equality of the integrated six-step Adam
 displacement. Promotion still requires positive average accuracy on both
 AIME-2025 and AIME-2026 without reducing majority accuracy or pass@6 and
 without materially increasing 32k cutoffs.
+
+The exact full-prefix AIME-2026 control completed in jobs `17457`/`17458`.
+It moved average accuracy from 123/180 to 109/180 (-7.78 pp; paired 95%
+interval [-13.33, -2.78] pp), majority from 22/30 to 20/30, and pass@6 from
+26/30 to 24/30. Cutoffs increased from 14 to 16 and mean output length grew
+by 545 tokens. There were 22 correct-to-wrong flips but only eight
+wrong-to-correct flips. Problems 10, 24, 26, and 28 alone lost ten correct
+samples; the candidate frequently recognized an inconsistency and then
+committed to an unsupported alternative or explicit guess.
+
+Answer-distribution entropy rose from 0.4150 to 0.5565, unique answers per
+problem from 1.93 to 2.33, and modal mass fell from 0.8111 to 0.7500. Thus the
+failure is excess route diversification, not answer-mode collapse. The
+prefix-512 checkpoint scored 124/180 on the same seeds, so late-token plan
+supervision is harmful on this year even though prefix truncation did not
+improve the local Fisher diagnostic.
+
+The exact AIME-2025 control then completed in jobs `17459`/`17460`. Average
+accuracy moved from 112/180 to 110/180 (-1.11 pp; paired 95% interval
+[-7.78, 6.11] pp) and majority remained 22/30, but pass@6 fell from 26/30 to
+22/30 with a paired interval of [-26.67, -3.33] pp. Cutoffs increased from 15
+to 22. There were 19 correct-to-wrong flips and 17 wrong-to-correct flips;
+the degraded responses grew by 6,886 tokens on average and introduced seven
+net cutoffs, whereas the improved responses shortened by 5,603 tokens and
+removed three cutoffs. This independently reproduces the basin-selection
+signature on the second allowed benchmark.
+
+The two-year result rejects the full-prefix six-step checkpoint: AIME-2026
+shows a decisive average-accuracy regression and AIME-2025 shows a decisive
+pass@6 regression. Prefix 512 reduces the average-accuracy damage but does
+not restore preservation. The one-global-batch screen therefore tests the
+remaining optimizer-grouping hypothesis; it is not a promotion of either
+six-step checkpoint.
