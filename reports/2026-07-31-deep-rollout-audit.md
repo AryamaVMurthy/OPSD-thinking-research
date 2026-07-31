@@ -563,6 +563,45 @@ Promotion requires all of the following:
 Only after that screen should a representative 1,024-example run and locked
 AIME 2025/2026 evaluation be spent.
 
+### 8.6 Positive-plan barycenter task screen
+
+The six-step positive-plan barycenter checkpoint from job `17391` was
+evaluated on all 30 AIME-2024 problems with six paired rollouts per problem
+and a 32,768-token generation limit. Against the exact same-seed frozen-base
+run:
+
+| Metric | Frozen base | Barycenter | Delta |
+|---|---:|---:|---:|
+| rollout accuracy | 133/180 (73.89%) | 137/180 (76.11%) | +2.22 pp |
+| majority accuracy | 23/30 (76.67%) | 25/30 (83.33%) | +6.67 pp |
+| pass@6 | 26/30 (86.67%) | 25/30 (83.33%) | -3.33 pp |
+| 32k cutoffs | 10/180 | 14/180 | +4 |
+| mean output tokens | 14,582 | 15,518 | +936 |
+
+The rollout-level paired table contains 128 both-correct, 38 both-wrong,
+nine wrong-to-correct, and six correct-to-wrong outcomes. The bootstrap
+95% interval for the average delta is `[-1.11 pp, +6.67 pp]`, so the result is
+a positive screen rather than conclusive evidence.
+
+The flip audit sharply localizes the unsafe behavior. Correct-to-wrong flips
+grew by 17,339 tokens on average and account for all four newly introduced
+cutoffs. Wrong-to-correct flips shortened by 4,840 tokens on average and
+removed three cutoffs. The strongest gain was AIME I problem 13, where the
+candidate enumerated all Hensel lifts and improved from 1/6 to 4/6. The
+pass@6 loss was AIME II problem 8, where the sole correct geometric derivation
+of 127 changed to an unsupported 7 and the other candidate paths repeatedly
+restarted the geometry.
+
+The method therefore improves the probability of entering some valid
+reasoning basins, but its full learned displacement also pushes a minority of
+previously valid paths into long indecisive basins. It fails the preregistered
+no-material-cutoff-increase gate at scale one.
+
+The next one-variable screen uses the same adapter weights at LoRA scale
+`3/8`, corresponding to `lora_alpha=48` rather than 128. This directly tests
+the earlier Fisher three-point prediction that alignment should dominate
+quadratic anchor drift below roughly 0.41 of the learned displacement.
+
 ## 9. Preliminary novelty boundary
 
 The closest current papers solve materially different problems:

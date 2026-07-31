@@ -2,7 +2,10 @@ import json
 
 import pytest
 
-from opsd_research.zero_lora_control import build_zero_lora_control
+from opsd_research.zero_lora_control import (
+    build_lora_scale,
+    build_zero_lora_control,
+)
 
 
 def test_build_zero_lora_control_preserves_weights_and_zeroes_scale(
@@ -53,3 +56,35 @@ def test_build_zero_lora_control_refuses_existing_output(tmp_path) -> None:
 
     with pytest.raises(FileExistsError):
         build_zero_lora_control(source, output)
+
+
+def test_build_lora_scale_interpolates_alpha_and_records_scale(
+    tmp_path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "adapter_config.json").write_text(
+        json.dumps(
+            {
+                "r": 64,
+                "lora_alpha": 128,
+                "target_modules": ["q_proj"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    weights = b"synthetic-safetensors"
+    (source / "adapter_model.safetensors").write_bytes(weights)
+    output = tmp_path / "three-eighths"
+
+    manifest = build_lora_scale(source, output, scale=0.375)
+
+    scaled_config = json.loads(
+        (output / "adapter_config.json").read_text(encoding="utf-8")
+    )
+    assert scaled_config["lora_alpha"] == 48
+    assert (output / "adapter_model.safetensors").read_bytes() == weights
+    assert manifest["scale"] == pytest.approx(0.375)
+    assert manifest["source_lora_alpha"] == 128
+    assert manifest["scaled_lora_alpha"] == 48
+    assert manifest["weights_sha256"] == manifest["source_weights_sha256"]

@@ -118,3 +118,36 @@ If the ratio remains above one, answer-free plan-conditioned next-token
 distillation itself lacks transfer at this scale. The next step then reuses
 Fisher only as a selection/confidence layer around the empirically successful
 G4 objective rather than continuing to alter local logit targets.
+
+## Post-screen trust-region interpolation
+
+The six-step checkpoint improved paired AIME-2024 average accuracy from
+133/180 to 137/180 and majority accuracy from 23/30 to 25/30. It nevertheless
+introduced four additional 32k cutoffs and reduced pass@6 from 26/30 to 25/30.
+Exact paired inspection localized the regression: the six correct-to-wrong
+flips grew by 17,339 tokens on average and contained all four new cutoffs,
+whereas the nine wrong-to-correct flips shortened by 4,840 tokens on average
+and removed three cutoffs.
+
+This is the same basin-selection signature seen across earlier methods, not a
+uniform length shift. The Fisher three-point diagnostics also predicted that
+guidance alignment should dominate frozen-anchor drift below approximately
+0.41 of the learned displacement. Raising the proximal coefficient from one
+to four did not realize that smaller displacement. The next causal screen
+therefore changes only the deployed LoRA scale to \(3/8\):
+
+\[
+\theta_{\mathrm{screen}}
+=\theta_0+\frac{3}{8}(\theta_{\mathrm{bary}}-\theta_0).
+\]
+
+The adapter tensors, training run, prompts, seeds, sampling protocol, and
+benchmark stay fixed. Scaling is implemented by changing PEFT
+`lora_alpha` from 128 to 48 in a copied adapter while verifying that the
+adapter-weight SHA-256 is unchanged. This directly tests the trust-region
+prediction without confounding it with a retraining change.
+
+Promote the interpolation only if it retains a positive average or majority
+signal while restoring pass@6 and eliminating the material cutoff increase.
+If it erases both gains and regressions, reject post-hoc scaling and test the
+separate early-prefix hypothesis.
