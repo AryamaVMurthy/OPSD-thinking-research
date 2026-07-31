@@ -77,6 +77,18 @@ def test_consensus_metrics_are_token_weighted_and_report_collapse():
         "target_entropy_change": torch.tensor(
             [[0.01, 99.0], [-0.02, 0.03]]
         ),
+        "positivity_limited": torch.tensor(
+            [[0.0, 99.0], [1.0, 0.0]]
+        ),
+        "minimum_mixture_ratio": torch.tensor(
+            [[0.4, 99.0], [0.2, 1.0]]
+        ),
+        "base_cross_entropy_change": torch.tensor(
+            [[1.0e-8, 99.0], [-2.0e-8, 0.0]]
+        ),
+        "entropy_kl_identity_residual": torch.tensor(
+            [[2.0e-8, 99.0], [-1.0e-8, 0.0]]
+        ),
     }
     selected = torch.tensor([[True, False], [True, True]])
     trainer = SimpleNamespace(
@@ -124,6 +136,14 @@ def test_consensus_metrics_are_token_weighted_and_report_collapse():
     )
     assert result["retained_direction_energy_fraction"] == pytest.approx(0.75)
     assert result["target_entropy_change"] == pytest.approx(0.02 / 3)
+    assert result["positivity_limited_fraction"] == pytest.approx(1 / 3)
+    assert result["mean_minimum_mixture_ratio"] == pytest.approx(1.6 / 3)
+    assert result["mean_absolute_base_cross_entropy_change"] == pytest.approx(
+        1.0e-8
+    )
+    assert result["mean_absolute_entropy_kl_identity_residual"] == pytest.approx(
+        1.0e-8
+    )
 
 
 def test_distributed_fisher_edge_returns_the_local_rank_weight():

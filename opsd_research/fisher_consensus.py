@@ -145,6 +145,7 @@ def fisher_consensus_target(
     max_target_kl: float,
     temperature: float = 1.0,
     direction_mode: str = "matched_control_residual",
+    retraction_mode: str = "exponential",
 ) -> FisherConsensusTarget:
     """Construct a frozen-anchor target from agreement among contrastive guides.
 
@@ -182,6 +183,18 @@ def fisher_consensus_target(
         "entropy_neutral_plan_barycenter",
     }:
         raise ValueError("unsupported Fisher consensus direction mode")
+    if retraction_mode not in {
+        "exponential",
+        "self_information_mixture",
+    }:
+        raise ValueError("unsupported Fisher consensus retraction mode")
+    if (
+        retraction_mode == "self_information_mixture"
+        and direction_mode != "entropy_neutral_plan_barycenter"
+    ):
+        raise ValueError(
+            "self-information mixture requires entropy-neutral direction"
+        )
     if not bool(torch.isfinite(base_logits).all().item()):
         raise ValueError("base logits are nonfinite")
     if not bool(torch.isfinite(guide_logits).all().item()):
@@ -194,7 +207,29 @@ def fisher_consensus_target(
     dtype = _work_dtype(base_logits)
     anchor = base_logits.detach().to(dtype) / temperature
     probability = anchor.softmax(dim=-1)
+    if retraction_mode == "self_information_mixture":
+        probability = probability / probability.sum(
+            dim=-1,
+            keepdim=True,
+            dtype=torch.float64,
+        ).to(dtype)
     log_probability = anchor.log_softmax(dim=-1)
+
+    def weighted_sum(
+        weight: torch.Tensor,
+        value: torch.Tensor,
+        *,
+        keepdim: bool = False,
+    ) -> torch.Tensor:
+        product = weight * value
+        if retraction_mode == "self_information_mixture":
+            return product.sum(
+                dim=-1,
+                keepdim=keepdim,
+                dtype=torch.float64,
+            ).to(dtype)
+        return product.sum(dim=-1, keepdim=keepdim)
+
     if direction_mode == "matched_control_residual":
         contrast = (
             guide_logits.detach().to(dtype)
@@ -207,14 +242,14 @@ def fisher_consensus_target(
         ) / temperature
 
     pair_probability = probability.unsqueeze(0)
-    contrast = contrast - (
-        pair_probability * contrast
-    ).sum(dim=-1, keepdim=True)
+    contrast = contrast - weighted_sum(
+        pair_probability,
+        contrast,
+        keepdim=True,
+    )
     raw_mean = contrast.mean(dim=0)
-    mean_energy = (probability * raw_mean.square()).sum(dim=-1)
-    pair_energy = (
-        pair_probability * contrast.square()
-    ).sum(dim=-1)
+    mean_energy = weighted_sum(probability, raw_mean.square())
+    pair_energy = weighted_sum(pair_probability, contrast.square())
     mean_pair_energy = pair_energy.mean(dim=0)
     tiny = torch.finfo(dtype).tiny
     agreement = torch.where(
@@ -223,21 +258,23 @@ def fisher_consensus_target(
         torch.zeros_like(mean_pair_energy),
     ).clamp(min=0.0, max=1.0)
     consensus = agreement.unsqueeze(-1) * raw_mean
-    consensus = consensus - (
-        probability * consensus
-    ).sum(dim=-1, keepdim=True)
+    consensus = consensus - weighted_sum(
+        probability,
+        consensus,
+        keepdim=True,
+    )
     entropy_direction = log_probability - (
-        probability * log_probability
-    ).sum(dim=-1, keepdim=True)
-    entropy_energy = (
-        probability * entropy_direction.square()
-    ).sum(dim=-1)
-    entropy_alignment_before = (
-        probability * consensus * entropy_direction
-    ).sum(dim=-1)
-    consensus_energy_before_projection = (
-        probability * consensus.square()
-    ).sum(dim=-1)
+        weighted_sum(probability, log_probability, keepdim=True)
+    )
+    entropy_energy = weighted_sum(probability, entropy_direction.square())
+    entropy_alignment_before = weighted_sum(
+        probability,
+        consensus * entropy_direction,
+    )
+    consensus_energy_before_projection = weighted_sum(
+        probability,
+        consensus.square(),
+    )
     if direction_mode == "entropy_neutral_plan_barycenter":
         entropy_active = entropy_energy > torch.finfo(dtype).eps
         entropy_coefficient = torch.where(
@@ -249,23 +286,30 @@ def fisher_consensus_target(
         projected_consensus = consensus - (
             entropy_coefficient.unsqueeze(-1) * entropy_direction
         )
-        projected_consensus = projected_consensus - (
-            probability * projected_consensus
-        ).sum(dim=-1, keepdim=True)
+        projected_consensus = projected_consensus - weighted_sum(
+            probability,
+            projected_consensus,
+            keepdim=True,
+        )
         consensus = torch.where(
             entropy_active.unsqueeze(-1),
             projected_consensus,
             consensus,
         )
-    entropy_alignment_after = (
-        probability * consensus * entropy_direction
-    ).sum(dim=-1)
-    consensus_energy_after_projection = (
-        probability * consensus.square()
-    ).sum(dim=-1)
+    entropy_alignment_after = weighted_sum(
+        probability,
+        consensus * entropy_direction,
+    )
+    consensus_energy_after_projection = weighted_sum(
+        probability,
+        consensus.square(),
+    )
     if direction_mode == "entropy_neutral_plan_barycenter":
         numerical_scale = 128.0 * torch.finfo(dtype).eps
-        centering_residual = (probability * consensus).sum(dim=-1).abs()
+        centering_residual = weighted_sum(
+            probability,
+            consensus,
+        ).abs()
         centering_tolerance = numerical_scale * (
             1.0 + consensus_energy_after_projection.sqrt()
         )
@@ -304,27 +348,61 @@ def fisher_consensus_target(
         torch.ones_like(consensus_energy_before_projection),
     ).clamp(min=0.0, max=1.0)
 
-    def tilted(scale: torch.Tensor):
-        target_log = (
-            log_probability + scale.unsqueeze(-1) * consensus
-        ).log_softmax(dim=-1)
-        target = target_log.exp()
-        forward_kl = (
-            probability * (log_probability - target_log)
-        ).sum(dim=-1)
-        reverse_kl = (
-            target * (target_log - log_probability)
-        ).sum(dim=-1)
+    requested_step = torch.full_like(agreement, float(step_size))
+    positivity_limited = torch.zeros_like(agreement, dtype=torch.bool)
+    if retraction_mode == "self_information_mixture":
+        positivity_bound = torch.where(
+            consensus < 0.0,
+            -1.0 / consensus,
+            torch.full_like(consensus, float("inf")),
+        ).amin(dim=-1)
+        positivity_margin = math.sqrt(torch.finfo(dtype).eps)
+        positivity_upper = positivity_bound * (1.0 - positivity_margin)
+        effective_step = torch.minimum(requested_step, positivity_upper)
+        positivity_limited = effective_step < requested_step
+    else:
+        effective_step = requested_step
+
+    def retracted(scale: torch.Tensor):
+        if retraction_mode == "self_information_mixture":
+            mixture_ratio = 1.0 + scale.unsqueeze(-1) * consensus
+            unnormalized = probability * mixture_ratio
+            normalizer = unnormalized.sum(
+                dim=-1,
+                keepdim=True,
+                dtype=torch.float64,
+            ).to(dtype)
+            target = unnormalized / normalizer
+            target_log = (
+                log_probability
+                + mixture_ratio.log()
+                - normalizer.log()
+            )
+            minimum_ratio = mixture_ratio.min(dim=-1).values
+        else:
+            target_log = (
+                log_probability + scale.unsqueeze(-1) * consensus
+            ).log_softmax(dim=-1)
+            target = target_log.exp()
+            minimum_ratio = torch.ones_like(scale)
+        forward_kl = weighted_sum(
+            probability,
+            log_probability - target_log,
+        )
+        reverse_kl = weighted_sum(
+            target,
+            target_log - log_probability,
+        )
         return (
             target_log,
             target,
             forward_kl,
             reverse_kl,
             torch.maximum(forward_kl, reverse_kl),
+            minimum_ratio,
         )
 
-    effective_step = torch.full_like(agreement, float(step_size))
-    target_log, target, forward_kl, reverse_kl, worst_kl = tilted(
+    target_log, target, forward_kl, reverse_kl, worst_kl, minimum_ratio = retracted(
         effective_step
     )
     needs_clip = worst_kl > float(max_target_kl)
@@ -332,7 +410,7 @@ def fisher_consensus_target(
     upper = effective_step
     for _ in range(32):
         midpoint = (lower + upper) / 2
-        *_, midpoint_kl = tilted(midpoint)
+        *_, midpoint_kl, _ = retracted(midpoint)
         lower = torch.where(
             midpoint_kl <= float(max_target_kl), midpoint, lower
         )
@@ -340,8 +418,21 @@ def fisher_consensus_target(
             midpoint_kl > float(max_target_kl), midpoint, upper
         )
     effective_step = torch.where(needs_clip, lower, effective_step)
-    target_log, target, forward_kl, reverse_kl, worst_kl = tilted(
-        effective_step
+    (
+        target_log,
+        target,
+        forward_kl,
+        reverse_kl,
+        worst_kl,
+        minimum_ratio,
+    ) = retracted(effective_step)
+    base_cross_entropy_change = -weighted_sum(
+        target,
+        log_probability,
+    ) + weighted_sum(probability, log_probability)
+    target_entropy_change = (
+        -weighted_sum(target, target_log)
+        + weighted_sum(probability, log_probability)
     )
     target_values = torch.stack(
         [
@@ -349,6 +440,9 @@ def fisher_consensus_target(
             reverse_kl,
             worst_kl,
             effective_step,
+            minimum_ratio,
+            base_cross_entropy_change,
+            target_entropy_change,
         ]
     )
     if not bool(torch.isfinite(target).all().item()) or not bool(
@@ -360,11 +454,36 @@ def fisher_consensus_target(
         (worst_kl > float(max_target_kl) + kl_tolerance).any().item()
     ):
         raise RuntimeError("Fisher consensus target exceeds KL trust region")
-    consensus_energy = (
-        probability * consensus.square()
-    ).sum(dim=-1)
+    if retraction_mode == "self_information_mixture":
+        information_tolerance = max(
+            1e-12,
+            128.0
+            * torch.finfo(dtype).eps
+            * (
+                1.0
+                + weighted_sum(probability, log_probability.abs()).max().item()
+            ),
+        )
+        if bool((minimum_ratio <= 0.0).any().item()):
+            raise RuntimeError("self-information mixture is not positive")
+        if bool(
+            (base_cross_entropy_change.abs() > information_tolerance)
+            .any()
+            .item()
+        ):
+            raise RuntimeError(
+                "self-information mixture violates base cross entropy"
+            )
+        if bool(
+            (target_entropy_change > information_tolerance).any().item()
+        ):
+            raise RuntimeError("self-information mixture increases entropy")
+    consensus_energy = weighted_sum(probability, consensus.square())
     pair_cosine_to_mean = (
-        (pair_probability * contrast * raw_mean.unsqueeze(0)).sum(dim=-1)
+        weighted_sum(
+            pair_probability,
+            contrast * raw_mean.unsqueeze(0),
+        )
         / (
             pair_energy.clamp_min(tiny).sqrt()
             * mean_energy.unsqueeze(0).clamp_min(tiny).sqrt()
@@ -386,6 +505,16 @@ def fisher_consensus_target(
             "target_reverse_kl": reverse_kl.detach(),
             "target_kl": worst_kl.detach(),
             "effective_step_size": effective_step.detach(),
+            "positivity_limited": positivity_limited.to(dtype).detach(),
+            "minimum_mixture_ratio": minimum_ratio.detach(),
+            "base_cross_entropy_change": (
+                base_cross_entropy_change.detach()
+            ),
+            "entropy_kl_identity_residual": (
+                target_entropy_change
+                + reverse_kl
+                - base_cross_entropy_change
+            ).detach(),
             "entropy_gradient_energy": entropy_energy.detach(),
             "entropy_alignment_before": entropy_alignment_before.detach(),
             "entropy_alignment_after": entropy_alignment_after.detach(),
@@ -395,10 +524,7 @@ def fisher_consensus_target(
             "retained_direction_energy_fraction": (
                 retained_direction_energy_fraction.detach()
             ),
-            "target_entropy_change": (
-                -(target * target_log).sum(dim=-1)
-                + (probability * log_probability).sum(dim=-1)
-            ).detach(),
+            "target_entropy_change": target_entropy_change.detach(),
         },
     )
 
@@ -415,6 +541,7 @@ def fisher_consensus_loss(
     temperature: float = 1.0,
     anchor_kl_weight: float = 0.0,
     direction_mode: str = "matched_control_residual",
+    retraction_mode: str = "exponential",
 ) -> tuple[torch.Tensor, FisherConsensusTarget]:
     """Fit the detached target with an optional frozen-policy KL proximal."""
     if student_logits.shape != base_logits.shape:
@@ -435,6 +562,7 @@ def fisher_consensus_loss(
         max_target_kl=max_target_kl,
         temperature=temperature,
         direction_mode=direction_mode,
+        retraction_mode=retraction_mode,
     )
     dtype = _work_dtype(student_logits)
     student_log = (

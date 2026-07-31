@@ -271,6 +271,32 @@ def _training_markdown(report: dict[str, Any]) -> str:
                 fisher.get("mean_retained_direction_energy_fraction"),
             ),
             ("Mean target entropy change", fisher.get("mean_target_entropy_change")),
+            ("Self-information events", fisher.get("self_information_events")),
+            (
+                "Self-information metrics complete / finite",
+                f"{fisher.get('self_information_metrics_complete')} / "
+                f"{fisher.get('self_information_all_finite')}",
+            ),
+            (
+                "Mean positivity-limited fraction",
+                fisher.get("mean_positivity_limited_fraction"),
+            ),
+            (
+                "Mean minimum mixture ratio",
+                fisher.get("mean_minimum_mixture_ratio"),
+            ),
+            (
+                "Maximum base-cross-entropy residual",
+                fisher.get(
+                    "max_mean_absolute_base_cross_entropy_change"
+                ),
+            ),
+            (
+                "Maximum entropy/KL identity residual",
+                fisher.get(
+                    "max_mean_absolute_entropy_kl_identity_residual"
+                ),
+            ),
         ]), "",
         "## Rollouts and integrity", "",
         *_table([

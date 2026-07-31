@@ -132,6 +132,18 @@ def _aggregate_consensus_metrics(
             total("first_order_entropy_change"),
             total("retained_direction_energy_fraction"),
             total("target_entropy_change"),
+            total("positivity_limited"),
+            total("minimum_mixture_ratio"),
+            metrics["base_cross_entropy_change"][mask]
+            .detach()
+            .to(torch.float64)
+            .abs()
+            .sum(),
+            metrics["entropy_kl_identity_residual"][mask]
+            .detach()
+            .to(torch.float64)
+            .abs()
+            .sum(),
         ]
     )
     local_max = metrics["target_kl"][mask].detach().to(torch.float64).max()
@@ -187,6 +199,10 @@ def _aggregate_consensus_metrics(
         "first_order_entropy_change": average(24),
         "retained_direction_energy_fraction": average(25),
         "target_entropy_change": average(26),
+        "positivity_limited_fraction": average(27),
+        "mean_minimum_mixture_ratio": average(28),
+        "mean_absolute_base_cross_entropy_change": average(29),
+        "mean_absolute_entropy_kl_identity_residual": average(30),
     }
 
 
@@ -274,6 +290,7 @@ def compute_loss_with_fisher_consensus(
         temperature=float(self.temperature),
         anchor_kl_weight=float(self._fisher_anchor_kl_weight),
         direction_mode=str(self._fisher_direction_mode),
+        retraction_mode=str(self._fisher_retraction_mode),
     )
     boost_weights = torch.ones(
         student_logits.shape[0],
@@ -353,6 +370,7 @@ def compute_loss_with_fisher_consensus(
                         self._fisher_cross_problem_edge
                     ),
                     "direction_mode": str(self._fisher_direction_mode),
+                    "retraction_mode": str(self._fisher_retraction_mode),
                     **edge_metrics,
                     **metrics,
                 },

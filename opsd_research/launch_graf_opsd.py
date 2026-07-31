@@ -636,6 +636,12 @@ def main() -> None:
                 "matched_control_residual",
             )
         )
+        opsd_trainer.OPSDTrainer._fisher_retraction_mode = str(
+            config.get(
+                "fisher_retraction_mode",
+                "exponential",
+            )
+        )
         opsd_trainer.OPSDTrainer._fisher_consensus_energy_threshold = float(
             config["fisher_consensus_energy_threshold"]
         )
@@ -672,6 +678,12 @@ def main() -> None:
                         config.get(
                             "fisher_direction_mode",
                             "matched_control_residual",
+                        )
+                    ),
+                    "retraction_mode": str(
+                        config.get(
+                            "fisher_retraction_mode",
+                            "exponential",
                         )
                     ),
                     "answer_access": False,

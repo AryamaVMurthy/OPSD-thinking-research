@@ -146,6 +146,11 @@ class TrainingSummaryTests(unittest.TestCase):
                         "first_order_entropy_change": -2.0e-10,
                         "retained_direction_energy_fraction": 0.65,
                         "target_entropy_change": -0.001,
+                        "retraction_mode": "self_information_mixture",
+                        "positivity_limited_fraction": 0.3,
+                        "mean_minimum_mixture_ratio": 0.05,
+                        "mean_absolute_base_cross_entropy_change": 1.0e-8,
+                        "mean_absolute_entropy_kl_identity_residual": 2.0e-8,
                     }
                 )
                 + "\n"
@@ -205,6 +210,19 @@ class TrainingSummaryTests(unittest.TestCase):
                 fisher["mean_retained_direction_energy_fraction"], 0.65
             )
             self.assertEqual(fisher["mean_target_entropy_change"], -0.001)
+            self.assertEqual(fisher["self_information_events"], 1)
+            self.assertTrue(fisher["self_information_metrics_complete"])
+            self.assertTrue(fisher["self_information_all_finite"])
+            self.assertEqual(fisher["mean_positivity_limited_fraction"], 0.3)
+            self.assertEqual(fisher["mean_minimum_mixture_ratio"], 0.05)
+            self.assertEqual(
+                fisher["max_mean_absolute_base_cross_entropy_change"],
+                1.0e-8,
+            )
+            self.assertEqual(
+                fisher["max_mean_absolute_entropy_kl_identity_residual"],
+                2.0e-8,
+            )
             gpu = result["gpu_telemetry"][0]
             self.assertEqual(gpu["mean_utilization_percent"], 90)
             self.assertEqual(gpu["max_memory_mib"], 35000)

@@ -28,6 +28,12 @@ ENTROPY_PROJECTION_KEYS = (
     "retained_direction_energy_fraction",
     "target_entropy_change",
 )
+SELF_INFORMATION_KEYS = (
+    "positivity_limited_fraction",
+    "mean_minimum_mixture_ratio",
+    "mean_absolute_base_cross_entropy_change",
+    "mean_absolute_entropy_kl_identity_residual",
+)
 
 
 def _directory_bytes(path: Path) -> int:
@@ -188,6 +194,16 @@ def summarize(
         for event in fisher_events
         if all(key in event for key in ENTROPY_PROJECTION_KEYS)
     ]
+    self_information_candidates = [
+        event
+        for event in fisher_events
+        if event.get("retraction_mode") == "self_information_mixture"
+    ]
+    self_information_events = [
+        event
+        for event in self_information_candidates
+        if all(key in event for key in SELF_INFORMATION_KEYS)
+    ]
     post_initial_fisher_events = [
         event
         for event in fisher_events
@@ -322,6 +338,19 @@ def summarize(
                 )
                 for event in entropy_projection_events
             ),
+            "self_information_events": len(self_information_events),
+            "self_information_metrics_complete": (
+                len(self_information_events)
+                == len(self_information_candidates)
+            ),
+            "self_information_all_finite": all(
+                all(
+                    isinstance(event[key], (int, float))
+                    and float("-inf") < float(event[key]) < float("inf")
+                    for key in SELF_INFORMATION_KEYS
+                )
+                for event in self_information_events
+            ),
             "all_finite": all(
                 all(
                     isinstance(event.get(key), (int, float))
@@ -429,6 +458,42 @@ def summarize(
                     for event in entropy_projection_events
                 )
                 if entropy_projection_events
+                else None
+            ),
+            "mean_positivity_limited_fraction": (
+                mean(
+                    float(event["positivity_limited_fraction"])
+                    for event in self_information_events
+                )
+                if self_information_events
+                else None
+            ),
+            "mean_minimum_mixture_ratio": (
+                mean(
+                    float(event["mean_minimum_mixture_ratio"])
+                    for event in self_information_events
+                )
+                if self_information_events
+                else None
+            ),
+            "max_mean_absolute_base_cross_entropy_change": (
+                max(
+                    float(event["mean_absolute_base_cross_entropy_change"])
+                    for event in self_information_events
+                )
+                if self_information_events
+                else None
+            ),
+            "max_mean_absolute_entropy_kl_identity_residual": (
+                max(
+                    float(
+                        event[
+                            "mean_absolute_entropy_kl_identity_residual"
+                        ]
+                    )
+                    for event in self_information_events
+                )
+                if self_information_events
                 else None
             ),
             "mean_clipped_target_fraction": (

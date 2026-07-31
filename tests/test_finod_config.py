@@ -394,3 +394,24 @@ def test_entropy_neutral_barycenter_changes_only_fisher_projection():
     } == {
         key: value for key, value in baseline.items() if key not in ignored
     }
+
+
+def test_self_information_mixture_changes_only_fisher_retraction():
+    baseline = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s13-entropy-neutral-prefix512-6.yaml"
+    ).data
+    candidate = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s14-self-information-mixture-prefix512-6.yaml"
+    ).data
+
+    assert candidate["fisher_retraction_mode"] == "self_information_mixture"
+    ignored = {"variant", "fisher_retraction_mode"}
+    assert {
+        key: value for key, value in candidate.items() if key not in ignored
+    } == {
+        key: value for key, value in baseline.items() if key not in ignored
+    }
