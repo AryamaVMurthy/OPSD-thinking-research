@@ -27,6 +27,11 @@ The strongest single historical score change is FRGD v2 on AIME 2026
 2025 and its teacher view explicitly contains the answer. It is therefore not
 evidence for a clean answer-free method.
 
+The standard 200-step Qwen3-4B OPSD trajectory shows the exposure failure
+directly on AIME 2025: 66.39% (base), 64.72% (step 50), 56.39% (step 100),
+44.17% (step 150), and 41.39% (step 200). Its step-200 AIME 2026 accuracy is
+46.67%, with a corresponding HMMT collapse. More optimization is not a remedy.
+
 ## 2. Development-benchmark controls
 
 | Method | AIME 2024 base | Candidate | Delta | Interpretation |
@@ -152,6 +157,24 @@ the guide. The problem is that imprint strength does not predict completion or
 correctness.
 
 ## 4. Objective and implementation defects
+
+The training telemetry rules out a simple exploding-gradient account:
+
+| Run | Logged loss start→end | Mean/max grad norm | Rollout cap rate | Boxed |
+|---|---:|---:|---:|---:|
+| G1 | -0.0085→-0.0113 | 0.136/0.225 | 99.2% | 7/200 |
+| G2 | 0.0116→-0.0025 | 0.155/0.281 | 99.6% | — |
+| G3 | 0.0158→-0.0020 | 0.159/0.290 | 99.5% | — |
+| G4 | 0.0312→0.0084 | 0.0637/0.131 | 90.0% | 82/300 |
+| CH-50 | 0.0006→-0.0072 | 0.0266/0.0501 | 72.7% | 90/200 |
+| FRGD-v1 | 0.0049→0.0052 | 0.0330/0.0502 | 99.9% | 0/128 |
+| FRGD-v2 | 0.0041→0.0039 | 0.0254/0.0835 | 79.5% | 43/128 |
+| FiNOD-5 | 0.0005→0.0004 | 0.0262/0.0317 | 85.6% | 9/20 |
+| FiNOD-32 | 0.0005→0.0005 | 0.0244/0.0358 | 83.8% | 37/128 |
+
+The registered max-gradient norm is 0.1 for the recent runs; it is rarely
+active in FiNOD. The key failures are target quality, objective validity,
+truncation, and cumulative direction drift—not an uncontrolled gradient norm.
 
 ### 4.1 Historical G1–G4 / CH divergence
 
