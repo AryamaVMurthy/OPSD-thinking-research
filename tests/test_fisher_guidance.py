@@ -144,6 +144,18 @@ def test_cache_loader_checks_hash_and_never_requires_reference(tmp_path):
     assert metadata["answer_access"] is False
     assert "reference" not in payload
 
+    leaked = dict(payload)
+    leaked["reference_solution"] = r"Private \boxed{73}"
+    records.write_text(json.dumps(leaked) + "\n", encoding="utf-8")
+    changed_manifest = json.loads(manifest.read_text(encoding="utf-8"))
+    changed_manifest["records_sha256"] = hashlib.sha256(
+        records.read_bytes()
+    ).hexdigest()
+    manifest.write_text(json.dumps(changed_manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="forbidden fields"):
+        load_guidance_ensemble(manifest)
+
+    records.write_text(json.dumps(payload) + "\n", encoding="utf-8")
     records.write_text(records.read_text() + "{}\n", encoding="utf-8")
     with pytest.raises(ValueError, match="sha256"):
         load_guidance_ensemble(manifest)

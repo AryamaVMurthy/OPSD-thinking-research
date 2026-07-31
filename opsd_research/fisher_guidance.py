@@ -171,6 +171,19 @@ def load_guidance_ensemble(
             raise ValueError(
                 f"invalid guidance record at line {line_number}: {error}"
             ) from error
+        allowed_fields = {
+            "source_index",
+            "problem",
+            "problem_sha256",
+            "plans",
+            "seeds",
+        }
+        extra_fields = set(record) - allowed_fields
+        if extra_fields:
+            raise ValueError(
+                f"guidance line {line_number} contains forbidden fields: "
+                + ", ".join(sorted(extra_fields))
+            )
         index = record.get("source_index")
         problem = record.get("problem")
         plans = record.get("plans")
