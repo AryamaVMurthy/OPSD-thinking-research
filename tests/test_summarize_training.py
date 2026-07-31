@@ -78,6 +78,26 @@ class TrainingSummaryTests(unittest.TestCase):
             log.write_text(
                 "\r  2%| | 4/200 [00:10]\n"
                 "{'loss': 0.01, 'grad_norm': 0.2}\n"
+                + json.dumps(
+                    {
+                        "event": "fisher_consensus_loss",
+                        "loss": 0.003,
+                        "agreement": 0.75,
+                        "mean_direction_energy": 0.08,
+                        "consensus_energy": 0.05,
+                        "target_forward_kl": 0.003,
+                        "target_reverse_kl": 0.0029,
+                        "target_kl": 0.0031,
+                        "max_observed_target_kl": 0.01,
+                        "clipped_target_fraction": 0.2,
+                        "collapsed_consensus_fraction": 0.25,
+                        "relative_loss_to_anchor": 1.1,
+                        "student_anchor_forward_kl": 0.0005,
+                        "fisher_alignment_gain": 0.0002,
+                        "fisher_alignment_cosine_proxy": 0.04,
+                    }
+                )
+                + "\n"
                 "vLLM generation done - elapsed time: 1.0s, prompts: 1, "
                 "total tokens: 1024, avg length: 1024.0\n",
                 encoding="utf-8",
@@ -109,6 +129,16 @@ class TrainingSummaryTests(unittest.TestCase):
             self.assertTrue(
                 result["rollout_dump_integrity"]["covers_latest_checkpoint"]
             )
+            fisher = result["fisher_signal"]
+            self.assertEqual(fisher["events"], 1)
+            self.assertEqual(fisher["post_initial_events"], 1)
+            self.assertTrue(fisher["all_finite"])
+            self.assertEqual(fisher["positive_loss_events"], 1)
+            self.assertEqual(fisher["max_target_kl"], 0.01)
+            self.assertEqual(fisher["mean_agreement"], 0.75)
+            self.assertEqual(fisher["mean_post_initial_relative_loss_to_anchor"], 1.1)
+            self.assertEqual(fisher["mean_post_initial_alignment_gain"], 0.0002)
+            self.assertEqual(fisher["mean_post_initial_alignment_cosine_proxy"], 0.04)
             gpu = result["gpu_telemetry"][0]
             self.assertEqual(gpu["mean_utilization_percent"], 90)
             self.assertEqual(gpu["max_memory_mib"], 35000)

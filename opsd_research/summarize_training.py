@@ -76,6 +76,23 @@ def _parse_finod_events(path: Path) -> list[dict[str, Any]]:
     return events
 
 
+def _parse_fisher_events(path: Path) -> list[dict[str, Any]]:
+    events = []
+    marker = re.compile(r'\{\s*"event"\s*:\s*"fisher_consensus_loss"')
+    for fragment in re.split(r"[\r\n]+", path.read_text(encoding="utf-8")):
+        match = marker.search(fragment)
+        if match is None:
+            continue
+        try:
+            event = json.loads(fragment[match.start():])
+        except json.JSONDecodeError as error:
+            raise ValueError(f"malformed Fisher event in {path}") from error
+        if event.get("event") != "fisher_consensus_loss":
+            raise ValueError(f"unexpected Fisher event in {path}")
+        events.append(event)
+    return events
+
+
 def _parse_gpu_telemetry(path: Path) -> list[dict[str, Any]]:
     by_gpu: dict[int, dict[str, Any]] = {}
     with path.open("r", encoding="utf-8", newline="") as handle:
@@ -157,6 +174,12 @@ def summarize(
     completions = [str(row.get("completion", "")) for row in generations]
     losses, rollout_tokens = _parse_training_log(training_log)
     finod_events = _parse_finod_events(training_log)
+    fisher_events = _parse_fisher_events(training_log)
+    post_initial_fisher_events = [
+        event
+        for event in fisher_events
+        if float(event.get("student_anchor_forward_kl", 0.0)) > 0.0
+    ]
 
     checkpoint_records = []
     for path in sorted(
@@ -256,6 +279,120 @@ def summarize(
                     for event in finod_events
                 )
                 if finod_events
+                else None
+            ),
+        },
+        "fisher_signal_history": fisher_events,
+        "fisher_signal": {
+            "events": len(fisher_events),
+            "post_initial_events": len(post_initial_fisher_events),
+            "all_finite": all(
+                all(
+                    isinstance(event.get(key), (int, float))
+                    and float("-inf") < float(event[key]) < float("inf")
+                    for key in (
+                        "loss",
+                        "agreement",
+                        "mean_direction_energy",
+                        "consensus_energy",
+                        "target_forward_kl",
+                        "target_reverse_kl",
+                        "target_kl",
+                        "relative_loss_to_anchor",
+                        "student_anchor_forward_kl",
+                        "fisher_alignment_gain",
+                        "fisher_alignment_cosine_proxy",
+                    )
+                )
+                for event in fisher_events
+            ),
+            "positive_loss_events": sum(
+                float(event.get("loss", 0.0)) > 0.0
+                for event in fisher_events
+            ),
+            "max_target_kl": max(
+                (
+                    float(
+                        event.get(
+                            "max_observed_target_kl",
+                            event["target_kl"],
+                        )
+                    )
+                    for event in fisher_events
+                ),
+                default=None,
+            ),
+            "max_target_forward_kl": max(
+                (float(event["target_forward_kl"]) for event in fisher_events),
+                default=None,
+            ),
+            "max_target_reverse_kl": max(
+                (float(event["target_reverse_kl"]) for event in fisher_events),
+                default=None,
+            ),
+            "max_student_anchor_forward_kl": max(
+                (
+                    float(event["student_anchor_forward_kl"])
+                    for event in fisher_events
+                ),
+                default=None,
+            ),
+            "mean_agreement": (
+                mean(float(event["agreement"]) for event in fisher_events)
+                if fisher_events
+                else None
+            ),
+            "mean_direction_energy": (
+                mean(
+                    float(event["mean_direction_energy"])
+                    for event in fisher_events
+                )
+                if fisher_events
+                else None
+            ),
+            "mean_consensus_energy": (
+                mean(float(event["consensus_energy"]) for event in fisher_events)
+                if fisher_events
+                else None
+            ),
+            "mean_clipped_target_fraction": (
+                mean(
+                    float(event["clipped_target_fraction"])
+                    for event in fisher_events
+                )
+                if fisher_events
+                else None
+            ),
+            "mean_collapsed_consensus_fraction": (
+                mean(
+                    float(event["collapsed_consensus_fraction"])
+                    for event in fisher_events
+                )
+                if fisher_events
+                else None
+            ),
+            "mean_post_initial_relative_loss_to_anchor": (
+                mean(
+                    float(event["relative_loss_to_anchor"])
+                    for event in post_initial_fisher_events
+                )
+                if post_initial_fisher_events
+                else None
+            ),
+            "mean_post_initial_alignment_gain": (
+                mean(
+                    float(event["fisher_alignment_gain"])
+                    for event in post_initial_fisher_events
+                )
+                if post_initial_fisher_events
+                else None
+            ),
+            "mean_post_initial_alignment_cosine_proxy": (
+                mean(
+                    float(event["fisher_alignment_cosine_proxy"])
+                    for event in post_initial_fisher_events
+                )
+                if post_initial_fisher_events
                 else None
             ),
         },
