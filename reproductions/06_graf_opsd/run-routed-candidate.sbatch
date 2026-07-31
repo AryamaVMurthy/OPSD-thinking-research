@@ -46,6 +46,12 @@ import sys
 print(load_config(sys.argv[1]).data["learning_rate"])
 PY
 )"
+adam_epsilon="$(python3 - "${GRAF_CANDIDATE_CONFIG}" <<'PY'
+from opsd_research.config import load_config
+import sys
+print(load_config(sys.argv[1]).data.get("adam_epsilon", 1e-8))
+PY
+)"
 max_sequence_length="$(python3 - "${GRAF_CANDIDATE_CONFIG}" <<'PY'
 from opsd_research.config import load_config
 import sys
@@ -138,12 +144,12 @@ fi
 export OPSD_TRAINING_PARTITION_MANIFEST="${output_dir}/training-partition.json"
 export OPSD_ADAPTER_STABILITY_INTERVAL=1
 export OPSD_RECOMPUTE_DIVERGENCE_BACKWARD=1
-printf 'candidate=%s\nmax_steps=%s\nnum_gpus=4\ngradient_accumulation_steps=8\neffective_batch_size=32\nseed=%s\ndata_seed=%s\nlearning_rate=%s\nvllm_gpu_memory_utilization=%s\ntoken_divergence=%s\ngraph_mode=%s\nmax_sequence_length=%s\njsd_token_clip=%s\ndivergence_diagnostics_interval=%s\nadapter_stability_interval=%s\nrecomputed_divergence_backward=%s\n' "${GRAF_CANDIDATE_ID}" "${GRAF_MAX_STEPS}" "${seed}" "${seed}" "${learning_rate}" "${vllm_utilization}" "${token_divergence}" "${graph_mode}" "${max_sequence_length}" "${jsd_token_clip}" "${OPSD_DIVERGENCE_DIAGNOSTICS_INTERVAL}" "${OPSD_ADAPTER_STABILITY_INTERVAL}" "${OPSD_RECOMPUTE_DIVERGENCE_BACKWARD}" > "${output_dir}/runtime-overrides.txt"
+printf 'candidate=%s\nmax_steps=%s\nnum_gpus=4\ngradient_accumulation_steps=8\neffective_batch_size=32\nseed=%s\ndata_seed=%s\nlearning_rate=%s\nadam_epsilon=%s\nvllm_gpu_memory_utilization=%s\ntoken_divergence=%s\ngraph_mode=%s\nmax_sequence_length=%s\njsd_token_clip=%s\ndivergence_diagnostics_interval=%s\nadapter_stability_interval=%s\nrecomputed_divergence_backward=%s\n' "${GRAF_CANDIDATE_ID}" "${GRAF_MAX_STEPS}" "${seed}" "${seed}" "${learning_rate}" "${adam_epsilon}" "${vllm_utilization}" "${token_divergence}" "${graph_mode}" "${max_sequence_length}" "${jsd_token_clip}" "${OPSD_DIVERGENCE_DIAGNOSTICS_INTERVAL}" "${OPSD_ADAPTER_STABILITY_INTERVAL}" "${OPSD_RECOMPUTE_DIVERGENCE_BACKWARD}" > "${output_dir}/runtime-overrides.txt"
 record_run_manifest "${output_dir}" "${manifest_inputs[@]}"
 start_gpu_telemetry "${run_name}"; trap stop_gpu_telemetry EXIT
 accelerate launch --config_file third_party/opsd/accelerate.yaml --num_processes 4 --gradient_accumulation_steps 8 --main_process_port "${GRAF_PORT}" \
   -m opsd_research.launch_graf_opsd --model_name_or_path Qwen/Qwen3-4B --model_revision 1cfa9a7208912126459214e8b04321603b3df60c --student_model_revision 1cfa9a7208912126459214e8b04321603b3df60c \
-  --learning_rate "${learning_rate}" --max_grad_norm 0.1 --per_device_train_batch_size 1 --gradient_checkpointing --gradient_accumulation_steps 8 --output_dir "${TRAIN_ROOT}" --run_config "${run_name}" --num_train_epochs 30 --max_steps "${GRAF_MAX_STEPS}" --max_completion_length "${completion_length}" --save_steps "${GRAF_MAX_STEPS}" --logging_steps 1 \
+  --learning_rate "${learning_rate}" --adam_epsilon "${adam_epsilon}" --max_grad_norm 0.1 --per_device_train_batch_size 1 --gradient_checkpointing --gradient_accumulation_steps 8 --output_dir "${TRAIN_ROOT}" --run_config "${run_name}" --num_train_epochs 30 --max_steps "${GRAF_MAX_STEPS}" --max_completion_length "${completion_length}" --save_steps "${GRAF_MAX_STEPS}" --logging_steps 1 \
   --attn_implementation flash_attention_2 --torch_dtype bfloat16 --max_length "${max_sequence_length}" --beta 0 --use_vllm --vllm_mode colocate --vllm_gpu_memory_utilization "${vllm_utilization}" --vllm_tensor_parallel_size 1 --use_peft --lora_r 64 --lora_alpha 128 --lora_target_modules q_proj k_proj v_proj o_proj gate_proj up_proj down_proj --temperature 1.1 --top_p 0.95 --top_k 20 --lmbda 1 --fixed_teacher --student_thinking --teacher_thinking --jsd_token_clip "${jsd_token_clip}" --seed "${seed}" --data_seed "${seed}" --report_to wandb --wandb_project GRAF-OPSD-autoresearch
 if [[ "${requires_fisher}" == 1 ]]; then
   test -s "${OPSD_FISHER_SELECTION_MANIFEST}"

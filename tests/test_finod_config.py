@@ -177,3 +177,17 @@ def test_fisher_consensus_rejects_a_subset_without_equal_domain_quotas(
         match="divisible by four AIME domains",
     ):
         load_config(invalid)
+
+
+def test_fisher_consensus_high_epsilon_screen_calibrates_tiny_residuals():
+    config = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s3-adam-eps-12.yaml"
+    ).data
+
+    assert config["graph_mode"] == "fisher_consensus"
+    assert config["learning_rate"] == 1e-6
+    assert config["adam_epsilon"] == 1e-4
+    assert config["max_steps"] == config["save_steps"] == 12
+    assert config["fisher_max_records"] == 192

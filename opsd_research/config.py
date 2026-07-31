@@ -581,6 +581,16 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
                 f"{source}: fisher_max_records must be divisible by four "
                 "AIME domains"
             )
+        adam_epsilon = data.get("adam_epsilon", 1e-8)
+        if (
+            not isinstance(adam_epsilon, (int, float))
+            or isinstance(adam_epsilon, bool)
+            or not math.isfinite(float(adam_epsilon))
+            or not 1e-12 <= float(adam_epsilon) <= 1e-2
+        ):
+            raise ConfigError(
+                f"{source}: adam_epsilon must be finite in [1e-12, 1e-2]"
+            )
         if (
             not isinstance(selection_seed, int)
             or isinstance(selection_seed, bool)

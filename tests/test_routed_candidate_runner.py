@@ -66,3 +66,10 @@ def test_guidance_runners_use_the_registered_learning_rate() -> None:
         assert 'learning_rate="$(python3 -' in script
         assert '--learning_rate "${learning_rate}"' in script
         assert "--learning_rate 5e-6" not in script
+
+
+def test_guidance_runners_use_the_registered_adam_epsilon() -> None:
+    for path in (RUNNER, FINOD_RUNNER):
+        script = path.read_text(encoding="utf-8")
+        assert 'adam_epsilon="$(python3 -' in script
+        assert '--adam_epsilon "${adam_epsilon}"' in script

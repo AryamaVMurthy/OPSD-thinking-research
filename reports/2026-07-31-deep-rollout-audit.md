@@ -451,9 +451,10 @@ deviation added approximately orthogonally to the new guidance direction.
 This is precisely the distinction between bounding each detached target and
 bounding the learned policy itself.
 
-The next diagnostic therefore makes only one optimizer change: learning rate
-\(10^{-6}\), with the same target, data, effective batch, and linear schedule.
-It runs 12 steps (two passes over 192 examples) and additionally logs
+The next diagnostic, job `17377`, made only one optimizer change: learning
+rate \(10^{-6}\), with the same target, data, effective batch, and linear
+schedule. It ran 12 steps (two passes over 192 examples) and additionally
+logged
 student-to-anchor KL plus the Fisher three-point alignment gain
 \[
 D_{\mathrm{KL}}(q\|p_0)+D_{\mathrm{KL}}(p_0\|p_\theta)
@@ -461,6 +462,23 @@ D_{\mathrm{KL}}(q\|p_0)+D_{\mathrm{KL}}(p_0\|p_\theta)
 \]
 Positive gain means the learned displacement aligns with guidance rather than
 merely increasing distance from the base.
+
+The lower-rate run completed cleanly but rejected the learning-rate
+hypothesis. Its first-epoch mean student-to-target/anchor-to-target ratio was
+1.97 and its second-epoch ratio worsened to 2.16. Mean alignment gain was
+\(-3.24\times10^{-5}\) then \(-2.38\times10^{-5}\), while the cosine proxy
+remained near zero. Gradients stayed below the clip and the final per-step
+adapter update norm decayed to \(2.31\times10^{-4}\). The residual is therefore
+nonzero and numerically safe, but it is too weak and cross-problem-orthogonal
+for default fused AdamW's \(10^{-8}\) epsilon: the optimizer behaves close to
+a coordinatewise sign update on many low-second-moment LoRA coordinates.
+
+The next mechanism screen keeps the method, exact balanced subset, learning
+rate, batch, and schedule fixed while raising only Adam epsilon to
+\(10^{-4}\). This makes the update proportional to the small measured
+residual instead of normalizing it almost entirely by its own tiny second
+moment. A one-step calibration must first show an appropriately smaller
+adapter displacement; only then is the full 12-step screen justified.
 
 Promotion requires all of the following:
 
