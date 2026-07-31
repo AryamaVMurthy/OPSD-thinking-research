@@ -576,6 +576,11 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
             raise ConfigError(
                 f"{source}: fisher_max_records must be in [32, 4096]"
             )
+        if max_records % 4:
+            raise ConfigError(
+                f"{source}: fisher_max_records must be divisible by four "
+                "AIME domains"
+            )
         if (
             not isinstance(selection_seed, int)
             or isinstance(selection_seed, bool)

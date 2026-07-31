@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from opsd_research.config import load_config
+import pytest
+
+from opsd_research.config import ConfigError, load_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -151,3 +153,27 @@ def test_fisher_consensus_two_epoch_diagnostic_uses_small_optimizer_steps():
     assert config["fisher_max_records"] == 192
     assert config["max_completion_length"] == 1024
     assert config["num_gpus"] == 8
+
+
+def test_fisher_consensus_rejects_a_subset_without_equal_domain_quotas(
+    tmp_path,
+):
+    source = (
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s1-contest-prefix.yaml"
+    )
+    invalid = tmp_path / "fisher-imbalanced.yaml"
+    invalid.write_text(
+        source.read_text(encoding="utf-8").replace(
+            "fisher_max_records: 192",
+            "fisher_max_records: 194",
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ConfigError,
+        match="divisible by four AIME domains",
+    ):
+        load_config(invalid)
