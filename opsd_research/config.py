@@ -477,6 +477,7 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         if projection_mode not in {
             "one-sided-positive-v1",
             "signed-orthogonal-v1",
+            "entropy-neutral-one-sided-v1",
         }:
             raise ConfigError(
                 f"{source}: unsupported finod_projection_mode "

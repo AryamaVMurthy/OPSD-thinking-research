@@ -92,6 +92,14 @@ def _aggregate_finod_metrics(
     effective_step = (
         metrics["effective_step_size"][mask].detach().to(torch.float64)
     )
+    entropy_alignment_after = (
+        metrics["residual_entropy_alignment"][mask]
+        .detach()
+        .to(torch.float64)
+    )
+    entropy_active = (
+        metrics["entropy_active"][mask].detach().to(torch.float64)
+    )
     local = torch.stack(
         [
             count,
@@ -112,6 +120,14 @@ def _aggregate_finod_metrics(
                 (alignment_after > 1e-5) & active.to(torch.bool)
             ).to(torch.float64).sum(),
             (effective_step < step_size - 1e-7).to(torch.float64).sum(),
+            total("entropy_energy"),
+            total("guide_entropy_alignment"),
+            entropy_alignment_after.sum(),
+            entropy_alignment_after.abs().sum(),
+            entropy_active.sum(),
+            total("student_entropy"),
+            total("target_entropy"),
+            total("target_entropy_change"),
         ]
     )
     local_max_kl = metrics["target_kl"][mask].detach().to(torch.float64).max()
@@ -150,6 +166,14 @@ def _aggregate_finod_metrics(
             values[14] / values[9] if values[9] > 0 else 0.0
         ),
         "clipped_target_fraction": average(15),
+        "entropy_energy": average(16),
+        "entropy_alignment_before": average(17),
+        "entropy_alignment_after": average(18),
+        "absolute_entropy_alignment_after": average(19),
+        "entropy_projection_fraction": average(20),
+        "student_entropy": average(21),
+        "target_entropy": average(22),
+        "target_entropy_change": average(23),
         "max_observed_target_kl": float(max_kl.detach().cpu()),
     }
 

@@ -42,6 +42,19 @@ def test_finod_telemetry_is_token_weighted_and_reduced_across_ranks():
         "residual_nuisance_alignment": torch.tensor(
             [[0.0, 99.0], [2.0e-5, 0.0]]
         ),
+        "entropy_active": torch.tensor([[True, False], [True, True]]),
+        "entropy_energy": torch.tensor([[3.0, 99.0], [6.0, 9.0]]),
+        "guide_entropy_alignment": torch.tensor(
+            [[0.3, 99.0], [0.6, 0.9]]
+        ),
+        "residual_entropy_alignment": torch.tensor(
+            [[1.0e-6, 99.0], [-2.0e-6, 0.0]]
+        ),
+        "student_entropy": torch.tensor([[2.0, 99.0], [3.0, 4.0]]),
+        "target_entropy": torch.tensor([[1.9, 99.0], [3.1, 3.8]]),
+        "target_entropy_change": torch.tensor(
+            [[-0.1, 99.0], [0.1, -0.2]]
+        ),
     }
 
     result = _aggregate_finod_metrics(
@@ -65,6 +78,18 @@ def test_finod_telemetry_is_token_weighted_and_reduced_across_ranks():
     assert result["absolute_alignment_after"] == pytest.approx(2.0e-5 / 3)
     assert result["positive_alignment_after_fraction"] == 0.0
     assert result["clipped_target_fraction"] == 1.0
+    assert result["entropy_energy"] == pytest.approx(6.0)
+    assert result["entropy_alignment_before"] == pytest.approx(0.6)
+    assert result["entropy_alignment_after"] == pytest.approx(-1.0e-6 / 3)
+    assert result["absolute_entropy_alignment_after"] == pytest.approx(
+        3.0e-6 / 3
+    )
+    assert result["entropy_projection_fraction"] == 1.0
+    assert result["student_entropy"] == pytest.approx(3.0)
+    assert result["target_entropy"] == pytest.approx(2.9333333333)
+    assert result["target_entropy_change"] == pytest.approx(
+        -0.0666666667
+    )
 
 
 def test_finod_telemetry_reports_alignment_on_active_nuisance():
@@ -81,6 +106,13 @@ def test_finod_telemetry_reports_alignment_on_active_nuisance():
         "active_projection": torch.tensor([[True]]),
         "guide_nuisance_alignment": torch.tensor([[0.1]]),
         "residual_nuisance_alignment": torch.tensor([[2.0e-5]]),
+        "entropy_active": torch.tensor([[True]]),
+        "entropy_energy": torch.tensor([[1.0]]),
+        "guide_entropy_alignment": torch.tensor([[0.1]]),
+        "residual_entropy_alignment": torch.tensor([[3.0e-6]]),
+        "student_entropy": torch.tensor([[2.0]]),
+        "target_entropy": torch.tensor([[1.9]]),
+        "target_entropy_change": torch.tensor([[-0.1]]),
     }
 
     result = _aggregate_finod_metrics(
@@ -94,3 +126,6 @@ def test_finod_telemetry_reports_alignment_on_active_nuisance():
 
     assert result["positive_alignment_after_fraction"] == 1.0
     assert result["absolute_alignment_after"] == pytest.approx(2.0e-5)
+    assert result["absolute_entropy_alignment_after"] == pytest.approx(
+        3.0e-6
+    )

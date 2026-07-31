@@ -109,6 +109,9 @@ def fisher_projected_target(
     unprivileged frozen-teacher view. ``one-sided-positive-v1`` removes
     positive Fisher alignment and preserves anti-alignment.
     ``signed-orthogonal-v1`` removes the full signed nuisance component.
+    ``entropy-neutral-one-sided-v1`` first removes the local
+    entropy-gradient component and then applies the one-sided answer filter
+    inside that Fisher-orthogonal subspace.
     """
     if not (
         student_logits.shape
@@ -128,6 +131,7 @@ def fisher_projected_target(
     if projection_mode not in {
         "one-sided-positive-v1",
         "signed-orthogonal-v1",
+        "entropy-neutral-one-sided-v1",
     }:
         raise ValueError(f"unsupported FiNOD projection_mode {projection_mode!r}")
     if max_target_kl is not None and max_target_kl <= 0.0:
@@ -140,6 +144,7 @@ def fisher_projected_target(
     )
     student = student_logits.detach().to(work_dtype) / temperature
     probability = student.softmax(dim=-1)
+    log_probability = student.log_softmax(dim=-1)
     guide = (
         guide_logits.detach().to(work_dtype)
         - base_logits.detach().to(work_dtype)
@@ -155,28 +160,78 @@ def fisher_projected_target(
 
     guide = center(guide)
     nuisance = center(nuisance)
+    entropy_direction = center(log_probability)
     guide_energy = (probability * guide.square()).sum(dim=-1)
     nuisance_energy = (probability * nuisance.square()).sum(dim=-1)
     alignment = (probability * guide * nuisance).sum(dim=-1)
-    active = nuisance_energy > nuisance_strength_threshold
+    entropy_energy = (
+        probability * entropy_direction.square()
+    ).sum(dim=-1)
+    guide_entropy_alignment = (
+        probability * guide * entropy_direction
+    ).sum(dim=-1)
+    nuisance_entropy_alignment = (
+        probability * nuisance * entropy_direction
+    ).sum(dim=-1)
+    entropy_active = entropy_energy > nuisance_strength_threshold
+    entropy_projection_active = torch.zeros_like(entropy_active)
+    entropy_coefficient = torch.zeros_like(entropy_energy)
+    restricted_guide = guide
+    restricted_nuisance = nuisance
+    if projection_mode == "entropy-neutral-one-sided-v1":
+        entropy_projection_active = entropy_active
+        safe_entropy_energy = entropy_energy.clamp_min(
+            torch.finfo(work_dtype).tiny
+        )
+        entropy_coefficient = torch.where(
+            entropy_active,
+            guide_entropy_alignment / safe_entropy_energy,
+            torch.zeros_like(guide_entropy_alignment),
+        )
+        nuisance_entropy_coefficient = torch.where(
+            entropy_active,
+            nuisance_entropy_alignment / safe_entropy_energy,
+            torch.zeros_like(nuisance_entropy_alignment),
+        )
+        restricted_guide = center(
+            guide - entropy_coefficient.unsqueeze(-1) * entropy_direction
+        )
+        restricted_nuisance = center(
+            nuisance
+            - nuisance_entropy_coefficient.unsqueeze(-1)
+            * entropy_direction
+        )
+    restricted_nuisance_energy = (
+        probability * restricted_nuisance.square()
+    ).sum(dim=-1)
+    restricted_alignment = (
+        probability * restricted_guide * restricted_nuisance
+    ).sum(dim=-1)
+    active = restricted_nuisance_energy > nuisance_strength_threshold
     projected_alignment = (
-        alignment
+        restricted_alignment
         if projection_mode == "signed-orthogonal-v1"
-        else torch.relu(alignment)
+        else torch.relu(restricted_alignment)
     )
     coefficient = torch.where(
         active,
         projected_alignment
-        / nuisance_energy.clamp_min(torch.finfo(work_dtype).tiny),
-        torch.zeros_like(alignment),
+        / restricted_nuisance_energy.clamp_min(
+            torch.finfo(work_dtype).tiny
+        ),
+        torch.zeros_like(restricted_alignment),
     )
-    residual = guide - coefficient.unsqueeze(-1) * nuisance
+    residual = (
+        restricted_guide
+        - coefficient.unsqueeze(-1) * restricted_nuisance
+    )
     residual = center(residual)
     residual_nuisance_alignment = (
         probability * residual * nuisance
     ).sum(dim=-1)
-
-    log_probability = student.log_softmax(dim=-1)
+    residual_entropy_alignment = (
+        probability * residual * entropy_direction
+    ).sum(dim=-1)
 
     def tilted(
         scale: torch.Tensor,
@@ -236,6 +291,8 @@ def fisher_projected_target(
             target_kl,
         ) = tilted(effective_step)
     residual_energy = (probability * residual.square()).sum(dim=-1)
+    student_entropy = -(probability * log_probability).sum(dim=-1)
+    target_entropy = -(target * target_log_probs).sum(dim=-1)
 
     return FisherProjectedTarget(
         target_probs=target.detach(),
@@ -243,12 +300,37 @@ def fisher_projected_target(
         metrics={
             "active_projection": active.detach(),
             "projection_coefficient": coefficient.detach(),
+            "entropy_projection_coefficient": (
+                entropy_coefficient.detach()
+            ),
             "guide_energy": guide_energy.detach(),
             "nuisance_energy": nuisance_energy.detach(),
+            "restricted_nuisance_energy": (
+                restricted_nuisance_energy.detach()
+            ),
             "guide_nuisance_alignment": alignment.detach(),
+            "restricted_guide_nuisance_alignment": (
+                restricted_alignment.detach()
+            ),
             "residual_nuisance_alignment": (
                 residual_nuisance_alignment.detach()
             ),
+            "entropy_active": entropy_projection_active.detach(),
+            "entropy_energy": entropy_energy.detach(),
+            "guide_entropy_alignment": (
+                guide_entropy_alignment.detach()
+            ),
+            "residual_entropy_alignment": (
+                residual_entropy_alignment.detach()
+            ),
+            "first_order_entropy_change": (
+                -residual_entropy_alignment.detach()
+            ),
+            "student_entropy": student_entropy.detach(),
+            "target_entropy": target_entropy.detach(),
+            "target_entropy_change": (
+                target_entropy - student_entropy
+            ).detach(),
             "residual_energy": residual_energy.detach(),
             "target_forward_kl": target_forward_kl.detach(),
             "target_reverse_kl": target_reverse_kl.detach(),

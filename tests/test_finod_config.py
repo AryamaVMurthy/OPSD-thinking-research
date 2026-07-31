@@ -52,3 +52,18 @@ def test_signed_orthogonal_finod_config_is_registered():
     assert config["finod_projection_mode"] == "signed-orthogonal-v1"
     assert config["finod_max_records"] == 1024
     assert config["max_steps"] == 32
+
+
+def test_entropy_neutral_finod_config_is_registered():
+    config = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "finod-g3-entropy-neutral-representative-1024.yaml"
+    ).data
+
+    assert (
+        config["finod_projection_mode"]
+        == "entropy-neutral-one-sided-v1"
+    )
+    assert config["finod_max_records"] == 1024
+    assert config["max_steps"] == 32

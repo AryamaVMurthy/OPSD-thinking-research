@@ -58,6 +58,93 @@ def test_signed_projection_removes_anti_aligned_answer_direction():
     assert result.metrics["target_kl"].item() > 0.0
 
 
+def test_entropy_neutral_projection_removes_only_concentration_direction():
+    student = torch.tensor(
+        [[2.0, 0.5, -1.0, -2.0]], dtype=torch.float64
+    )
+    base = torch.zeros_like(student)
+    probability = student.softmax(dim=-1)
+
+    def center(direction):
+        return direction - (probability * direction).sum(
+            dim=-1, keepdim=True
+        )
+
+    entropy_direction = center(student.log_softmax(dim=-1))
+    raw_procedure = center(
+        torch.tensor([[0.4, -0.7, 1.2, -0.9]], dtype=torch.float64)
+    )
+    procedure = raw_procedure - (
+        (probability * raw_procedure * entropy_direction).sum(dim=-1)
+        / (probability * entropy_direction.square()).sum(dim=-1)
+    ).unsqueeze(-1) * entropy_direction
+    guide = procedure + 2.0 * entropy_direction
+
+    ordinary = fisher_projected_target(
+        student_logits=student,
+        guide_logits=guide,
+        base_logits=base,
+        nuisance_logits=base,
+        step_size=0.05,
+        nuisance_strength_threshold=1e-12,
+        projection_mode="one-sided-positive-v1",
+    )
+    neutral = fisher_projected_target(
+        student_logits=student,
+        guide_logits=guide,
+        base_logits=base,
+        nuisance_logits=base,
+        step_size=0.05,
+        nuisance_strength_threshold=1e-12,
+        projection_mode="entropy-neutral-one-sided-v1",
+    )
+
+    torch.testing.assert_close(neutral.residual_direction, procedure)
+    assert abs(
+        ordinary.metrics["residual_entropy_alignment"].item()
+    ) > 1e-3
+    assert abs(
+        neutral.metrics["residual_entropy_alignment"].item()
+    ) < 1e-12
+    assert abs(
+        neutral.metrics["first_order_entropy_change"].item()
+    ) < 1e-12
+    assert abs(neutral.metrics["target_entropy_change"].item()) < abs(
+        ordinary.metrics["target_entropy_change"].item()
+    )
+    assert neutral.metrics["residual_energy"].item() > 0.0
+
+
+def test_entropy_neutral_projection_satisfies_joint_answer_constraint():
+    student = torch.tensor(
+        [[1.7, 0.4, -0.8, -1.6]], dtype=torch.float64
+    )
+    base = torch.zeros_like(student)
+    nuisance = torch.tensor(
+        [[1.0, -0.5, 0.7, -1.2]], dtype=torch.float64
+    )
+    procedure = torch.tensor(
+        [[-0.3, 1.1, -0.4, 0.8]], dtype=torch.float64
+    )
+    guide = procedure + 2.0 * nuisance + student
+
+    result = fisher_projected_target(
+        student_logits=student,
+        guide_logits=guide,
+        base_logits=base,
+        nuisance_logits=nuisance,
+        step_size=0.05,
+        nuisance_strength_threshold=1e-12,
+        projection_mode="entropy-neutral-one-sided-v1",
+    )
+
+    assert abs(
+        result.metrics["residual_entropy_alignment"].item()
+    ) < 1e-12
+    assert result.metrics["residual_nuisance_alignment"].item() <= 1e-12
+    assert result.metrics["residual_energy"].item() > 0.0
+
+
 def test_target_kl_is_clipped_without_changing_residual_direction():
     student = torch.zeros(1, 4, dtype=torch.float64)
     base = torch.zeros_like(student)
