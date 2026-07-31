@@ -327,3 +327,46 @@ def test_barycenter_global_batch_screen_changes_only_update_grouping():
     } == {
         key: value for key, value in baseline.items() if key not in ignored
     }
+
+
+def test_barycenter_prefix512_global_batch_combines_only_screened_axes():
+    full_prefix_global = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s11-barycenter-global-batch-1.yaml"
+    ).data
+    prefix512_sequential = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s10-barycenter-prefix512-6.yaml"
+    ).data
+    candidate = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s12-barycenter-prefix512-global-batch-1.yaml"
+    ).data
+
+    assert candidate["fisher_position_prefix_tokens"] == 512
+    ignored_from_global = {"variant", "fisher_position_prefix_tokens"}
+    assert {
+        key: value for key, value in candidate.items() if key not in ignored_from_global
+    } == {
+        key: value
+        for key, value in full_prefix_global.items()
+        if key not in ignored_from_global
+    }
+
+    grouping_fields = {
+        "variant",
+        "effective_batch_size",
+        "gradient_accumulation_steps",
+        "max_steps",
+        "save_steps",
+    }
+    assert {
+        key: value for key, value in candidate.items() if key not in grouping_fields
+    } == {
+        key: value
+        for key, value in prefix512_sequential.items()
+        if key not in grouping_fields
+    }
