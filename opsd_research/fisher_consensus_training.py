@@ -54,7 +54,7 @@ def _aggregate_consensus_metrics(
     local = torch.stack(
         [
             count,
-            loss.detach().to(torch.float64) * count,
+            total("target_student_kl"),
             total("agreement"),
             total("mean_direction_energy"),
             total("mean_pair_energy"),
@@ -74,6 +74,7 @@ def _aggregate_consensus_metrics(
             total("target_student_kl"),
             total("fisher_alignment_gain"),
             total("fisher_alignment_cosine_proxy"),
+            total("optimization_per_token"),
         ]
     )
     local_max = metrics["target_kl"][mask].detach().to(torch.float64).max()
@@ -121,6 +122,7 @@ def _aggregate_consensus_metrics(
         "target_student_kl": average(16),
         "fisher_alignment_gain": average(17),
         "fisher_alignment_cosine_proxy": average(18),
+        "optimization_loss": average(19),
     }
 
 
@@ -206,6 +208,7 @@ def compute_loss_with_fisher_consensus(
         step_size=float(self._fisher_step_size),
         max_target_kl=float(self._fisher_max_target_kl),
         temperature=float(self.temperature),
+        anchor_kl_weight=float(self._fisher_anchor_kl_weight),
     )
     metrics = _aggregate_consensus_metrics(
         self,
@@ -229,6 +232,9 @@ def compute_loss_with_fisher_consensus(
                         self._fisher_position_prefix_tokens
                     ),
                     "max_target_kl": float(self._fisher_max_target_kl),
+                    "anchor_kl_weight": float(
+                        self._fisher_anchor_kl_weight
+                    ),
                     **metrics,
                 },
                 separators=(",", ":"),

@@ -185,6 +185,50 @@ def test_student_anchor_and_alignment_diagnostics_have_expected_endpoints():
     )
 
 
+def test_anchor_regularizer_adds_frozen_policy_kl_to_optimization_loss():
+    base = _logits([0.0, 0.0, 0.0])
+    student = _logits([0.6, -0.2, -0.4])
+    guides = torch.tensor(
+        [
+            [[1.0, -1.0, 0.0]],
+            [[0.8, -0.7, -0.1]],
+            [[1.2, -0.9, -0.3]],
+        ],
+        dtype=torch.float64,
+    )
+    controls = torch.zeros_like(guides)
+    mask = torch.tensor([True])
+
+    target_only, _ = fisher_consensus_loss(
+        student_logits=student,
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=controls,
+        token_mask=mask,
+        step_size=0.25,
+        max_target_kl=0.01,
+        anchor_kl_weight=0.0,
+    )
+    proximal, result = fisher_consensus_loss(
+        student_logits=student,
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=controls,
+        token_mask=mask,
+        step_size=0.25,
+        max_target_kl=0.01,
+        anchor_kl_weight=2.0,
+    )
+
+    anchor_kl = result.metrics["student_anchor_forward_kl"][mask].mean()
+    assert proximal.item() == pytest.approx(
+        target_only.item() + 2.0 * anchor_kl.item()
+    )
+    assert result.metrics["optimization_per_token"].item() == pytest.approx(
+        proximal.item()
+    )
+
+
 def test_requires_at_least_two_matched_guide_control_pairs():
     base = _logits([0.0, 0.0])
     guides = torch.zeros((1, 1, 2), dtype=torch.float64)

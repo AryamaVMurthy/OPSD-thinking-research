@@ -55,6 +55,9 @@ def test_consensus_metrics_are_token_weighted_and_report_collapse():
         "fisher_alignment_cosine_proxy": torch.tensor(
             [[0.4, 99.0], [-0.2, 0.0]]
         ),
+        "optimization_per_token": torch.tensor(
+            [[0.07, 99.0], [0.04, 0.0]]
+        ),
     }
     selected = torch.tensor([[True, False], [True, True]])
     trainer = SimpleNamespace(
@@ -71,7 +74,8 @@ def test_consensus_metrics_are_token_weighted_and_report_collapse():
     )
 
     assert result["retained_tokens"] == 3
-    assert result["loss"] == pytest.approx(0.3)
+    expected_target_loss = (0.03 + 0.02 + 0.0) / 3
+    assert result["loss"] == pytest.approx(expected_target_loss)
     assert result["agreement"] == pytest.approx(0.5)
     assert result["collapsed_consensus_fraction"] == pytest.approx(1 / 3)
     assert result["clipped_target_fraction"] == pytest.approx(1 / 3)
@@ -81,10 +85,10 @@ def test_consensus_metrics_are_token_weighted_and_report_collapse():
         expected_anchor_loss
     )
     assert result["relative_loss_to_anchor"] == pytest.approx(
-        0.3 / expected_anchor_loss
+        expected_target_loss / expected_anchor_loss
     )
     assert result["improvement_over_anchor"] == pytest.approx(
-        expected_anchor_loss - 0.3
+        expected_anchor_loss - expected_target_loss
     )
     assert result["student_anchor_forward_kl"] == pytest.approx(0.01)
     assert result["student_anchor_reverse_kl"] == pytest.approx(0.009)
@@ -92,3 +96,4 @@ def test_consensus_metrics_are_token_weighted_and_report_collapse():
     assert result["fisher_alignment_cosine_proxy"] == pytest.approx(
         0.2 / 3
     )
+    assert result["optimization_loss"] == pytest.approx(0.11 / 3)

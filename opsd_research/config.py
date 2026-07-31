@@ -591,6 +591,17 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
             raise ConfigError(
                 f"{source}: adam_epsilon must be finite in [1e-12, 1e-2]"
             )
+        anchor_weight = data.get("fisher_anchor_kl_weight", 0.0)
+        if (
+            not isinstance(anchor_weight, (int, float))
+            or isinstance(anchor_weight, bool)
+            or not math.isfinite(float(anchor_weight))
+            or not 0.0 <= float(anchor_weight) <= 100.0
+        ):
+            raise ConfigError(
+                f"{source}: fisher_anchor_kl_weight must be finite in "
+                "[0, 100]"
+            )
         if (
             not isinstance(selection_seed, int)
             or isinstance(selection_seed, bool)

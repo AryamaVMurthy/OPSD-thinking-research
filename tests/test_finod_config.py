@@ -191,3 +191,17 @@ def test_fisher_consensus_high_epsilon_screen_calibrates_tiny_residuals():
     assert config["adam_epsilon"] == 1e-4
     assert config["max_steps"] == config["save_steps"] == 12
     assert config["fisher_max_records"] == 192
+
+
+def test_fisher_consensus_proximal_screen_uses_frozen_policy_kl():
+    config = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s4-proximal-12.yaml"
+    ).data
+
+    assert config["graph_mode"] == "fisher_consensus"
+    assert config["adam_epsilon"] == 1e-4
+    assert config["fisher_anchor_kl_weight"] == 1.0
+    assert config["fisher_max_records"] == 192
+    assert config["max_steps"] == 12

@@ -621,6 +621,9 @@ def main() -> None:
         opsd_trainer.OPSDTrainer._fisher_max_target_kl = float(
             config["fisher_max_target_kl"]
         )
+        opsd_trainer.OPSDTrainer._fisher_anchor_kl_weight = float(
+            config.get("fisher_anchor_kl_weight", 0.0)
+        )
         opsd_trainer.OPSDTrainer._fisher_consensus_energy_threshold = float(
             config["fisher_consensus_energy_threshold"]
         )
@@ -643,6 +646,9 @@ def main() -> None:
                     "step_size": float(config["fisher_step_size"]),
                     "max_target_kl": float(
                         config["fisher_max_target_kl"]
+                    ),
+                    "anchor_kl_weight": float(
+                        config.get("fisher_anchor_kl_weight", 0.0)
                     ),
                     "answer_access": False,
                     "reference_solution_access": False,

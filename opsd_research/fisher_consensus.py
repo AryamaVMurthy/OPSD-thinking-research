@@ -169,8 +169,9 @@ def fisher_consensus_loss(
     step_size: float,
     max_target_kl: float,
     temperature: float = 1.0,
+    anchor_kl_weight: float = 0.0,
 ) -> tuple[torch.Tensor, FisherConsensusTarget]:
-    """Forward KL from the detached consensus target to the student."""
+    """Fit the detached target with an optional frozen-policy KL proximal."""
     if student_logits.shape != base_logits.shape:
         raise ValueError("student and base logits must have identical shapes")
     if token_mask.shape != student_logits.shape[:-1]:
@@ -179,6 +180,8 @@ def fisher_consensus_loss(
         raise ValueError("token_mask must be boolean")
     if not bool(token_mask.any().item()):
         raise ValueError("Fisher consensus loss requires a retained token")
+    if anchor_kl_weight < 0.0:
+        raise ValueError("anchor_kl_weight must be nonnegative")
     result = fisher_consensus_target(
         base_logits=base_logits,
         guide_logits=guide_logits,
@@ -219,6 +222,9 @@ def fisher_consensus_loss(
         alignment_gain / alignment_denominator,
         torch.zeros_like(alignment_gain),
     ).clamp(min=-1.0, max=1.0)
+    optimization_per_token = (
+        per_token + float(anchor_kl_weight) * student_anchor_forward
+    )
     result.metrics.update(
         {
             "student_anchor_forward_kl": student_anchor_forward.detach(),
@@ -226,7 +232,8 @@ def fisher_consensus_loss(
             "target_student_kl": per_token.detach(),
             "fisher_alignment_gain": alignment_gain.detach(),
             "fisher_alignment_cosine_proxy": alignment_cosine.detach(),
+            "optimization_per_token": optimization_per_token.detach(),
         }
     )
-    loss = per_token[token_mask].mean()
+    loss = optimization_per_token[token_mask].mean()
     return loss, result
