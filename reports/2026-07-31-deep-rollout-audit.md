@@ -439,6 +439,29 @@ under the 0.1 cap and produced adapter update norm 0.0404
 (\(5.51\times10^{-4}\) relative to parameter norm). Peak GPU memory was
 27.5 GiB, leaving substantial A100 headroom.
 
+The first five-step screen, job `17375`, exposed a distinct optimization
+failure despite passing all target-construction checks. Step-one loss equalled
+the frozen-anchor target KL as required, but on later unseen batches mean
+student-to-target loss was 1.95–2.40 times the corresponding anchor-to-target
+loss. Gradients remained small (0.042–0.052) and never reached the 0.1 clip.
+Thus neither exploding gradients nor target KL caused the failure. The first
+AdamW update moved the student roughly one target-radius away from the base,
+but gave no measurable cross-problem alignment; on a fresh problem, its
+deviation added approximately orthogonally to the new guidance direction.
+This is precisely the distinction between bounding each detached target and
+bounding the learned policy itself.
+
+The next diagnostic therefore makes only one optimizer change: learning rate
+\(10^{-6}\), with the same target, data, effective batch, and linear schedule.
+It runs 12 steps (two passes over 192 examples) and additionally logs
+student-to-anchor KL plus the Fisher three-point alignment gain
+\[
+D_{\mathrm{KL}}(q\|p_0)+D_{\mathrm{KL}}(p_0\|p_\theta)
+-D_{\mathrm{KL}}(q\|p_\theta).
+\]
+Positive gain means the learned displacement aligns with guidance rather than
+merely increasing distance from the base.
+
 Promotion requires all of the following:
 
 1. finite, nonnegative loss and nonzero gradients;

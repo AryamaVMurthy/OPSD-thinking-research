@@ -239,7 +239,6 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
     expected = {
         "dataset": "jasonrqh/Math-CoT-20k",
         "effective_batch_size": 32,
-        "learning_rate": 5e-6,
         "lora_r": 64,
         "lora_alpha": 128,
         "rollouts_per_prompt": 1,
@@ -355,6 +354,16 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         "fisher_consensus",
     }:
         raise ConfigError(f"{source}: unsupported graph_mode")
+    allowed_learning_rates = (
+        {1e-6, 5e-6}
+        if data["graph_mode"] == "fisher_consensus"
+        else {5e-6}
+    )
+    if data.get("learning_rate") not in allowed_learning_rates:
+        raise ConfigError(
+            f"{source}: {data['graph_mode']} learning_rate must be one of "
+            f"{sorted(allowed_learning_rates)}"
+        )
     for key in ("branch_loss_weight", "entropy_floor_weight"):
         value = data.get(key)
         if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:

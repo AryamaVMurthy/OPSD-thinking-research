@@ -40,6 +40,21 @@ def test_consensus_metrics_are_token_weighted_and_report_collapse():
         "effective_step_size": torch.tensor(
             [[0.2, 99.0], [0.25, 0.25]]
         ),
+        "student_anchor_forward_kl": torch.tensor(
+            [[0.02, 99.0], [0.01, 0.0]]
+        ),
+        "student_anchor_reverse_kl": torch.tensor(
+            [[0.018, 99.0], [0.009, 0.0]]
+        ),
+        "target_student_kl": torch.tensor(
+            [[0.03, 99.0], [0.02, 0.0]]
+        ),
+        "fisher_alignment_gain": torch.tensor(
+            [[0.005, 99.0], [-0.002, 0.0]]
+        ),
+        "fisher_alignment_cosine_proxy": torch.tensor(
+            [[0.4, 99.0], [-0.2, 0.0]]
+        ),
     }
     selected = torch.tensor([[True, False], [True, True]])
     trainer = SimpleNamespace(
@@ -70,4 +85,10 @@ def test_consensus_metrics_are_token_weighted_and_report_collapse():
     )
     assert result["improvement_over_anchor"] == pytest.approx(
         expected_anchor_loss - 0.3
+    )
+    assert result["student_anchor_forward_kl"] == pytest.approx(0.01)
+    assert result["student_anchor_reverse_kl"] == pytest.approx(0.009)
+    assert result["fisher_alignment_gain"] == pytest.approx(0.001)
+    assert result["fisher_alignment_cosine_proxy"] == pytest.approx(
+        0.2 / 3
     )

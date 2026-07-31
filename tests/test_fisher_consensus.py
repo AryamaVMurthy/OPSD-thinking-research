@@ -140,6 +140,51 @@ def test_loss_is_positive_and_backpropagates_only_to_student():
     assert result.target_probs.requires_grad is False
 
 
+def test_student_anchor_and_alignment_diagnostics_have_expected_endpoints():
+    base = _logits([0.0, 0.0, 0.0])
+    guides = torch.tensor(
+        [
+            [[1.0, -1.0, 0.0]],
+            [[0.8, -0.7, -0.1]],
+            [[1.2, -0.9, -0.3]],
+        ],
+        dtype=torch.float64,
+    )
+    controls = torch.zeros_like(guides)
+    mask = torch.tensor([True])
+
+    _, initial = fisher_consensus_loss(
+        student_logits=base,
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=controls,
+        token_mask=mask,
+        step_size=0.25,
+        max_target_kl=0.01,
+    )
+    assert initial.metrics["student_anchor_forward_kl"].item() == pytest.approx(
+        0.0
+    )
+    assert initial.metrics["fisher_alignment_gain"].item() == pytest.approx(
+        0.0
+    )
+
+    _, fitted = fisher_consensus_loss(
+        student_logits=initial.target_probs.log(),
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=controls,
+        token_mask=mask,
+        step_size=0.25,
+        max_target_kl=0.01,
+    )
+    assert fitted.metrics["student_anchor_forward_kl"].item() > 0.0
+    assert fitted.metrics["fisher_alignment_gain"].item() > 0.0
+    assert fitted.metrics["fisher_alignment_cosine_proxy"].item() == (
+        pytest.approx(1.0)
+    )
+
+
 def test_requires_at_least_two_matched_guide_control_pairs():
     base = _logits([0.0, 0.0])
     guides = torch.zeros((1, 1, 2), dtype=torch.float64)

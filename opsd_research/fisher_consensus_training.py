@@ -69,6 +69,11 @@ def _aggregate_consensus_metrics(
                 energy <= float(consensus_energy_threshold)
             ).to(torch.float64).sum(),
             (effective < float(step_size) - 1e-7).to(torch.float64).sum(),
+            total("student_anchor_forward_kl"),
+            total("student_anchor_reverse_kl"),
+            total("target_student_kl"),
+            total("fisher_alignment_gain"),
+            total("fisher_alignment_cosine_proxy"),
         ]
     )
     local_max = metrics["target_kl"][mask].detach().to(torch.float64).max()
@@ -111,6 +116,11 @@ def _aggregate_consensus_metrics(
         "improvement_over_anchor": (
             anchor_target_loss - student_target_loss
         ),
+        "student_anchor_forward_kl": average(14),
+        "student_anchor_reverse_kl": average(15),
+        "target_student_kl": average(16),
+        "fisher_alignment_gain": average(17),
+        "fisher_alignment_cosine_proxy": average(18),
     }
 
 

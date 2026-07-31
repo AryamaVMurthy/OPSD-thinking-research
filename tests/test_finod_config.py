@@ -136,3 +136,18 @@ def test_answer_free_fisher_consensus_four_gpu_fallback_preserves_batch():
     )
     assert config["fisher_max_records"] == 192
     assert config["max_completion_length"] == 1024
+
+
+def test_fisher_consensus_two_epoch_diagnostic_uses_small_optimizer_steps():
+    config = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s2-low-lr-12.yaml"
+    ).data
+
+    assert config["graph_mode"] == "fisher_consensus"
+    assert config["learning_rate"] == 1e-6
+    assert config["max_steps"] == config["save_steps"] == 12
+    assert config["fisher_max_records"] == 192
+    assert config["max_completion_length"] == 1024
+    assert config["num_gpus"] == 8

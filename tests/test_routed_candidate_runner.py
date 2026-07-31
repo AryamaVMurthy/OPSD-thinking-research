@@ -2,6 +2,9 @@ from pathlib import Path
 
 
 RUNNER = Path("reproductions/06_graf_opsd/run-routed-candidate.sbatch")
+FINOD_RUNNER = Path(
+    "reproductions/06_graf_opsd/run-finod-candidate.sbatch"
+)
 
 
 def test_runner_selects_manifests_after_reading_graph_mode() -> None:
@@ -55,3 +58,11 @@ def test_runner_summarizes_the_actual_slurm_output_path() -> None:
 
     assert 'training_log="${SLURM_SUBMIT_DIR}/logs/' in script
     assert '--training-log "${training_log}"' in script
+
+
+def test_guidance_runners_use_the_registered_learning_rate() -> None:
+    for path in (RUNNER, FINOD_RUNNER):
+        script = path.read_text(encoding="utf-8")
+        assert 'learning_rate="$(python3 -' in script
+        assert '--learning_rate "${learning_rate}"' in script
+        assert "--learning_rate 5e-6" not in script

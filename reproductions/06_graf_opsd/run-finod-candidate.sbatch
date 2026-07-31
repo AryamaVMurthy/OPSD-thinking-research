@@ -60,6 +60,12 @@ import sys
 print(load_config(sys.argv[1]).data["seed"])
 PY
 )"
+learning_rate="$(python3 - "${FINOD_CONFIG}" <<'PY'
+from opsd_research.config import load_config
+import sys
+print(load_config(sys.argv[1]).data["learning_rate"])
+PY
+)"
 max_sequence_length="$(python3 - "${FINOD_CONFIG}" <<'PY'
 from opsd_research.config import load_config
 import sys
@@ -102,9 +108,9 @@ if [[ "${graph_mode}" == "fisher_consensus" ]]; then
 elif [[ -n "${representative_records}" ]]; then
   export OPSD_FINOD_SELECTION_MANIFEST="${output_dir}/finod-representative-selection.json"
 fi
-printf 'method=%s\nmax_steps=%s\nnum_gpus=8\ngradient_accumulation_steps=4\neffective_batch_size=32\nseed=%s\ndata_seed=%s\nvllm_gpu_memory_utilization=%s\nmax_sequence_length=%s\nmax_grad_norm=0.1\n' \
+printf 'method=%s\nmax_steps=%s\nnum_gpus=8\ngradient_accumulation_steps=4\neffective_batch_size=32\nseed=%s\ndata_seed=%s\nlearning_rate=%s\nvllm_gpu_memory_utilization=%s\nmax_sequence_length=%s\nmax_grad_norm=0.1\n' \
   "${graph_mode}" \
-  "${FINOD_MAX_STEPS}" "${seed}" "${seed}" "${vllm_utilization}" \
+  "${FINOD_MAX_STEPS}" "${seed}" "${seed}" "${learning_rate}" "${vllm_utilization}" \
   "${max_sequence_length}" > "${output_dir}/runtime-overrides.txt"
 record_run_manifest \
   "${output_dir}" runtime-overrides.txt "${copied_manifest}"
@@ -121,7 +127,7 @@ accelerate launch \
   --model_name_or_path Qwen/Qwen3-4B \
   --model_revision 1cfa9a7208912126459214e8b04321603b3df60c \
   --student_model_revision 1cfa9a7208912126459214e8b04321603b3df60c \
-  --learning_rate 5e-6 \
+  --learning_rate "${learning_rate}" \
   --max_grad_norm 0.1 \
   --per_device_train_batch_size 1 \
   --gradient_checkpointing \

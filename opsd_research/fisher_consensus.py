@@ -194,5 +194,39 @@ def fisher_consensus_loss(
     target = result.target_probs.to(dtype)
     target_log = target.clamp_min(torch.finfo(dtype).tiny).log()
     per_token = (target * (target_log - student_log)).sum(dim=-1)
+    base_log = (
+        base_logits.detach().to(dtype) / temperature
+    ).log_softmax(dim=-1)
+    base_probability = base_log.exp()
+    student_probability = student_log.exp()
+    student_anchor_forward = (
+        base_probability * (base_log - student_log)
+    ).sum(dim=-1)
+    student_anchor_reverse = (
+        student_probability * (student_log - base_log)
+    ).sum(dim=-1)
+    alignment_gain = (
+        result.metrics["target_reverse_kl"].to(dtype)
+        + student_anchor_forward
+        - per_token
+    )
+    alignment_denominator = 2.0 * (
+        result.metrics["target_reverse_kl"].to(dtype)
+        * student_anchor_forward
+    ).clamp_min(0.0).sqrt()
+    alignment_cosine = torch.where(
+        alignment_denominator > torch.finfo(dtype).tiny,
+        alignment_gain / alignment_denominator,
+        torch.zeros_like(alignment_gain),
+    ).clamp(min=-1.0, max=1.0)
+    result.metrics.update(
+        {
+            "student_anchor_forward_kl": student_anchor_forward.detach(),
+            "student_anchor_reverse_kl": student_anchor_reverse.detach(),
+            "target_student_kl": per_token.detach(),
+            "fisher_alignment_gain": alignment_gain.detach(),
+            "fisher_alignment_cosine_proxy": alignment_cosine.detach(),
+        }
+    )
     loss = per_token[token_mask].mean()
     return loss, result
