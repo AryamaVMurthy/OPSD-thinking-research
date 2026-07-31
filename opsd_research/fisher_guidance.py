@@ -60,7 +60,7 @@ _DOMAIN_PATTERNS = {
         r"\b(?:triangle|circle|polygon|quadrilateral|rectang(?:le|ular)|square|"
         r"trapezoid|parallelogram|angle|perpendicular|parallel|tangent|"
         r"chord|radius|diameter|area|volume|coordinate|point|line|plane|"
-        r"ellipse|sphere|cube|prism|pyramid|polyhedron)\b",
+        r"ellipse|sphere|cube|prism|pyramid|tetrahedron|polyhedron)\b",
         re.IGNORECASE,
     ),
     "combinatorics": re.compile(
@@ -71,7 +71,7 @@ _DOMAIN_PATTERNS = {
     ),
     "number_theory": re.compile(
         r"\b(?:prime|divisor|factor|multiple|congruen|modulo|remainder|"
-        r"gcd|lcm|integer solution|diophantine|digit|base [0-9]|"
+        r"gcd|lcm|integer solutions?|diophantine|digit|base [0-9]|"
         r"divisible)\b",
         re.IGNORECASE,
     ),
@@ -102,8 +102,8 @@ def classify_problem_domain(question: str) -> str:
     order = (
         "geometry",
         "probability",
-        "number_theory",
         "sequences",
+        "number_theory",
         "algebra",
         "combinatorics",
     )

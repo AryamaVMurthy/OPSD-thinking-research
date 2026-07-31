@@ -163,13 +163,26 @@ def test_problem_domain_classifier_uses_question_only(
             "number_theory",
         ),
         (
+            "Find the number of integer pairs for which a cubic equation has "
+            "infinitely many integer solutions.",
+            "combinatorics",
+            "number_theory",
+        ),
+        (
+            "A regular tetrahedron is scaled to a new edge length. Find its "
+            "new weight.",
+            "number_theory",
+            "geometry",
+        ),
+        (
             "How many permutations avoid adjacent equal colors?",
             "algebra",
             "combinatorics",
         ),
         (
-            "A sequence satisfies a recurrence relation. Determine its term.",
-            "combinatorics",
+            "A sequence of integers satisfies a recurrence relation for "
+            "every integer index. Determine its term.",
+            "number_theory",
             "algebra",
         ),
     ],
