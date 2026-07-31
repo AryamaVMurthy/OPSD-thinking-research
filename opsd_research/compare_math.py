@@ -71,6 +71,76 @@ def _metric_triplet(
     }
 
 
+def _output_tokens(record: dict[str, Any]) -> int:
+    value = record.get("output_tokens")
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError("paired generation record has invalid output_tokens")
+    return value
+
+
+def _is_cutoff(record: dict[str, Any]) -> bool:
+    if record.get("finish_reason") == "length":
+        return True
+    limit = record.get("effective_max_new_tokens")
+    return (
+        isinstance(limit, int)
+        and not isinstance(limit, bool)
+        and limit > 0
+        and _output_tokens(record) >= limit
+    )
+
+
+def _generation_diagnostics(
+    baseline: dict[tuple[str, int], dict[str, Any]],
+    treatment: dict[tuple[str, int], dict[str, Any]],
+    transitions: dict[
+        str,
+        list[tuple[dict[str, Any], dict[str, Any]]],
+    ],
+) -> tuple[dict[str, float | int], dict[str, dict[str, float | int | None]]]:
+    baseline_rows = list(baseline.values())
+    treatment_rows = [treatment[key] for key in baseline]
+    baseline_cutoffs = sum(_is_cutoff(row) for row in baseline_rows)
+    treatment_cutoffs = sum(_is_cutoff(row) for row in treatment_rows)
+    aggregate: dict[str, float | int] = {
+        "baseline_mean_output_tokens": mean(
+            _output_tokens(row) for row in baseline_rows
+        ),
+        "treatment_mean_output_tokens": mean(
+            _output_tokens(row) for row in treatment_rows
+        ),
+        "mean_output_token_delta": mean(
+            _output_tokens(treatment[key]) - _output_tokens(baseline[key])
+            for key in baseline
+        ),
+        "baseline_cutoffs": baseline_cutoffs,
+        "treatment_cutoffs": treatment_cutoffs,
+        "cutoff_delta": treatment_cutoffs - baseline_cutoffs,
+    }
+    localized = {}
+    for name in ("both_correct", "both_wrong", "degraded", "improved"):
+        rows = transitions.get(name, [])
+        base_count = sum(_is_cutoff(base) for base, _ in rows)
+        treatment_count = sum(
+            _is_cutoff(candidate) for _, candidate in rows
+        )
+        localized[name] = {
+            "count": len(rows),
+            "mean_output_token_delta": (
+                mean(
+                    _output_tokens(candidate) - _output_tokens(base)
+                    for base, candidate in rows
+                )
+                if rows
+                else None
+            ),
+            "baseline_cutoffs": base_count,
+            "treatment_cutoffs": treatment_count,
+            "cutoff_delta": treatment_count - base_count,
+        }
+    return aggregate, localized
+
+
 def _paired_bootstrap(
     baseline: dict[str, dict[str, float]],
     treatment: dict[str, dict[str, float]],
@@ -163,17 +233,30 @@ def compare_paired_math(
         raise ValueError("baseline and treatment problem IDs do not match")
 
     changes = Counter()
+    transition_rows: dict[
+        str,
+        list[tuple[dict[str, Any], dict[str, Any]]],
+    ] = defaultdict(list)
     for record_key, base_record in baseline_by_key.items():
         base_correct = bool(base_record["correct"])
-        treatment_correct = bool(treatment_by_key[record_key]["correct"])
+        treatment_record = treatment_by_key[record_key]
+        treatment_correct = bool(treatment_record["correct"])
         if base_correct and treatment_correct:
-            changes["both_correct"] += 1
+            transition = "both_correct"
         elif not base_correct and not treatment_correct:
-            changes["both_wrong"] += 1
+            transition = "both_wrong"
         elif base_correct:
-            changes["degraded"] += 1
+            transition = "degraded"
         else:
-            changes["improved"] += 1
+            transition = "improved"
+        changes[transition] += 1
+        transition_rows[transition].append((base_record, treatment_record))
+
+    generation_diagnostics, transition_diagnostics = _generation_diagnostics(
+        baseline_by_key,
+        treatment_by_key,
+        transition_rows,
+    )
 
     suffix = str(samples_per_problem)
     intervals = _paired_bootstrap(
@@ -219,6 +302,8 @@ def compare_paired_math(
             key: changes[key]
             for key in ("both_correct", "both_wrong", "degraded", "improved")
         },
+        "generation_diagnostics": generation_diagnostics,
+        "transition_diagnostics": transition_diagnostics,
     }
 
 

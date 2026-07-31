@@ -3,7 +3,14 @@ import hashlib
 from opsd_research.compare_math import compare_paired_math
 
 
-def _run(method: str, checkpoint: str, outcomes: list[list[bool]]):
+def _run(
+    method: str,
+    checkpoint: str,
+    outcomes: list[list[bool]],
+    *,
+    output_tokens: list[list[int]] | None = None,
+    finish_reasons: list[list[str]] | None = None,
+):
     records = []
     grades = []
     for problem_index, problem_outcomes in enumerate(outcomes):
@@ -21,6 +28,17 @@ def _run(method: str, checkpoint: str, outcomes: list[list[bool]]):
                 "response": response,
                 "predicted_answer": "10" if correct else "11",
                 "correct": correct,
+                "output_tokens": (
+                    output_tokens[problem_index][sample_index]
+                    if output_tokens is not None
+                    else 100
+                ),
+                "finish_reason": (
+                    finish_reasons[problem_index][sample_index]
+                    if finish_reasons is not None
+                    else "stop"
+                ),
+                "effective_max_new_tokens": 32768,
             }
             records.append(record)
             grades.append(
@@ -102,3 +120,52 @@ def test_explicit_prefix_subset_reuses_first_samples_from_larger_run() -> None:
 
     assert comparison["pairing_verified"] is True
     assert comparison["sample_subset_protocol"] == "first-n-paired-samples-v1"
+
+
+def test_paired_math_comparison_localizes_length_and_cutoff_by_flip() -> None:
+    baseline_records, baseline_grades = _run(
+        "untouched",
+        "none",
+        [[True, False]],
+        output_tokens=[[1000, 32768]],
+        finish_reasons=[["stop", "length"]],
+    )
+    treatment_records, treatment_grades = _run(
+        "trained",
+        "6",
+        [[False, True]],
+        output_tokens=[[32768, 2000]],
+        finish_reasons=[["length", "stop"]],
+    )
+
+    comparison = compare_paired_math(
+        baseline_records,
+        baseline_grades,
+        treatment_records,
+        treatment_grades,
+        samples_per_problem=2,
+        bootstrap_samples=100,
+    )
+
+    assert comparison["generation_diagnostics"] == {
+        "baseline_mean_output_tokens": 16884.0,
+        "treatment_mean_output_tokens": 17384.0,
+        "mean_output_token_delta": 500.0,
+        "baseline_cutoffs": 1,
+        "treatment_cutoffs": 1,
+        "cutoff_delta": 0,
+    }
+    assert comparison["transition_diagnostics"]["degraded"] == {
+        "count": 1,
+        "mean_output_token_delta": 31768.0,
+        "baseline_cutoffs": 0,
+        "treatment_cutoffs": 1,
+        "cutoff_delta": 1,
+    }
+    assert comparison["transition_diagnostics"]["improved"] == {
+        "count": 1,
+        "mean_output_token_delta": -30768.0,
+        "baseline_cutoffs": 1,
+        "treatment_cutoffs": 0,
+        "cutoff_delta": -1,
+    }
