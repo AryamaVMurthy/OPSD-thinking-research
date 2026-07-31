@@ -4,6 +4,8 @@ import pytest
 import torch
 
 from opsd_research.fisher_consensus import (
+    fisher_edge_boost_weights,
+    fisher_score_signature,
     fisher_consensus_loss,
     fisher_consensus_target,
 )
@@ -241,3 +243,74 @@ def test_requires_at_least_two_matched_guide_control_pairs():
             step_size=0.25,
             max_target_kl=0.01,
         )
+
+
+def test_fisher_score_signature_uses_whitened_vocabulary_coordinates():
+    base = torch.zeros((1, 2, 3), dtype=torch.float64)
+    direction = torch.tensor(
+        [[[1.0, 2.0, 3.0], [3.0, 2.0, 1.0]]],
+        dtype=torch.float64,
+    )
+    mask = torch.tensor([[True, False]])
+
+    signature, norms = fisher_score_signature(
+        base_logits=base,
+        consensus_direction=direction,
+        token_mask=mask,
+    )
+
+    expected = direction[:, 0] / (3.0**0.5)
+    assert torch.allclose(signature, expected)
+    assert norms.item() == pytest.approx(expected.norm().item())
+
+
+def test_identical_cross_problem_signatures_have_unit_edge_and_weight():
+    signatures = torch.tensor(
+        [[1.0, 2.0], [1.0, 2.0], [1.0, 2.0]],
+        dtype=torch.float64,
+    )
+
+    result = fisher_edge_boost_weights(signatures, threshold=0.0)
+
+    assert torch.allclose(
+        result.signed_edges, torch.ones_like(result.signed_edges)
+    )
+    assert torch.allclose(result.weights, torch.ones_like(result.weights))
+    assert result.active_fraction.item() == pytest.approx(1.0)
+
+
+def test_leave_one_out_edge_removes_positive_self_similarity():
+    signatures = torch.eye(3, dtype=torch.float64)
+
+    result = fisher_edge_boost_weights(signatures, threshold=0.0)
+
+    assert torch.allclose(
+        result.signed_edges, torch.zeros_like(result.signed_edges)
+    )
+    assert torch.equal(result.weights, torch.zeros_like(result.weights))
+    assert result.active_fraction.item() == pytest.approx(0.0)
+
+
+def test_opposing_cross_problem_signatures_have_no_positive_edge():
+    signatures = torch.tensor(
+        [[1.0, 0.0], [-1.0, 0.0], [0.0, 1.0]],
+        dtype=torch.float64,
+    )
+
+    result = fisher_edge_boost_weights(signatures, threshold=0.0)
+
+    assert bool((result.signed_edges <= 0.0).all())
+    assert torch.equal(result.weights, torch.zeros_like(result.weights))
+
+
+def test_positive_fisher_edges_are_normalized_to_global_mean_one():
+    signatures = torch.tensor(
+        [[1.0, 0.0], [1.0, 0.0], [0.0, 1.0]],
+        dtype=torch.float64,
+    )
+
+    result = fisher_edge_boost_weights(signatures, threshold=0.0)
+
+    assert result.active_fraction.item() == pytest.approx(2 / 3)
+    assert result.weights.mean().item() == pytest.approx(1.0)
+    assert result.weights[-1].item() == pytest.approx(0.0)

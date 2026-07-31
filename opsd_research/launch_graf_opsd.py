@@ -624,6 +624,12 @@ def main() -> None:
         opsd_trainer.OPSDTrainer._fisher_anchor_kl_weight = float(
             config.get("fisher_anchor_kl_weight", 0.0)
         )
+        opsd_trainer.OPSDTrainer._fisher_cross_problem_edge = bool(
+            config.get("fisher_cross_problem_edge", False)
+        )
+        opsd_trainer.OPSDTrainer._fisher_edge_threshold = float(
+            config.get("fisher_edge_threshold", 0.0)
+        )
         opsd_trainer.OPSDTrainer._fisher_consensus_energy_threshold = float(
             config["fisher_consensus_energy_threshold"]
         )
@@ -649,6 +655,12 @@ def main() -> None:
                     ),
                     "anchor_kl_weight": float(
                         config.get("fisher_anchor_kl_weight", 0.0)
+                    ),
+                    "cross_problem_edge": bool(
+                        config.get("fisher_cross_problem_edge", False)
+                    ),
+                    "edge_threshold": float(
+                        config.get("fisher_edge_threshold", 0.0)
                     ),
                     "answer_access": False,
                     "reference_solution_access": False,

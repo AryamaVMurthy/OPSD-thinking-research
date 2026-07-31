@@ -7,6 +7,7 @@ import torch
 
 from opsd_research.fisher_consensus_training import (
     _aggregate_consensus_metrics,
+    _distributed_fisher_edge,
 )
 
 
@@ -97,3 +98,28 @@ def test_consensus_metrics_are_token_weighted_and_report_collapse():
         0.2 / 3
     )
     assert result["optimization_loss"] == pytest.approx(0.11 / 3)
+
+
+def test_distributed_fisher_edge_returns_the_local_rank_weight():
+    gathered = torch.tensor(
+        [[1.0, 0.0], [1.0, 0.0], [0.0, 1.0]],
+        dtype=torch.float32,
+    )
+
+    class Accelerator:
+        process_index = 1
+        num_processes = 3
+
+        @staticmethod
+        def gather(_signature):
+            return gathered
+
+    local_weight, result = _distributed_fisher_edge(
+        SimpleNamespace(accelerator=Accelerator()),
+        torch.tensor([[1.0, 0.0]]),
+        threshold=0.0,
+    )
+
+    assert local_weight.shape == (1,)
+    assert local_weight.item() == pytest.approx(1.5)
+    assert result.active_fraction.item() == pytest.approx(2 / 3)

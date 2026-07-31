@@ -607,6 +607,29 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
                 f"{source}: fisher_anchor_kl_weight must be finite in "
                 "[0, 100]"
             )
+        edge_enabled = data.get("fisher_cross_problem_edge", False)
+        if not isinstance(edge_enabled, bool):
+            raise ConfigError(
+                f"{source}: fisher_cross_problem_edge must be boolean"
+            )
+        edge_threshold = data.get("fisher_edge_threshold", 0.0)
+        if (
+            not isinstance(edge_threshold, (int, float))
+            or isinstance(edge_threshold, bool)
+            or not math.isfinite(float(edge_threshold))
+            or not 0.0 <= float(edge_threshold) < 1.0
+        ):
+            raise ConfigError(
+                f"{source}: fisher_edge_threshold must be finite in [0, 1)"
+            )
+        if edge_enabled and (
+            int(data["num_gpus"]) < 3
+            or int(data["per_device_train_batch_size"]) != 1
+        ):
+            raise ConfigError(
+                f"{source}: Fisher edge boosting requires at least three "
+                "data-parallel problems and per-device batch one"
+            )
         if (
             not isinstance(selection_seed, int)
             or isinstance(selection_seed, bool)

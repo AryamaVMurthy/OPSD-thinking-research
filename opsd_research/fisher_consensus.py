@@ -16,8 +16,123 @@ class FisherConsensusTarget:
     metrics: dict[str, torch.Tensor]
 
 
+@dataclass(frozen=True)
+class FisherEdgeBoost:
+    """Leave-one-out cross-problem coherence and normalized boost weights."""
+
+    signed_edges: torch.Tensor
+    weights: torch.Tensor
+    active_fraction: torch.Tensor
+    mean_positive_edge: torch.Tensor
+    max_positive_edge: torch.Tensor
+    signature_norms: torch.Tensor
+
+
 def _work_dtype(tensor: torch.Tensor) -> torch.dtype:
     return torch.float64 if tensor.dtype == torch.float64 else torch.float32
+
+
+def fisher_score_signature(
+    *,
+    base_logits: torch.Tensor,
+    consensus_direction: torch.Tensor,
+    token_mask: torch.Tensor,
+    temperature: float = 1.0,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Collapse tokenwise scores into shared Fisher-whitened vocabulary axes."""
+    if base_logits.shape != consensus_direction.shape:
+        raise ValueError("base logits and consensus direction must match")
+    if token_mask.shape != base_logits.shape[:-1]:
+        raise ValueError("token_mask must match non-vocabulary dimensions")
+    if token_mask.dtype != torch.bool:
+        raise ValueError("token_mask must be boolean")
+    if base_logits.ndim != 3:
+        raise ValueError("Fisher signatures require [batch, token, vocab]")
+    if not bool(token_mask.any(dim=1).all().item()):
+        raise ValueError("every Fisher signature requires a retained token")
+    if temperature <= 0.0:
+        raise ValueError("temperature must be positive")
+
+    dtype = _work_dtype(base_logits)
+    probability = (
+        base_logits.detach().to(dtype) / float(temperature)
+    ).softmax(dim=-1)
+    whitened = (
+        probability.sqrt()
+        * consensus_direction.detach().to(dtype)
+        * token_mask.unsqueeze(-1)
+    )
+    counts = token_mask.sum(dim=1, keepdim=True).to(dtype)
+    signature = whitened.sum(dim=1) / counts
+    norms = signature.norm(dim=-1)
+    if not bool(torch.isfinite(signature).all().item()):
+        raise ValueError("Fisher signature is nonfinite")
+    return signature, norms
+
+
+def fisher_edge_boost_weights(
+    signatures: torch.Tensor,
+    *,
+    threshold: float,
+) -> FisherEdgeBoost:
+    """Compute leave-one-out boosting edges without positive self-bias."""
+    if signatures.ndim != 2:
+        raise ValueError("Fisher edge signatures must be a matrix")
+    if signatures.shape[0] < 3:
+        raise ValueError("Fisher edge boosting requires at least 3 problems")
+    if threshold < 0.0:
+        raise ValueError("Fisher edge threshold must be nonnegative")
+    if not bool(torch.isfinite(signatures).all().item()):
+        raise ValueError("Fisher edge signatures are nonfinite")
+
+    dtype = _work_dtype(signatures)
+    values = signatures.detach().to(dtype)
+    tiny = torch.finfo(dtype).tiny
+    norms = values.norm(dim=-1)
+    normalized = torch.where(
+        (norms > tiny).unsqueeze(-1),
+        values / norms.clamp_min(tiny).unsqueeze(-1),
+        torch.zeros_like(values),
+    )
+    leave_one_out = normalized.sum(dim=0, keepdim=True) - normalized
+    leave_norms = leave_one_out.norm(dim=-1)
+    leave_unit = torch.where(
+        (leave_norms > tiny).unsqueeze(-1),
+        leave_one_out
+        / leave_norms.clamp_min(tiny).unsqueeze(-1),
+        torch.zeros_like(leave_one_out),
+    )
+    signed_edges = (normalized * leave_unit).sum(dim=-1).clamp(
+        min=-1.0,
+        max=1.0,
+    )
+    positive = (signed_edges - float(threshold)).clamp_min(0.0)
+    active = positive > 0.0
+    positive_mean = positive.mean()
+    weights = torch.where(
+        positive_mean > tiny,
+        positive / positive_mean.clamp_min(tiny),
+        torch.zeros_like(positive),
+    )
+    active_values = positive[active]
+    mean_positive = (
+        active_values.mean()
+        if active_values.numel()
+        else torch.zeros((), dtype=dtype, device=values.device)
+    )
+    max_positive = (
+        active_values.max()
+        if active_values.numel()
+        else torch.zeros((), dtype=dtype, device=values.device)
+    )
+    return FisherEdgeBoost(
+        signed_edges=signed_edges,
+        weights=weights,
+        active_fraction=active.to(dtype).mean(),
+        mean_positive_edge=mean_positive,
+        max_positive_edge=max_positive,
+        signature_norms=norms,
+    )
 
 
 def fisher_consensus_target(

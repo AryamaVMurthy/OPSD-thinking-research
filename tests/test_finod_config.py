@@ -219,3 +219,18 @@ def test_fisher_consensus_stronger_target_keeps_hard_kl_cap():
     assert config["fisher_max_target_kl"] == 0.01
     assert config["fisher_anchor_kl_weight"] == 1.0
     assert config["max_steps"] == config["save_steps"] == 6
+
+
+def test_fisher_edge_boosting_screen_requires_cross_problem_dp_batch():
+    config = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s6-edge-boost-6.yaml"
+    ).data
+
+    assert config["graph_mode"] == "fisher_consensus"
+    assert config["fisher_cross_problem_edge"] is True
+    assert config["fisher_edge_threshold"] == 0.0
+    assert config["num_gpus"] == 8
+    assert config["per_device_train_batch_size"] == 1
+    assert config["max_steps"] == 6

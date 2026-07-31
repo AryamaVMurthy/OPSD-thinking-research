@@ -9,7 +9,41 @@ from trl.trainer.utils import empty_cache
 
 from .finod import select_rollout_positions
 from .finod_training import _selected_logits, _teacher_context
-from .fisher_consensus import fisher_consensus_loss
+from .fisher_consensus import (
+    FisherEdgeBoost,
+    fisher_consensus_loss,
+    fisher_edge_boost_weights,
+    fisher_score_signature,
+)
+
+
+def _distributed_fisher_edge(
+    self,
+    signature: torch.Tensor,
+    *,
+    threshold: float,
+) -> tuple[torch.Tensor, FisherEdgeBoost]:
+    """All-gather detached signatures and return this rank's boost weights."""
+    if signature.ndim != 2:
+        raise RuntimeError("local Fisher signature must be a matrix")
+    local_count = int(signature.shape[0])
+    accelerator = self.accelerator
+    gathered = accelerator.gather(signature.detach())
+    process_count = int(getattr(accelerator, "num_processes", 1))
+    expected = process_count * local_count
+    if gathered.shape[0] != expected:
+        raise RuntimeError(
+            f"gathered {gathered.shape[0]} Fisher signatures, expected "
+            f"{expected}"
+        )
+    result = fisher_edge_boost_weights(
+        gathered,
+        threshold=float(threshold),
+    )
+    process_index = int(getattr(accelerator, "process_index", 0))
+    start = process_index * local_count
+    stop = start + local_count
+    return result.weights[start:stop].to(signature.device), result
 
 
 def _sequence(
@@ -39,6 +73,7 @@ def _aggregate_consensus_metrics(
     selected_mask: torch.Tensor,
     step_size: float,
     consensus_energy_threshold: float,
+    example_weights: torch.Tensor | None = None,
 ) -> dict[str, float | int]:
     """Reduce token-weighted consensus diagnostics across data-parallel ranks."""
     mask = selected_mask.to(torch.bool)
@@ -51,6 +86,21 @@ def _aggregate_consensus_metrics(
     effective = (
         metrics["effective_step_size"][mask].detach().to(torch.float64)
     )
+    if example_weights is None:
+        example_weights = torch.ones(
+            mask.shape[0],
+            dtype=torch.float64,
+            device=mask.device,
+        )
+    if example_weights.shape != (mask.shape[0],):
+        raise RuntimeError("Fisher boost weights must match local examples")
+    token_weights = example_weights.to(torch.float64).unsqueeze(1).expand(
+        mask.shape
+    )
+    boosted_optimization_total = (
+        metrics["optimization_per_token"].detach().to(torch.float64)
+        * token_weights
+    )[mask].sum()
     local = torch.stack(
         [
             count,
@@ -75,6 +125,7 @@ def _aggregate_consensus_metrics(
             total("fisher_alignment_gain"),
             total("fisher_alignment_cosine_proxy"),
             total("optimization_per_token"),
+            boosted_optimization_total,
         ]
     )
     local_max = metrics["target_kl"][mask].detach().to(torch.float64).max()
@@ -123,6 +174,7 @@ def _aggregate_consensus_metrics(
         "fisher_alignment_gain": average(17),
         "fisher_alignment_cosine_proxy": average(18),
         "optimization_loss": average(19),
+        "boosted_optimization_loss": average(20),
     }
 
 
@@ -210,6 +262,26 @@ def compute_loss_with_fisher_consensus(
         temperature=float(self.temperature),
         anchor_kl_weight=float(self._fisher_anchor_kl_weight),
     )
+    boost_weights = torch.ones(
+        student_logits.shape[0],
+        dtype=torch.float32,
+        device=student_logits.device,
+    )
+    edge_result = None
+    signature_norms = None
+    if bool(self._fisher_cross_problem_edge):
+        signature, signature_norms = fisher_score_signature(
+            base_logits=base_logits,
+            consensus_direction=result.consensus_direction,
+            token_mask=selected_mask,
+            temperature=float(self.temperature),
+        )
+        boost_weights, edge_result = _distributed_fisher_edge(
+            self,
+            signature,
+            threshold=float(self._fisher_edge_threshold),
+        )
+        loss = loss * boost_weights.mean().to(loss.dtype)
     metrics = _aggregate_consensus_metrics(
         self,
         loss=loss,
@@ -219,8 +291,37 @@ def compute_loss_with_fisher_consensus(
         consensus_energy_threshold=float(
             self._fisher_consensus_energy_threshold
         ),
+        example_weights=boost_weights,
     )
     if self.accelerator.is_main_process:
+        edge_metrics = {}
+        if edge_result is not None:
+            edge_metrics = {
+                "fisher_edge_signed_mean": float(
+                    edge_result.signed_edges.mean().detach().cpu()
+                ),
+                "fisher_edge_signed_min": float(
+                    edge_result.signed_edges.min().detach().cpu()
+                ),
+                "fisher_edge_signed_max": float(
+                    edge_result.signed_edges.max().detach().cpu()
+                ),
+                "fisher_edge_active_fraction": float(
+                    edge_result.active_fraction.detach().cpu()
+                ),
+                "fisher_edge_mean_positive": float(
+                    edge_result.mean_positive_edge.detach().cpu()
+                ),
+                "fisher_edge_max_positive": float(
+                    edge_result.max_positive_edge.detach().cpu()
+                ),
+                "fisher_edge_boost_weight_mean": float(
+                    edge_result.weights.mean().detach().cpu()
+                ),
+                "fisher_signature_norm_mean": float(
+                    signature_norms.mean().detach().cpu()
+                ),
+            }
         print(
             json.dumps(
                 {
@@ -235,6 +336,10 @@ def compute_loss_with_fisher_consensus(
                     "anchor_kl_weight": float(
                         self._fisher_anchor_kl_weight
                     ),
+                    "cross_problem_edge": bool(
+                        self._fisher_cross_problem_edge
+                    ),
+                    **edge_metrics,
                     **metrics,
                 },
                 separators=(",", ":"),
@@ -252,6 +357,7 @@ def compute_loss_with_fisher_consensus(
         result,
         base_ids,
         base_mask,
+        boost_weights,
     )
     empty_cache()
 
