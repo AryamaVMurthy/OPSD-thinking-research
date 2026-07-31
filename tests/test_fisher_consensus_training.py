@@ -61,3 +61,13 @@ def test_consensus_metrics_are_token_weighted_and_report_collapse():
     assert result["collapsed_consensus_fraction"] == pytest.approx(1 / 3)
     assert result["clipped_target_fraction"] == pytest.approx(1 / 3)
     assert result["max_observed_target_kl"] == pytest.approx(0.01)
+    expected_anchor_loss = (0.009 + 0.004 + 0.0) / 3
+    assert result["anchor_target_loss"] == pytest.approx(
+        expected_anchor_loss
+    )
+    assert result["relative_loss_to_anchor"] == pytest.approx(
+        0.3 / expected_anchor_loss
+    )
+    assert result["improvement_over_anchor"] == pytest.approx(
+        expected_anchor_loss - 0.3
+    )

@@ -101,7 +101,29 @@ This is why a single guide can improve one benchmark and damage another: it
 amplifies whichever route it makes locally attractive, whether or not that
 route is sound.
 
-### 3.3 Guide quality is the immediate failure mode
+### 3.3 Difficulty stratification
+
+Using the untouched rollout success rate to define easy
+(\(\geq2/3\)), medium (nonzero but below \(2/3\)), and hard (zero), the
+aggregate correct-rollout changes are:
+
+| Method | Benchmark | Easy | Medium | Hard |
+|---|---|---:|---:|---:|
+| FiNOD-5 | AIME 2025 | -7 | +12 | +1 |
+| FiNOD-5 | AIME 2026 | -6 | -4 | 0 |
+| FiNOD-32 | AIME 2025 | -2 | +11 | 0 |
+| FiNOD-32 | AIME 2026 | -3 | -1 | 0 |
+| FRGD-v2 | AIME 2025 | -7 | -2 | 0 |
+| FRGD-v2 | AIME 2026 | +4 | +15 | +2 |
+
+The clean methods almost never create success on a problem for which all base
+rollouts fail. They redistribute probability among existing capabilities,
+with the largest movement on medium problems, while sometimes taxing easy
+ones. This sets the realistic aim for answer-free guidance: preserve easy
+problems and improve route selection on medium problems. A pure guidance
+method should not claim to manufacture missing mathematical knowledge.
+
+### 3.4 Guide quality is the immediate failure mode
 
 The accepted legacy cache has 1,385 graphs, averaging 2.386 forks and 7.817
 actions. The viability labels are generated priors rather than empirical
@@ -307,7 +329,9 @@ The first screen uses:
 - Qwen3-4B at immutable revision `1cfa9a7`;
 - 192 AMC/AIME + AoPS examples selected from a 512-problem plan cache;
 - five optimizer steps, effective batch 32;
-- AdamW as provided by the upstream trainer, learning rate \(5\times10^{-6}\);
+- fused PyTorch AdamW, learning rate \(5\times10^{-6}\), betas
+  \((0.9,0.999)\), epsilon \(10^{-8}\), zero weight decay;
+- linear decay over five steps with no warmup;
 - LoRA rank 64, alpha 128, all attention and MLP projections;
 - gradient norm cap 0.1;
 - 4,096-token on-policy training rollouts;
@@ -328,3 +352,39 @@ Promotion requires all of the following:
 
 Only after that screen should a representative 1,024-example run and locked
 AIME 2025/2026 evaluation be spent.
+
+## 9. Preliminary novelty boundary
+
+The closest current papers solve materially different problems:
+
+- [GeoSD](https://arxiv.org/abs/2607.06855) assumes a privileged hint or full
+  solution, attenuates teacher pulls with Hellinger overlap, and adds a
+  Fisher–Rao proximal/natural-gradient treatment of drift.
+- [Multi-Rollout OPD](https://arxiv.org/abs/2605.12652) conditions on
+  verifier-labelled peer successes and failures.
+- [MOPD](https://arxiv.org/abs/2606.30406) integrates capabilities from
+  separately RL-trained domain teachers.
+- [KAT](https://arxiv.org/abs/2606.09471) detects persistent low-KL agreement
+  traps and terminates weak rollout supervision.
+- [Classifier-Free Guidance for language models](https://arxiv.org/abs/2306.17806)
+  already establishes positive-minus-negative prompt logit arithmetic at
+  inference, and
+  [Distillation Contrastive Decoding](https://arxiv.org/abs/2402.14874)
+  combines contrastive prompting with distillation. Therefore, subtracting a
+  control prompt by itself is not the novelty.
+- Standard multi-teacher and contrastive distillation aggregate class
+  predictions or hidden representations; they do not construct matched
+  problem-plan/control-plan tangents under a frozen next-token Fisher metric.
+
+The current search did not find the exact combination of problem-only
+independent plans, matched shuffled-plan contrasts, the
+\(\|\mathbb{E}u\|_F^2/\mathbb{E}\|u\|_F^2\) coherence shrinkage, and a
+two-sided KL-bounded exponential tilt on on-policy reasoning prefixes.
+That supports a plausible novelty claim, not a proof of novelty. An ICLR claim
+should be made only after broader citation-chain review and, more importantly,
+after the screen demonstrates a real cross-benchmark effect.
+
+The defensible technical novelty, if the experiment works, is thus the
+label-free Fisher coherence estimator and its use to decide how much
+contrastive procedural guidance is locally safe to distill—not generic
+positive/negative logit subtraction.

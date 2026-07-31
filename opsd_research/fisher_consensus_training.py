@@ -87,9 +87,11 @@ def _aggregate_consensus_metrics(
     def average(index: int) -> float:
         return values[index] / global_count
 
+    student_target_loss = average(1)
+    anchor_target_loss = average(9)
     return {
         "retained_tokens": int(global_count),
-        "loss": average(1),
+        "loss": student_target_loss,
         "agreement": average(2),
         "mean_direction_energy": average(3),
         "mean_pair_energy": average(4),
@@ -103,6 +105,12 @@ def _aggregate_consensus_metrics(
         "collapsed_consensus_fraction": average(12),
         "clipped_target_fraction": average(13),
         "max_observed_target_kl": float(max_kl.detach().cpu()),
+        "anchor_target_loss": anchor_target_loss,
+        "relative_loss_to_anchor": student_target_loss
+        / max(anchor_target_loss, 1e-12),
+        "improvement_over_anchor": (
+            anchor_target_loss - student_target_loss
+        ),
     }
 
 
