@@ -10,6 +10,46 @@ from opsd_research.summarize_training import _parse_finod_events, _parse_trainin
 
 
 class TrainingSummaryTests(unittest.TestCase):
+    def test_pre_update_rollout_dump_covers_the_next_checkpoint(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            generations = root / "generations"
+            generations.mkdir()
+            (generations / "generations_step_5.json").write_text(
+                json.dumps(
+                    {
+                        "step": 5,
+                        "num_samples": 1,
+                        "generations": [
+                            {
+                                "step": 5,
+                                "prompt": "problem",
+                                "completion": "<think>rollout",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            checkpoint = root / "checkpoint-6"
+            checkpoint.mkdir()
+            (checkpoint / "adapter_model.safetensors").write_bytes(b"adapter")
+            (checkpoint / "trainer_state.json").write_text(
+                "{}", encoding="utf-8"
+            )
+            log = root / "train.log"
+            log.write_text("", encoding="utf-8")
+
+            result = summarize(
+                root,
+                log,
+                max_completion_length=1024,
+            )
+
+            integrity = result["rollout_dump_integrity"]
+            self.assertEqual(integrity["generation_checkpoint_lag"], 1)
+            self.assertTrue(integrity["covers_latest_checkpoint"])
+
     def test_parses_unrounded_finod_signal_events(self):
         with tempfile.TemporaryDirectory() as temporary:
             log = Path(temporary) / "train.log"

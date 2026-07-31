@@ -226,6 +226,12 @@ def summarize(
         if checkpoint_records
         else None
     )
+    generation_checkpoint_lag = (
+        latest_checkpoint_step - latest_generation_step
+        if latest_generation_step is not None
+        and latest_checkpoint_step is not None
+        else None
+    )
     summary = {
         "schema_version": 1,
         "training_dir": str(training_dir),
@@ -471,10 +477,10 @@ def summarize(
         "rollout_dump_integrity": {
             "latest_generation_step": latest_generation_step,
             "latest_checkpoint_step": latest_checkpoint_step,
+            "generation_checkpoint_lag": generation_checkpoint_lag,
             "covers_latest_checkpoint": (
-                latest_generation_step is not None
-                and latest_checkpoint_step is not None
-                and latest_generation_step >= latest_checkpoint_step
+                generation_checkpoint_lag is not None
+                and generation_checkpoint_lag <= 1
             ),
         },
         "recorded_rollouts": {
