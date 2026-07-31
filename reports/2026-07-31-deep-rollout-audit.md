@@ -1,0 +1,313 @@
+# Deep rollout audit and method decision
+
+Date: 2026-07-31
+
+This report separates observed benchmark behavior, exact rollout evidence,
+objective-level defects, and the resulting method decision. Scores are
+problem-clustered over the available rollouts; a gain is not treated as robust
+when its paired confidence interval includes zero.
+
+## 1. Comparable 32k benchmark results
+
+| Method | AIME 2025 base | AIME 2025 candidate | Delta | AIME 2026 base | AIME 2026 candidate | Delta |
+|---|---:|---:|---:|---:|---:|---:|
+| G4, common 6-rollout reconstruction | 237/360 | 250/360 | +3.61 pp | 225/360 | 231/360 | +1.67 pp |
+| Legacy G1, common reconstruction | 237/360 | 232/360 | -1.39 pp | 225/360 | 245/360 | +5.56 pp |
+| FRGD v1 | 66.39% | 65.83% | -0.56 pp | 62.78% | 66.94% | +4.17 pp |
+| FRGD v2, 4k train rollouts | 66.39% | 63.89% | -2.50 pp | 62.78% | 68.61% | +5.83 pp |
+| FiNOD, 32 steps | 62.22% | 66.67% | +4.44 pp | 68.33% | 66.11% | -2.22 pp |
+| FiNOD, 5 steps | 62.22% | 65.00% | +2.78 pp | 68.33% | 62.78% | **-5.56 pp** |
+
+The FiNOD 5-step AIME 2026 paired 95% problem-clustered interval is
+[-11.11, -1.11] pp. It is the clearest negative result in the recent screen,
+not noise that should be hidden by pooling benchmarks.
+
+The strongest single historical score change is FRGD v2 on AIME 2026
+(+5.83 pp, paired interval [2.78, 9.44] pp), but it loses 2.50 points on AIME
+2025 and its teacher view explicitly contains the answer. It is therefore not
+evidence for a clean answer-free method.
+
+## 2. Development-benchmark controls
+
+| Method | AIME 2024 base | Candidate | Delta | Interpretation |
+|---|---:|---:|---:|---|
+| G1 answer-masked scaffold | 75.00% | 78.06% | +3.06 pp | weak positive Avg signal; majority/pass unchanged |
+| G2 viability routing | 75.00% | 75.56% | +0.56 pp | effectively flat |
+| G3 viability + entropy | 75.00% | 73.89% | -1.11 pp | negative |
+| CH, no extra optimization | 77.50% | 75.83% | -1.67 pp | negative |
+| CH, 1–12 steps | 77.50% | 77.50% | 0 | flat |
+| CH, 50 steps | 77.50% | 71.67% | -5.83 pp | exposure collapse |
+| Fluid context | 77.50% | 74.17% | -3.33 pp | negative |
+| FiNOD, 5 steps | 73.89% | 73.89% | 0 | Avg flat; majority/pass +3.33 pp |
+
+The pending zero-scale LoRA control is required before interpreting a
+few-point AIME 2024 change. It runs the same LoRA/Punica inference path while
+mathematically multiplying the adapter contribution by zero.
+
+## 3. What the exact rollouts show
+
+### 3.1 The universal flip signature is basin selection
+
+Across G1, G4, CH, FRGD, and FiNOD:
+
+- correct flips usually terminate roughly 2k–8k tokens earlier and remove
+  repeated loops;
+- wrong flips often run 1k–10k tokens longer and hit the cap;
+- however, shortening itself is not causal evidence of improved reasoning:
+  a correct solver naturally stops after finding and checking the result;
+- several candidate rollouts are shorter because they commit early to an
+  unsupported assertion.
+
+The learned change is best described as a shift in the probability of entering
+particular reasoning basins, not acquisition of a general new mathematical
+skill.
+
+### 3.2 Exact AIME 2026 FiNOD regressions
+
+- Problem 10: base rollouts checked both rotations and the side condition and
+  reached 156. A candidate accepted an incorrect polygon/shoelace area of 21
+  even while calling it implausibly small.
+- Problem 26: a base route factored the polynomial into roots
+  \(16,3\pm4i\) and obtained 132. Candidate routes capped, optimized an
+  unrelated quartic to 285, or guessed 270.
+- Problem 28: a base route used
+  \(4040=2^3\cdot5\cdot101\) and obtained 107. A candidate hand-waved
+  \(4040\approx2^{12}\) and guessed 12.
+
+Positive flips existed, but they were equally basin-specific:
+
+- Problem 11 fixed grid-degree accounting and reached 896.
+- Problem 23 corrected an integer scaling error from 1225 to 245.
+- Problem 27 found exact coordinates and changed \(175/48\) to 223.
+
+This is why a single guide can improve one benchmark and damage another: it
+amplifies whichever route it makes locally attractive, whether or not that
+route is sound.
+
+### 3.3 Guide quality is the immediate failure mode
+
+The accepted legacy cache has 1,385 graphs, averaging 2.386 forks and 7.817
+actions. The viability labels are generated priors rather than empirical
+outcomes. Only 32.5% of descriptions contain a problem-specific numeral or
+entity and 24.4% contain even a basic mathematical marker.
+
+Exact failures include:
+
+- recommending enumeration of every divisor for a 25-prime-divisor
+  probability problem instead of exploiting the product factorization;
+- assuming a rotated ellipse's center-to-\(x\)-axis distance is its semiminor
+  axis;
+- steering a hexagon problem toward parsing Asymptote label coordinates;
+- inserting incorrect inclusion-exclusion templates;
+- generic instructions such as “calculate and check” that contribute style
+  but little problem information.
+
+All recorded AMC/AIME and AoPS training rollouts hit the 4k cap. Across the
+128 recorded FiNOD training completions, only 31 closed the thinking segment
+and 37 emitted a boxed result.
+
+True guide text does imprint the completion: its lexical overlap with the first
+6k completion tokens is 0.1366 versus 0.0485 for a shuffled guide, and the true
+guide wins 99.2% of comparisons. The problem is not that the teacher ignores
+the guide. The problem is that imprint strength does not predict completion or
+correctness.
+
+## 4. Objective and implementation defects
+
+### 4.1 Historical G1–G4 / CH divergence
+
+The historical “forward KL” clipped each vocabulary-element KL summand at
+0.05 before summing. Individual summands can be negative. Clipping only their
+positive side destroys KL non-negativity, which explains negative reported
+losses. Those loss curves cannot be interpreted as a decreasing divergence.
+
+CH teacher dossiers also contain the literal trusted final answer and full
+reference solution. Fluid routing repaired the sign but not the graph
+semantics, and its benchmark result was worse.
+
+### 4.2 FRGD leakage
+
+FRGD constructs a teacher view stating the final answer and derives a Fisher
+projection against it. Removing one local linear component does not remove
+nonlinear semantic information about that answer. FRGD is therefore an
+interesting privileged diagnostic, but not a clean solution to answer
+leakage.
+
+### 4.3 Original FiNOD leakage and anchor drift
+
+The original FiNOD collator retained an answer-control view. A one-sided
+projection removed positive answer alignment but deliberately preserved
+anti-aligned answer signal. The signed variant avoids that exact asymmetry but
+still processes an answer-conditioned distribution.
+
+The original target also used the current detached student distribution as
+its trust anchor. That bounds each optimizer step but does not bound the final
+model from the original deploy policy.
+
+Finally, the purported base teacher prompt was not the student/deploy prompt:
+it contained an auxiliary-context wrapper and “continue/check/revise” prose.
+Consequently, even a zero residual could distill prompt style.
+
+### 4.4 Dose drift
+
+The 5-step and 32-step FiNOD adapters are not the same update at different
+scale:
+
+- \(\|\Delta W_5\|_F=0.08564\)
+- \(\|\Delta W_{32}\|_F=0.23791\)
+- norm ratio 2.778
+- cosine similarity 0.524
+- \(\|\Delta W_{32}-\Delta W_5\|/\|\Delta W_{32}\|=0.867\)
+
+The later 27 steps introduce a large new direction. This matches the broader
+observation that long OPSD exposure destroys initially easy problems.
+
+### 4.5 Evaluation-path instability
+
+Changing six to twelve samples per problem changes flattened request indices,
+shard membership, and batch grouping. Even with the same nominal seeds and
+prompt hashes, autoregressive numerical divergence changes outputs:
+
+- AIME 2025 first-six accuracy changed by -7.78 pp;
+- AIME 2026 changed by +3.89 pp;
+- only one differing AIME 2025 output required more than 32k tokens, so the
+  token cap is not the explanation.
+
+Every future comparison must keep sample count, flattening, shard assignment,
+runtime, and adapter path fixed. The zero-scale LoRA control measures the
+remaining no-op runtime displacement.
+
+## 5. Fisher specificity diagnostic
+
+On 12 exact rollout prefixes and 48 positions:
+
+- true-guide Fisher energy: 0.01090;
+- true versus generic-control cosine: 0.6194;
+- true versus shuffled-guide cosine: 0.6918;
+- generic projection retains 29.9% of energy;
+- shuffled-guide projection retains 24.3%;
+- after generic style removal, true versus shuffled cosine remains 0.5374.
+
+At the start of a completion, all guide directions are nearly collinear
+(cosines 0.94–0.96), reflecting prompt structure. At one-third of successful
+rollouts the guide supports the actually generated token, whereas late in
+unfinished rollouts it strongly opposes it. This supports two decisions:
+
+1. train only the early prefix;
+2. use matched shuffled plans as a contrast, not a fixed generic style prompt.
+
+## 6. Method decision: Fisher Consensus Guidance
+
+For a problem \(x\), let \(p_0(\cdot\mid h)\) be the frozen base model under
+the exact deploy prompt at rollout prefix \(h\). Generate \(K=3\) concise plans
+\(g_k\) independently from \(x\) alone. Pair each with a source- and
+length-matched plan \(c_k\) generated for another problem. No answer,
+reference solution, reward, verifier, or correctness label is available.
+
+At a selected early-prefix token, construct the centered contrastive tangent
+
+\[
+u_k =
+\operatorname{Center}_{p_0}\left[
+z_0(x,g_k,h)-z_0(x,c_k,h)
+\right].
+\]
+
+The Fisher inner product is
+
+\[
+\langle a,b\rangle_{F,p_0}
+=\sum_v p_0(v\mid h)a_vb_v.
+\]
+
+Let
+
+\[
+\bar u=\frac1K\sum_k u_k,\qquad
+A=
+\frac{\|\bar u\|_{F,p_0}^2}
+{\frac1K\sum_k\|u_k\|_{F,p_0}^2+\epsilon}.
+\]
+
+By Jensen's inequality, \(A\in[0,1]\). Identical contrastive directions have
+\(A=1\); mutually cancelling directions have \(A=0\). The retained direction
+is simply
+
+\[
+r=A\bar u.
+\]
+
+The detached target is an exponential tilt of the frozen deploy anchor:
+
+\[
+q_\eta(v\mid h)
+\propto p_0(v\mid h)\exp(\eta r_v).
+\]
+
+Per-token bisection chooses the largest \(\eta\le 0.25\) satisfying both
+
+\[
+D_{\mathrm{KL}}(q_\eta\|p_0)\le0.01,\qquad
+D_{\mathrm{KL}}(p_0\|q_\eta)\le0.01.
+\]
+
+The student minimizes the ordinary nonnegative
+\(D_{\mathrm{KL}}(q_\eta\|p_\theta)\) on 32 positions sampled within the first
+1,024 rollout tokens.
+
+This is intentionally one mechanism, not a mixture:
+
+- contrast removes prompt/style effects and irrelevant-plan influence;
+- Fisher agreement suppresses unstable plan-specific directions;
+- the frozen anchor prevents cumulative trust-region drift;
+- the early-prefix restriction targets route selection before wrong basins
+  become self-reinforcing.
+
+## 7. Cache and leakage contract
+
+The new builder:
+
+- receives only `question`, `data_source`, and source index;
+- drops the dataset response column before constructing prompts;
+- creates three separately sampled plans with different seeds and planning
+  lenses;
+- rejects boxed expressions, answer/result claims, prompt injection, explicit
+  numeric equalities, and numerals not already present in the problem;
+- stores no answer or reference field;
+- cryptographically binds every saved problem and the complete records file;
+- constructs negative controls by deterministic source/length-matched
+  derangements.
+
+The training row contains exactly:
+
+`problem`, `solution` (guide zero for upstream compatibility),
+`fisher_guides`, `fisher_controls`, and `fisher_source_index`.
+
+## 8. Screen and promotion rule
+
+The first screen uses:
+
+- Qwen3-4B at immutable revision `1cfa9a7`;
+- 192 AMC/AIME + AoPS examples selected from a 512-problem plan cache;
+- five optimizer steps, effective batch 32;
+- AdamW as provided by the upstream trainer, learning rate \(5\times10^{-6}\);
+- LoRA rank 64, alpha 128, all attention and MLP projections;
+- gradient norm cap 0.1;
+- 4,096-token on-policy training rollouts;
+- 32 Fisher positions in the first 1,024 tokens;
+- three guide/control pairs;
+- \(\eta_{\max}=0.25\), two-sided KL cap 0.01.
+
+Promotion requires all of the following:
+
+1. finite, nonnegative loss and nonzero gradients;
+2. noncollapsed consensus energy and agreement meaningfully below one;
+3. maximum observed target KL at or below 0.01;
+4. improvement over both the no-LoRA baseline and zero-scale LoRA runtime
+   control on AIME 2024 under the exact same six-rollout 32k protocol;
+5. no material increase in capped completions;
+6. exact flip inspection shows better checks rather than earlier unsupported
+   commitment.
+
+Only after that screen should a representative 1,024-example run and locked
+AIME 2025/2026 evaluation be spent.
