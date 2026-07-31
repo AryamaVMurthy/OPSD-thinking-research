@@ -167,3 +167,30 @@ effect teaches continued reconsideration after the route should already be
 committed. This is distinct from optimizing for short outputs: inference
 retains the full 32k budget, and the loss still contains no answer, reward,
 verifier, length penalty, or termination label.
+
+## Evaluation-protocol amendment
+
+At the user's direction, no subsequent candidate selection or final
+evaluation uses AIME-2024. The prefix-512 screen and all later candidates are
+evaluated only on AIME-2025 and AIME-2026, with six paired rollouts per
+problem and a 32,768-token generation cap. The fixed baselines are:
+
+| Benchmark | Average | Majority | Pass@6 | Cutoffs |
+|---|---:|---:|---:|---:|
+| AIME-2025 | 112/180 (62.22%) | 22/30 | 26/30 | 15/180 |
+| AIME-2026 | 123/180 (68.33%) | 20/30 | 26/30 | 14/180 |
+
+The prefix-512 training run completed in job `17428`. Its post-initial
+mechanism diagnostics were slightly worse than prefix 1,024:
+
+| Metric | Prefix 1,024 | Prefix 512 |
+|---|---:|---:|
+| target-loss / frozen-anchor loss | 1.1540 | 1.1575 |
+| Fisher alignment gain | 0.000256 | 0.000217 |
+| alignment cosine proxy | 0.0477 | 0.0178 |
+| student-anchor forward KL | 0.000629 | 0.000640 |
+| clipped target fraction | 18.65% | 23.38% |
+
+This does not promote prefix 512 on internal metrics. Its two allowed task
+evaluations still run because the hypothesis concerns long-horizon basin
+selection, which the 512-token training loss cannot measure directly.

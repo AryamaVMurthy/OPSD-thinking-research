@@ -625,6 +625,19 @@ gates and is rejected. The next isolated screen shortens only the supervised
 Fisher horizon from 1,024 to 512 tokens while preserving the 32k inference
 budget.
 
+Per the subsequent evaluation amendment, no further screen uses AIME-2024.
+The prefix-512 and unscaled prefix-1,024 checkpoints are compared only on
+AIME-2025 and AIME-2026 with six paired rollouts and the 32k cap.
+
+Prefix-512 training job `17428` completed safely. All losses were finite and
+nonzero, maximum two-sided target KL remained at or below 0.01, and the
+adapter update completed. Its post-initial target-loss/frozen-anchor ratio
+was 1.1575 versus 1.1540 for prefix 1,024. Alignment gain fell from
+\(2.56\times10^{-4}\) to \(2.17\times10^{-4}\), alignment cosine from 0.0477
+to 0.0178, and clipping rose from 18.65% to 23.38%. The shorter horizon is
+therefore not better in the local target geometry; only the long-generation
+task evaluations can support its basin-selection hypothesis.
+
 ## 9. Preliminary novelty boundary
 
 The closest current papers solve materially different problems:
