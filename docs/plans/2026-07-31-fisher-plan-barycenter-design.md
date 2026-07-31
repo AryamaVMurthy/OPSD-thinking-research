@@ -178,7 +178,7 @@ problem and a 32,768-token generation cap. The fixed baselines are:
 | Benchmark | Average | Majority | Pass@6 | Cutoffs |
 |---|---:|---:|---:|---:|
 | AIME-2025 | 112/180 (62.22%) | 22/30 | 26/30 | 15/180 |
-| AIME-2026 | 123/180 (68.33%) | 20/30 | 26/30 | 14/180 |
+| AIME-2026 | 123/180 (68.33%) | 22/30 | 26/30 | 14/180 |
 
 The prefix-512 training run completed in job `17428`. Its post-initial
 mechanism diagnostics were slightly worse than prefix 1,024:
@@ -194,3 +194,26 @@ mechanism diagnostics were slightly worse than prefix 1,024:
 This does not promote prefix 512 on internal metrics. Its two allowed task
 evaluations still run because the hypothesis concerns long-horizon basin
 selection, which the 512-token training loss cannot measure directly.
+
+The exact paired AIME-2026 evaluation completed in jobs `17435`/`17436`.
+Prefix 512 moved average accuracy from 123/180 to 124/180 (+0.56 pp),
+majority accuracy from 22/30 to 24/30 (+6.67 pp), and pass@6 from 26/30 to
+25/30 (-3.33 pp). Cutoffs remained 14/180 and mean output length increased
+by only 108 tokens. At sample level there were 13 improvements and 12
+regressions. The pass loss was entirely problem 9: the only correct baseline
+probability-counting rollout became a completed but unsupported guess, not a
+length cutoff. Conversely, all six problem-11 grid-optimization rollouts
+became correct (2/6 to 6/6). Thus prefix 512 changes route selection but does
+not yet pass the two-benchmark promotion gate; AIME-2025 and the full-prefix
+control remain necessary.
+
+The paired AIME-2025 evaluation then completed in jobs `17437`/`17438`.
+Average accuracy increased from 112/180 to 114/180 (+1.11 pp), but majority
+fell from 22/30 to 21/30, pass@6 fell from 26/30 to 24/30, and cutoffs rose
+from 15/180 to 19/180. There were 18 improved and 16 degraded samples.
+Correct-to-wrong flips grew by 3,681 tokens on average and introduced three
+net cutoffs, while wrong-to-correct flips shortened by 4,960 tokens and
+removed four. The two lost pass problems were 11 (2/6 to 0/6, including two
+new cutoffs) and 14 (1/6 to 0/6). Prefix 512 therefore gives a small positive
+average delta on both years, but it fails the preservation gate and is not
+ready for larger-subset promotion.
