@@ -29,7 +29,7 @@ if [[ "${actual_adapter_sha}" != "${FINOD_ADAPTER_SHA256}" ]]; then
   exit 1
 fi
 
-read -r -a benchmarks <<< "${FINOD_BENCHMARKS:-aime24 aime25 aime26}"
+read -r -a benchmarks <<< "${FINOD_BENCHMARKS:-aime25 aime26}"
 if (( ${#benchmarks[@]} == 0 )); then
   echo "FINOD_BENCHMARKS must name at least one benchmark" >&2
   exit 1
@@ -38,7 +38,7 @@ declare -A seen=()
 previous_job=""
 for benchmark in "${benchmarks[@]}"; do
   case "${benchmark}" in
-    aime24|aime25|aime26) ;;
+    aime25|aime26) ;;
     *)
       echo "Unsupported FiNOD benchmark ${benchmark}" >&2
       exit 1

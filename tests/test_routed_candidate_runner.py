@@ -5,6 +5,9 @@ RUNNER = Path("reproductions/06_graf_opsd/run-routed-candidate.sbatch")
 FINOD_RUNNER = Path(
     "reproductions/06_graf_opsd/run-finod-candidate.sbatch"
 )
+FINOD_PAIRED_SUITE = Path(
+    "reproductions/06_graf_opsd/submit-finod-paired-suite.sbatch"
+)
 
 
 def test_runner_selects_manifests_after_reading_graph_mode() -> None:
@@ -87,3 +90,11 @@ def test_finod_runner_uses_the_registered_update_grouping() -> None:
     assert '"${gradient_accumulation_steps}" "${effective_batch_size}"' in script
     assert "gradient_accumulation_steps=4" not in script
     assert "effective_batch_size=32" not in script
+
+
+def test_finod_paired_suite_is_limited_to_aime25_and_aime26() -> None:
+    script = FINOD_PAIRED_SUITE.read_text(encoding="utf-8")
+
+    assert '${FINOD_BENCHMARKS:-aime25 aime26}' in script
+    assert "aime25|aime26)" in script
+    assert "aime24" not in script
