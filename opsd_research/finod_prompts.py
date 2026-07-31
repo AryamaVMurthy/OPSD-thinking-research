@@ -39,10 +39,7 @@ def build_finod_teacher_views(
     if not problem or not guide or not answer:
         raise ValueError("FiNOD teacher views require problem, guide, and answer")
     return {
-        "base": _teacher_view(
-            problem,
-            "No privileged auxiliary context is supplied for this view.",
-        ),
+        "base": f"Problem: {problem}\n\n{_FINAL_INSTRUCTION}",
         "guide": _teacher_view(problem, guide),
         "style": _teacher_view(problem, GENERIC_STYLE_CONTROL),
         "answer": _teacher_view(

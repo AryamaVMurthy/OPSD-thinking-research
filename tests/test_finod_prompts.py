@@ -21,7 +21,12 @@ def test_teacher_views_use_one_matched_wrapper_and_isolate_answer_content():
     assert "73" not in views["style"]
     assert "Check algebra, counting boundaries" in views["style"]
     assert "\\boxed{73}" in views["answer"]
-    for text in views.values():
+    assert views["base"] == (
+        "Problem: Prove the requested claim.\n\n"
+        "Please reason step by step, and put your final answer within \\boxed{}."
+    )
+    for name in ("guide", "style", "answer"):
+        text = views[name]
         assert "=== Auxiliary Context Begin ===" in text
         assert "=== Auxiliary Context End ===" in text
         assert text.startswith("Problem: Prove the requested claim.")
