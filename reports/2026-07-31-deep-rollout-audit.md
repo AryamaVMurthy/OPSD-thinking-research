@@ -691,6 +691,52 @@ on AIME-2026. Any next retraction must preserve the useful Fisher tangent
 while controlling the finite move's self-information, not merely its
 first-order entropy derivative.
 
+### 8.8 Self-information mixture retraction (S14)
+
+S14 keeps S13's guide construction and entropy-neutral Fisher tangent but
+replaces the finite exponential map with
+
+\[
+q_\alpha(a)=p_0(a)(1+\alpha r_\perp(a)).
+\]
+
+Because both \(\mathbb E_{p_0}r_\perp=0\) and
+\(\mathbb E_{p_0}[r_\perp\log p_0]=0\), this mixture-geodesic target is
+normalized and preserves frozen cross entropy exactly. Consequently,
+
+\[
+H(q_\alpha)=H(p_0)-D_{\mathrm{KL}}(q_\alpha\Vert p_0),
+\]
+
+so the finite target cannot increase entropy or collectively migrate toward
+lower-probability frozen tokens. A positivity bound on \(\alpha\) precedes the
+unchanged two-sided 0.01 KL bisection.
+
+The implementation commit `a7ac99f` passes 315 tests plus 68 subtests and
+five production-shaped 151,936-vocabulary float32 stress cases. A one-step
+eight-A100 smoke, job `17537`, completed in 2:40 with finite nonzero loss,
+gradient norm 0.0442, 26.0 GiB peak memory, and a nonzero adapter. The full
+six-step equal-domain run, job `17540`, completed in 6:27. Its training audit
+shows:
+
+- 24/24 finite positive Fisher events and maximum target KL 0.01;
+- mean agreement 0.7250 and retained tangent energy 0.4469, matching S13;
+- mean target entropy change -0.001157;
+- maximum mean absolute cross-entropy residual \(1.35\times10^{-8}\);
+- positivity limiting on 52.2% of target positions, while mean effective
+  targets remain nonzero;
+- post-initial alignment gain \(1.08\times10^{-4}\), cosine 0.0305, and
+  target-loss/frozen-anchor ratio 1.453;
+- gradient norms 0.0442--0.1159, with the registered 0.1 clip active once;
+- all 252 LoRA-B tensors and all 70,778,880 entries nonzero, adapter L2
+  0.000910, and adapter SHA-256 `dad16eaa6d6cfc353bc6909d4f8a12590cc80c20fb9230aa9356da83b7dbf236`.
+
+The exact conservation law is working, but the positivity boundary makes the
+target roughly half as strong while the learned student drift remains near
+S13's scale. Per the preregistered design, AIME-2026 is the first strict task
+screen. It is running in job `17545`; no AIME-2025 evaluation is spent unless
+AIME-2026 preserves average, majority, pass@6, and cutoffs.
+
 ## 9. Preliminary novelty boundary
 
 The closest current papers solve materially different problems:
