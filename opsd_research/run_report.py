@@ -146,6 +146,7 @@ def training_report(summary: dict[str, Any], run_dir: Path) -> dict[str, Any]:
             "configured_completion_cap": configured_cap,
             "recorded": summary.get("recorded_rollouts"),
         },
+        "fisher_signal": summary.get("fisher_signal"),
         "checkpoint_integrity": summary.get("rollout_dump_integrity"),
         "gpu_telemetry": summary.get("gpu_telemetry"),
         "artifacts": _artifact_names(run_dir),
@@ -197,6 +198,7 @@ def _training_markdown(report: dict[str, Any]) -> str:
     )
     opt = report["optimization"]
     rollouts = report["rollouts"]
+    fisher = report.get("fisher_signal") or {}
     lines = [
         f"# Training report: `{Path(report['run_dir']).name}`", "",
         "## Provenance", "",
@@ -238,6 +240,18 @@ def _training_markdown(report: dict[str, Any]) -> str:
             ("Mean / max grad norm", f"{_fmt(opt.get('mean_grad_norm'))} / {_fmt(opt.get('max_grad_norm'))}"),
         ]), "",
         f"Loss trace (each point is one logged optimizer update): `{opt.get('loss_sparkline')}`", "",
+        "## Fisher guidance signal", "",
+        *_table([
+            ("Events / post-initial events", f"{fisher.get('events')} / {fisher.get('post_initial_events')}"),
+            ("All finite / positive-loss events", f"{fisher.get('all_finite')} / {fisher.get('positive_loss_events')}"),
+            ("Maximum observed target KL", fisher.get("max_target_kl")),
+            ("Mean plan agreement", fisher.get("mean_agreement")),
+            ("Mean clipped-target fraction", fisher.get("mean_clipped_target_fraction")),
+            ("Maximum student-anchor forward KL", fisher.get("max_student_anchor_forward_kl")),
+            ("Post-initial target / anchor loss", fisher.get("mean_post_initial_relative_loss_to_anchor")),
+            ("Post-initial alignment gain", fisher.get("mean_post_initial_alignment_gain")),
+            ("Post-initial alignment cosine", fisher.get("mean_post_initial_alignment_cosine_proxy")),
+        ]), "",
         "## Rollouts and integrity", "",
         *_table([
             ("vLLM calls", rollouts.get("count")),

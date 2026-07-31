@@ -31,6 +31,19 @@ class RunReportTests(unittest.TestCase):
                 },
                 "recorded_rollouts": {"count": 10, "thinking_closed": 8, "boxed_answer": 7},
                 "rollout_dump_integrity": {"covers_latest_checkpoint": True},
+                "fisher_signal": {
+                    "events": 8,
+                    "post_initial_events": 4,
+                    "all_finite": True,
+                    "positive_loss_events": 8,
+                    "max_target_kl": 0.01,
+                    "mean_agreement": 0.73,
+                    "mean_clipped_target_fraction": 0.19,
+                    "mean_post_initial_relative_loss_to_anchor": 1.15,
+                    "mean_post_initial_alignment_gain": 0.00025,
+                    "mean_post_initial_alignment_cosine_proxy": 0.05,
+                    "max_student_anchor_forward_kl": 0.0008,
+                },
                 "gpu_telemetry": [{"gpu": 0, "mean_utilization_percent": 92.0, "max_memory_mib": 43000, "max_temperature_c": 60}],
             }
             report = write_training_report(summary, root)
@@ -38,6 +51,8 @@ class RunReportTests(unittest.TestCase):
             self.assertEqual(report["rollouts"]["completion_cap_rate"], 0.3)
             markdown = (root / "report.md").read_text(encoding="utf-8")
             self.assertIn("Optimization trace", markdown)
+            self.assertIn("Fisher guidance signal", markdown)
+            self.assertEqual(report["fisher_signal"]["events"], 8)
             self.assertIn("█▁", markdown)
             self.assertTrue((root / "report.json").is_file())
 
