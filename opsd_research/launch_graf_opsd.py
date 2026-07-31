@@ -220,6 +220,7 @@ def main() -> None:
         )
     elif config["graph_mode"] == "finod_scaffold":
         from .finod_dataset import (
+            filter_finod_indices_by_sources,
             install_finod_dataset_redirect,
             select_representative_finod_indices,
         )
@@ -229,6 +230,25 @@ def main() -> None:
             os.environ["GRAF_GRAPH_CACHE_MANIFEST"]
         )
         eligible = sorted(set(available).intersection(train_index_set))
+        data_sources = config.get("finod_data_sources")
+        if data_sources is not None:
+            eligible = filter_finod_indices_by_sources(
+                raw_dataset,
+                eligible_indices=eligible,
+                data_sources=data_sources,
+            )
+            if is_primary:
+                print(
+                    json.dumps(
+                        {
+                            "event": "finod_data_source_filter",
+                            "data_sources": data_sources,
+                            "eligible_records": len(eligible),
+                        },
+                        separators=(",", ":"),
+                    ),
+                    flush=True,
+                )
         selection_manifest = None
         max_records = config.get("finod_max_records")
         if max_records is not None:
@@ -425,6 +445,9 @@ def main() -> None:
         opsd_trainer.OPSDTrainer._finod_positions_per_rollout = int(
             config["finod_positions_per_rollout"]
         )
+        opsd_trainer.OPSDTrainer._finod_position_prefix_tokens = config.get(
+            "finod_position_prefix_tokens"
+        )
         opsd_trainer.OPSDTrainer._finod_step_size = float(
             config["finod_step_size"]
         )
@@ -450,6 +473,9 @@ def main() -> None:
                     "event": "finod_loss_enabled",
                     "positions_per_rollout": int(
                         config["finod_positions_per_rollout"]
+                    ),
+                    "position_prefix_tokens": config.get(
+                        "finod_position_prefix_tokens"
                     ),
                     "step_size": float(config["finod_step_size"]),
                     "max_target_kl": float(config["finod_max_target_kl"]),

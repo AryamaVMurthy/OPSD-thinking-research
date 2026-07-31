@@ -29,6 +29,29 @@ REPRESENTATIVE_SELECTION_PROTOCOL = (
 )
 
 
+def filter_finod_indices_by_sources(
+    rows: Sequence[dict[str, Any]],
+    *,
+    eligible_indices: Iterable[int],
+    data_sources: Collection[str],
+) -> list[int]:
+    """Keep eligible rows from an explicit set of native data families."""
+    requested = {str(source) for source in data_sources}
+    if not requested or any(not source for source in requested):
+        raise ValueError("FiNOD data source filter must be nonempty")
+    eligible = sorted({int(index) for index in eligible_indices})
+    if any(index < 0 or index >= len(rows) for index in eligible):
+        raise ValueError("FiNOD eligible index is outside the dataset")
+    selected = [
+        index
+        for index in eligible
+        if str(rows[index].get("data_source") or "unknown") in requested
+    ]
+    if not selected:
+        raise ValueError("FiNOD data source filter selected no eligible rows")
+    return selected
+
+
 def _row_response_length(row: dict[str, Any]) -> int:
     value = row.get("response_length")
     if (

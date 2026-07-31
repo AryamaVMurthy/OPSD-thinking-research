@@ -196,6 +196,9 @@ def compute_loss_with_finod(
     rollout_positions = select_rollout_positions(
         valid_mask,
         max_positions=int(self._finod_positions_per_rollout),
+        prefix_tokens=getattr(
+            self, "_finod_position_prefix_tokens", None
+        ),
     )
     selected_mask = valid_mask.index_select(1, rollout_positions)
 

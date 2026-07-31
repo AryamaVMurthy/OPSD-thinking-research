@@ -15,14 +15,21 @@ class FisherProjectedTarget:
 
 
 def select_rollout_positions(
-    token_mask: torch.Tensor, *, max_positions: int
+    token_mask: torch.Tensor,
+    *,
+    max_positions: int,
+    prefix_tokens: int | None = None,
 ) -> torch.Tensor:
     """Select deterministic, uniformly spaced positions with any valid token."""
     if token_mask.ndim != 2 or token_mask.dtype != torch.bool:
         raise ValueError("token_mask must be a rank-2 boolean tensor")
     if max_positions <= 0:
         raise ValueError("max_positions must be positive")
+    if prefix_tokens is not None and prefix_tokens <= 0:
+        raise ValueError("prefix_tokens must be positive when provided")
     candidates = token_mask.any(dim=0).nonzero(as_tuple=False).flatten()
+    if prefix_tokens is not None:
+        candidates = candidates[candidates < prefix_tokens]
     if not candidates.numel():
         raise ValueError("rollout contains no valid token positions")
     if candidates.numel() <= max_positions:

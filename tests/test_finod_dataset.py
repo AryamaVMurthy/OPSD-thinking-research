@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from opsd_research.finod_dataset import (
+    filter_finod_indices_by_sources,
     finod_training_row_from_graph,
     finod_training_row,
     remove_graph_identifiers,
@@ -214,3 +215,20 @@ def test_representative_selection_refuses_insufficient_eligible_rows():
             limit=9,
             seed=73,
         )
+
+
+def test_source_filter_keeps_only_requested_contest_families():
+    rows = [
+        {"data_source": "olympiads"},
+        {"data_source": "aops_forum"},
+        {"data_source": "amc_aime"},
+        {"data_source": "cn_contest"},
+    ]
+
+    selected = filter_finod_indices_by_sources(
+        rows,
+        eligible_indices=[3, 2, 1, 0],
+        data_sources=("amc_aime", "aops_forum"),
+    )
+
+    assert selected == [1, 2]

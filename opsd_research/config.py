@@ -441,6 +441,10 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
             "finod_projection_mode", "one-sided-positive-v1"
         )
         nuisance_view = data.get("finod_nuisance_view", "answer")
+        data_sources = data.get("finod_data_sources")
+        position_prefix_tokens = data.get(
+            "finod_position_prefix_tokens"
+        )
         if max_records is not None:
             if (
                 not isinstance(max_records, int)
@@ -489,6 +493,19 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
                 f"{source}: unsupported finod_nuisance_view "
                 f"{nuisance_view!r}"
             )
+        if data_sources is not None and (
+            not isinstance(data_sources, list)
+            or not data_sources
+            or any(
+                not isinstance(item, str) or not item
+                for item in data_sources
+            )
+            or len(set(data_sources)) != len(data_sources)
+        ):
+            raise ConfigError(
+                f"{source}: finod_data_sources must be a nonempty list "
+                "of unique strings"
+            )
         positions = data.get("finod_positions_per_rollout")
         if (
             not isinstance(positions, int)
@@ -497,6 +514,17 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         ):
             raise ConfigError(
                 f"{source}: finod_positions_per_rollout must be in [1, 256]"
+            )
+        if position_prefix_tokens is not None and (
+            not isinstance(position_prefix_tokens, int)
+            or isinstance(position_prefix_tokens, bool)
+            or not 1
+            <= position_prefix_tokens
+            <= int(data["max_completion_length"])
+        ):
+            raise ConfigError(
+                f"{source}: finod_position_prefix_tokens must be in "
+                "[1, max_completion_length]"
             )
         bounded_positive = {
             "finod_step_size": 2.0,

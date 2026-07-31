@@ -250,3 +250,15 @@ def test_sparse_positions_span_the_valid_rollout_and_ignore_padding():
     positions = select_rollout_positions(mask, max_positions=3)
 
     assert positions.tolist() == [0, 2, 4]
+
+
+def test_sparse_positions_can_focus_on_an_early_rollout_prefix():
+    mask = torch.ones(2, 12, dtype=torch.bool)
+
+    positions = select_rollout_positions(
+        mask,
+        max_positions=4,
+        prefix_tokens=6,
+    )
+
+    assert positions.tolist() == [0, 2, 3, 5]
