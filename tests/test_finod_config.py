@@ -297,3 +297,33 @@ def test_barycenter_prefix_screen_changes_only_supervised_horizon():
     } == {
         key: value for key, value in baseline.items() if key not in ignored
     }
+
+
+def test_barycenter_global_batch_screen_changes_only_update_grouping():
+    baseline = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s7-plan-barycenter-6.yaml"
+    ).data
+    candidate = load_config(
+        ROOT
+        / "reproductions/06_graf_opsd/configs/"
+        "fisher-consensus-s11-barycenter-global-batch-1.yaml"
+    ).data
+
+    assert candidate["effective_batch_size"] == 192
+    assert candidate["gradient_accumulation_steps"] == 24
+    assert candidate["max_steps"] == candidate["save_steps"] == 1
+    assert candidate["fisher_max_records"] == 192
+    ignored = {
+        "variant",
+        "effective_batch_size",
+        "gradient_accumulation_steps",
+        "max_steps",
+        "save_steps",
+    }
+    assert {
+        key: value for key, value in candidate.items() if key not in ignored
+    } == {
+        key: value for key, value in baseline.items() if key not in ignored
+    }

@@ -217,3 +217,26 @@ removed four. The two lost pass problems were 11 (2/6 to 0/6, including two
 new cutoffs) and 14 (1/6 to 0/6). Prefix 512 therefore gives a small positive
 average delta on both years, but it fails the preservation gate and is not
 ready for larger-subset promotion.
+
+## Global-batch interference screen
+
+The prefix result falsifies supervised horizon as the main cause of the
+preservation failures. The remaining training evidence points to optimizer
+interference: the 192-example screen is currently applied as six Adam updates
+of 32 examples, while the post-initial Fisher alignment cosine is only 0.0477.
+Thus a batch-specific update can be nearly orthogonal to the guidance on the
+next group of problems even though every individual target passes the KL cap.
+
+The next minimal screen preserves the exact 192 selected examples, prompts,
+targets, seed, learning rate, optimizer, LoRA parameterization, and one-pass
+sample exposure. It changes the update grouping from six DP8/GA4 steps to one
+DP8/GA24 step, giving an effective batch of 192. The candidate therefore
+optimizes the arithmetic mean guidance direction before Adam transforms it,
+rather than composing six problem-subset-specific Adam transforms.
+
+This screen deliberately keeps the conservative learning rate at
+\(10^{-6}\). Consequently it tests whether a coherent aggregate step is
+already useful; it does not assert equality of the integrated six-step Adam
+displacement. Promotion still requires positive average accuracy on both
+AIME-2025 and AIME-2026 without reducing majority accuracy or pass@6 and
+without materially increasing 32k cutoffs.

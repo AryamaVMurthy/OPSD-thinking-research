@@ -73,3 +73,17 @@ def test_guidance_runners_use_the_registered_adam_epsilon() -> None:
         script = path.read_text(encoding="utf-8")
         assert 'adam_epsilon="$(python3 -' in script
         assert '--adam_epsilon "${adam_epsilon}"' in script
+
+
+def test_finod_runner_uses_the_registered_update_grouping() -> None:
+    script = FINOD_RUNNER.read_text(encoding="utf-8")
+
+    assert 'gradient_accumulation_steps="$(python3 - "${FINOD_CONFIG}"' in script
+    assert 'effective_batch_size="$(python3 - "${FINOD_CONFIG}"' in script
+    assert script.count(
+        '--gradient_accumulation_steps "${gradient_accumulation_steps}"'
+    ) == 2
+    assert 'gradient_accumulation_steps=%s\\neffective_batch_size=%s' in script
+    assert '"${gradient_accumulation_steps}" "${effective_batch_size}"' in script
+    assert "gradient_accumulation_steps=4" not in script
+    assert "effective_batch_size=32" not in script

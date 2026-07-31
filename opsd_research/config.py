@@ -238,7 +238,6 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
             raise ConfigError(f"{source}: {key} must be true")
     expected = {
         "dataset": "jasonrqh/Math-CoT-20k",
-        "effective_batch_size": 32,
         "lora_r": 64,
         "lora_alpha": 128,
         "rollouts_per_prompt": 1,
@@ -252,6 +251,19 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
     for key, value in expected.items():
         if data.get(key) != value:
             raise ConfigError(f"{source}: GRAF protocol requires {key}={value!r}")
+    effective_batch_size = data.get("effective_batch_size")
+    global_batch_fisher_screen = (
+        data.get("graph_mode") == "fisher_consensus"
+        and effective_batch_size == 192
+        and data.get("fisher_max_records") == 192
+        and data.get("max_steps") == 1
+        and data.get("save_steps") == 1
+    )
+    if effective_batch_size != 32 and not global_batch_fisher_screen:
+        raise ConfigError(
+            f"{source}: GRAF effective_batch_size must be 32, except the "
+            "registered 192-example one-step Fisher screen"
+        )
     seed = data.get("seed")
     if seed not in {42, 43}:
         raise ConfigError(f"{source}: GRAF seed must be one of [42, 43]")
@@ -289,6 +301,8 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         # 192-example screen; sixteen are one pass over the promoted
         # 512-example equal-domain scale-up.
         allowed_steps.update({6, 16})
+        if global_batch_fisher_screen:
+            allowed_steps.add(1)
     if data.get("max_steps") not in allowed_steps:
         raise ConfigError(
             f"{source}: max_steps is not registered for this GRAF mode"
@@ -342,8 +356,10 @@ def _validate_graf_train(data: dict[str, Any], source: str) -> None:
         * int(data.get("gradient_accumulation_steps", 0))
         * int(data.get("num_gpus", 0))
     )
-    if computed_batch != 32:
-        raise ConfigError(f"{source}: GRAF batch factors must produce 32")
+    if computed_batch != effective_batch_size:
+        raise ConfigError(
+            f"{source}: GRAF batch factors must produce effective_batch_size"
+        )
     if set(data.get("lora_target_modules", [])) != {
         "q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"
     }:

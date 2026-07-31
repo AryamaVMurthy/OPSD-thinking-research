@@ -28,8 +28,8 @@ import sys
 config = load_config(sys.argv[1]).data
 if config["graph_mode"] not in {"finod_scaffold", "fisher_consensus"}:
     raise SystemExit("guidance runner requires FiNOD or Fisher consensus")
-if config["num_gpus"] != 8 or config["gradient_accumulation_steps"] != 4:
-    raise SystemExit("FiNOD runner requires the registered DP8/GA4 recipe")
+if config["num_gpus"] != 8:
+    raise SystemExit("FiNOD runner requires the registered eight-GPU recipe")
 PY
 
 graph_mode="$(python3 - "${FINOD_CONFIG}" <<'PY'
@@ -70,6 +70,18 @@ adam_epsilon="$(python3 - "${FINOD_CONFIG}" <<'PY'
 from opsd_research.config import load_config
 import sys
 print(load_config(sys.argv[1]).data.get("adam_epsilon", 1e-8))
+PY
+)"
+gradient_accumulation_steps="$(python3 - "${FINOD_CONFIG}" <<'PY'
+from opsd_research.config import load_config
+import sys
+print(load_config(sys.argv[1]).data["gradient_accumulation_steps"])
+PY
+)"
+effective_batch_size="$(python3 - "${FINOD_CONFIG}" <<'PY'
+from opsd_research.config import load_config
+import sys
+print(load_config(sys.argv[1]).data["effective_batch_size"])
 PY
 )"
 max_sequence_length="$(python3 - "${FINOD_CONFIG}" <<'PY'
@@ -114,9 +126,10 @@ if [[ "${graph_mode}" == "fisher_consensus" ]]; then
 elif [[ -n "${representative_records}" ]]; then
   export OPSD_FINOD_SELECTION_MANIFEST="${output_dir}/finod-representative-selection.json"
 fi
-printf 'method=%s\nmax_steps=%s\nnum_gpus=8\ngradient_accumulation_steps=4\neffective_batch_size=32\nseed=%s\ndata_seed=%s\nlearning_rate=%s\nadam_epsilon=%s\nvllm_gpu_memory_utilization=%s\nmax_sequence_length=%s\nmax_grad_norm=0.1\n' \
+printf 'method=%s\nmax_steps=%s\nnum_gpus=8\ngradient_accumulation_steps=%s\neffective_batch_size=%s\nseed=%s\ndata_seed=%s\nlearning_rate=%s\nadam_epsilon=%s\nvllm_gpu_memory_utilization=%s\nmax_sequence_length=%s\nmax_grad_norm=0.1\n' \
   "${graph_mode}" \
-  "${FINOD_MAX_STEPS}" "${seed}" "${seed}" "${learning_rate}" "${adam_epsilon}" "${vllm_utilization}" \
+  "${FINOD_MAX_STEPS}" "${gradient_accumulation_steps}" "${effective_batch_size}" \
+  "${seed}" "${seed}" "${learning_rate}" "${adam_epsilon}" "${vllm_utilization}" \
   "${max_sequence_length}" > "${output_dir}/runtime-overrides.txt"
 record_run_manifest \
   "${output_dir}" runtime-overrides.txt "${copied_manifest}"
@@ -127,7 +140,7 @@ trap stop_gpu_telemetry EXIT
 accelerate launch \
   --config_file third_party/opsd/accelerate.yaml \
   --num_processes 8 \
-  --gradient_accumulation_steps 4 \
+  --gradient_accumulation_steps "${gradient_accumulation_steps}" \
   --main_process_port "${FINOD_PORT}" \
   -m opsd_research.launch_graf_opsd \
   --model_name_or_path Qwen/Qwen3-4B \
@@ -138,7 +151,7 @@ accelerate launch \
   --max_grad_norm 0.1 \
   --per_device_train_batch_size 1 \
   --gradient_checkpointing \
-  --gradient_accumulation_steps 4 \
+  --gradient_accumulation_steps "${gradient_accumulation_steps}" \
   --output_dir "${TRAIN_ROOT}" \
   --run_config "${run_name}" \
   --num_train_epochs 30 \
