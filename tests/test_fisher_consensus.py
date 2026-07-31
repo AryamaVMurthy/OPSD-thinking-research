@@ -585,6 +585,43 @@ def test_self_information_exponential_has_same_local_fisher_tangent():
     assert torch.allclose(derivative, expected, atol=2e-6, rtol=2e-5)
 
 
+def test_self_information_exponential_corrects_nearly_uniform_anchor():
+    base = torch.tensor(
+        [[0.0, 1.0e-4, -1.0e-4, 2.0e-4]],
+        dtype=torch.float32,
+    )
+    direction = torch.tensor(
+        [[10.0, -10.0, 10.0, -10.0]],
+        dtype=torch.float32,
+    )
+    guides = torch.stack([base + direction] * 3)
+    probability = base.softmax(dim=-1)
+    log_probability = base.log_softmax(dim=-1)
+
+    result = fisher_consensus_target(
+        base_logits=base,
+        guide_logits=guides,
+        control_logits=torch.zeros_like(guides),
+        step_size=1.0,
+        max_target_kl=100.0,
+        direction_mode="entropy_neutral_plan_barycenter",
+        retraction_mode="self_information_exponential",
+    )
+
+    target_cross_entropy = -(result.target_probs * log_probability).sum(-1)
+    base_cross_entropy = -(probability * log_probability).sum(-1)
+    assert result.metrics["entropy_gradient_energy"].item() < torch.finfo(
+        torch.float32
+    ).eps
+    assert result.metrics["self_information_multiplier"].abs().item() > 0.0
+    assert torch.allclose(
+        target_cross_entropy,
+        base_cross_entropy,
+        atol=2.0e-6,
+        rtol=0.0,
+    )
+
+
 def test_entropy_neutral_barycenter_is_identity_at_uniform_anchor():
     base = _logits([0.0, 0.0, 0.0])
     guides = torch.tensor(

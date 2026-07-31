@@ -272,6 +272,12 @@ def fisher_consensus_target(
     entropy_direction = log_probability - (
         weighted_sum(probability, log_probability, keepdim=True)
     )
+    information_range = (
+        entropy_direction.amax(dim=-1) - entropy_direction.amin(dim=-1)
+    )
+    information_active = information_range > (
+        8.0 * torch.finfo(dtype).eps
+    )
     entropy_energy = weighted_sum(probability, entropy_direction.square())
     entropy_alignment_before = weighted_sum(
         probability,
@@ -401,26 +407,39 @@ def fisher_consensus_target(
         for _ in range(12):
             _, _, moment, variance = distribution(beta)
             update = torch.where(
-                entropy_active,
-                moment / variance.clamp_min(torch.finfo(dtype).eps),
+                information_active,
+                moment / variance.clamp_min(torch.finfo(dtype).tiny),
                 torch.zeros_like(moment),
-            ).clamp(min=-4.0, max=4.0)
+            ).clamp(min=-1.0e6, max=1.0e6)
             beta = beta - update
 
         corrected_log, corrected, moment, _ = distribution(beta)
-        unresolved = entropy_active & (moment.abs() > moment_tolerance)
+        unresolved = information_active & (moment.abs() > moment_tolerance)
         if bool(unresolved.any().item()):
-            radius = torch.ones_like(beta)
-            lower = beta - radius
-            upper = beta + radius
+            consensus_range = (
+                consensus.amax(dim=-1) - consensus.amin(dim=-1)
+            )
+            estimated_radius = 1.0 + (
+                2.0
+                * scale.abs()
+                * consensus_range
+                / information_range.clamp_min(torch.finfo(dtype).tiny)
+            )
+            radius = torch.where(
+                unresolved,
+                estimated_radius.clamp(max=1.0e12),
+                torch.ones_like(beta),
+            )
+            lower = -radius
+            upper = radius
             for _ in range(16):
                 *_, lower_moment, _ = distribution(lower)
                 *_, upper_moment, _ = distribution(upper)
                 bracketed = (lower_moment <= 0.0) & (upper_moment >= 0.0)
                 expand = unresolved & ~bracketed
                 radius = torch.where(expand, radius * 2.0, radius)
-                lower = torch.where(expand, beta - radius, lower)
-                upper = torch.where(expand, beta + radius, upper)
+                lower = torch.where(expand, -radius, lower)
+                upper = torch.where(expand, radius, upper)
             *_, lower_moment, _ = distribution(lower)
             *_, upper_moment, _ = distribution(upper)
             if bool(
@@ -450,7 +469,9 @@ def fisher_consensus_target(
             beta = torch.where(unresolved, (lower + upper) / 2.0, beta)
             corrected_log, corrected, moment, _ = distribution(beta)
         if bool(
-            (entropy_active & (moment.abs() > moment_tolerance)).any().item()
+            (information_active & (moment.abs() > moment_tolerance))
+            .any()
+            .item()
         ):
             raise RuntimeError(
                 "self-information exponential moment solve did not converge"
