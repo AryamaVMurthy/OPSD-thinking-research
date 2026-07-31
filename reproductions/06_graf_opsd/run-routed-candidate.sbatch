@@ -105,7 +105,8 @@ fi
 # branch into an unrelated OOM experiment.
 vllm_utilization="${GRAF_VLLM_GPU_MEMORY_UTILIZATION:-0.35}"
 run_name="graf-${GRAF_CANDIDATE_ID}-${GRAF_MAX_STEPS}-${SLURM_JOB_ID}"; output_dir="${TRAIN_ROOT}/${run_name}"
-mkdir -p "${output_dir}"
+training_log="${SLURM_SUBMIT_DIR}/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out"
+mkdir -p "${output_dir}" logs
 cp "${GRAF_CANDIDATE_CONFIG}" "${output_dir}/config.yaml"
 manifest_inputs=(runtime-overrides.txt)
 if [[ "${requires_graph}" == 1 ]]; then
@@ -144,4 +145,4 @@ if [[ "${requires_fisher}" == 1 ]]; then
     "${output_dir}" "${manifest_inputs[@]}" \
     fisher-representative-selection.json
 fi
-python3 -m opsd_research.summarize_training --training-dir "${output_dir}" --training-log "${PROJECT_SOURCE}/logs/${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out" --telemetry "${TELEMETRY_ROOT}/${run_name}-${SLURM_JOB_ID}.csv" --output "${output_dir}/training-summary.json" --max-completion-length "${completion_length}"
+python3 -m opsd_research.summarize_training --training-dir "${output_dir}" --training-log "${training_log}" --telemetry "${TELEMETRY_ROOT}/${run_name}-${SLURM_JOB_ID}.csv" --output "${output_dir}/training-summary.json" --max-completion-length "${completion_length}"

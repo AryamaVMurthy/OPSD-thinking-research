@@ -48,3 +48,10 @@ def test_runner_archives_fisher_manifest_and_exact_selection() -> None:
     assert 'fisher-guidance-manifest.json' in script
     assert 'OPSD_FISHER_SELECTION_MANIFEST' in script
     assert 'fisher-representative-selection.json' in script
+
+
+def test_runner_summarizes_the_actual_slurm_output_path() -> None:
+    script = RUNNER.read_text(encoding="utf-8")
+
+    assert 'training_log="${SLURM_SUBMIT_DIR}/logs/' in script
+    assert '--training-log "${training_log}"' in script
