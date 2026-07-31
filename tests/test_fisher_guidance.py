@@ -185,6 +185,24 @@ def test_problem_domain_classifier_uses_question_only(
             "number_theory",
             "algebra",
         ),
+        (
+            "Find all differentiable functions satisfying the derivative "
+            "conditions at every real and integer input.",
+            "number_theory",
+            "algebra",
+        ),
+        (
+            "Real numbers satisfy two quadratic constraints. Determine the "
+            "maximum possible value of one variable.",
+            "combinatorics",
+            "algebra",
+        ),
+        (
+            "Suppose a real number satisfies an identity involving sine and "
+            "cosine. Evaluate a trigonometric expression.",
+            "number_theory",
+            "algebra",
+        ),
     ],
 )
 def test_aime_domain_resolution_uses_solution_structure_not_surface_words(

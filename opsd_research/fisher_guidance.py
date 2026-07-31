@@ -88,7 +88,9 @@ _DOMAIN_PATTERNS = {
     "algebra": re.compile(
         r"\b(?:polynomial|equation|inequality|function|real roots?|"
         r"complex roots?|logarithm|exponential|coefficient|system of|"
-        r"expression|quadratic|cubic)\b",
+        r"expression|quadratic|cubic|differentiable|derivative|integral|"
+        r"trigonometric|sine|cosine|sin|cos|tan|real numbers?|"
+        r"maximum|minimum)\b",
         re.IGNORECASE,
     ),
 }
