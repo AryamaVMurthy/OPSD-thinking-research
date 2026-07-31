@@ -638,6 +638,59 @@ to 0.0178, and clipping rose from 18.65% to 23.38%. The shorter horizon is
 therefore not better in the local target geometry; only the long-generation
 task evaluations can support its basin-selection hypothesis.
 
+### 8.7 Allowed-benchmark barycenter screens
+
+The fixed comparison baseline has 112/180 correct rollouts on AIME-2025 and
+123/180 on AIME-2026. Each entry below uses the same six paired seeds per
+problem and the same 32,768-token limit.
+
+| Screen | AIME-2025 Avg@6 | Maj@6 | Pass@6 | Cutoffs | AIME-2026 Avg@6 | Maj@6 | Pass@6 | Cutoffs |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| frozen base | 112/180 | 22/30 | 26/30 | 15 | 123/180 | 22/30 | 26/30 | 14 |
+| prefix-512 sequential (S10) | 114/180 | 21/30 | 24/30 | 19 | 124/180 | 24/30 | 25/30 | 14 |
+| full-prefix global batch (S11) | 126/180 | 24/30 | 24/30 | 11 | 112/180 | 23/30 | 25/30 | 12 |
+| prefix-512 global batch (S12) | 110/180 | 21/30 | 22/30 | 18 | 117/180 | 22/30 | 25/30 | 11 |
+| entropy-neutral prefix-512 (S13) | 113/180 | 24/30 | 26/30 | 23 | 113/180 | 21/30 | 25/30 | 13 |
+
+S10 is the only completed recent screen with a positive average-score change
+on both years, but it loses majority or pass coverage and adds four AIME-2025
+cutoffs. S11 demonstrates that global optimizer aggregation can produce a
+large AIME-2025 gain while reversing sharply on AIME-2026. Combining the two
+axes in S12 does not repair the reversal.
+
+S13 removes the consensus component parallel to the frozen entropy gradient.
+Its six-step training run was finite and nonzero, retained 44.8% of consensus
+energy, reduced the residual first-order entropy alignment below
+\(3.5\times10^{-9}\), and respected the 0.01 two-sided target-KL cap. However,
+the finite exponential target still increased entropy by 0.00324 on average.
+On AIME-2025, S13 gains one correct rollout and two majority-correct problems
+while preserving pass@6, but adds eight cutoffs. All eight additional cutoffs
+occur in correct-to-wrong transitions; wrong-to-correct transitions remove
+three cutoffs. Problems 21 and 29 each fall from 5/6 to 3/6 and add five
+cutoffs together, while problem 27 rises from 2/6 to 6/6 and removes two.
+This is direct evidence that first-order entropy neutrality retains useful
+route steering but does not control the finite retraction's basin dispersion.
+
+The AIME-2026 evaluation completed in job `17525`, with paired comparison job
+`17526`. Average accuracy fell from 123/180 (68.33%) to 113/180 (62.78%), a
+-5.56-point change with paired problem-clustered interval
+[-12.22, +0.56] points. Majority fell from 22/30 to 21/30 and pass@6 from
+26/30 to 25/30. Cutoffs decreased from 14 to 13, so this second failure is not
+explained by length truncation. There were 18 correct-to-wrong transitions
+and eight wrong-to-correct transitions. Problem 10 fell from 5/6 to 1/6 by
+selecting the invalid 103-area rotation instead of the checked 156 route;
+problem 26 fell from 4/6 to 1/6 as candidate paths abandoned the exact
+132-root argument for unsupported 252, 300, or 852 branches. The sole correct
+baseline path on problem 17 also disappeared. Conversely, problem 27 rose
+from 1/6 to 3/6 by recovering the exact 223 coordinate derivation.
+
+S13 is therefore rejected for two separable reasons: finite exponential
+curvature creates long dispersion on AIME-2025, while the unconstrained
+finite redistribution can also concentrate on a confident but invalid route
+on AIME-2026. Any next retraction must preserve the useful Fisher tangent
+while controlling the finite move's self-information, not merely its
+first-order entropy derivative.
+
 ## 9. Preliminary novelty boundary
 
 The closest current papers solve materially different problems:
