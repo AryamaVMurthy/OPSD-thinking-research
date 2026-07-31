@@ -9,6 +9,7 @@ from opsd_research.fisher_guidance import (
     answer_free_guidance_row,
     assign_matched_controls,
     classify_problem_domain,
+    enforce_guidance_capacity,
     load_guidance_ensemble,
     select_representative_fisher_indices,
     validate_answer_free_plan,
@@ -174,6 +175,37 @@ def test_fisher_selection_is_equal_across_aime_domains_without_responses():
     assert "response" not in json.dumps(manifest).lower()
     assert manifest["selection_protocol"] == (
         "data-source-problem-domain-question-length-quartile-v1"
+    )
+
+
+def test_guidance_capacity_gate_requires_every_aime_domain():
+    manifest = {
+        "accepted_records": 420,
+        "accepted_by_domain": {
+            "algebra": 55,
+            "combinatorics": 221,
+            "geometry": 47,
+            "number_theory": 97,
+        },
+    }
+
+    with pytest.raises(ValueError, match=r"geometry.*47.*48"):
+        enforce_guidance_capacity(
+            manifest,
+            min_accepted=384,
+            min_per_domain=48,
+        )
+
+    enforce_guidance_capacity(
+        {
+            **manifest,
+            "accepted_by_domain": {
+                **manifest["accepted_by_domain"],
+                "geometry": 48,
+            },
+        },
+        min_accepted=384,
+        min_per_domain=48,
     )
 
 

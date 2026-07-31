@@ -21,6 +21,7 @@ test -z "$(git status --short)"
 
 export FISHER_GUIDANCE_LIMIT="${FISHER_GUIDANCE_LIMIT:-512}"
 export FISHER_GUIDANCE_MIN_ACCEPTED="${FISHER_GUIDANCE_MIN_ACCEPTED:-384}"
+export FISHER_GUIDANCE_MIN_PER_DOMAIN="${FISHER_GUIDANCE_MIN_PER_DOMAIN:-48}"
 export FISHER_GUIDANCE_SHARDS=8
 export FISHER_GUIDANCE_ROOT="${FISHER_GUIDANCE_ROOT:-${SCRATCH_ROOT}/fisher-guidance/contest-${SLURM_JOB_ID}}"
 mkdir -p "${FISHER_GUIDANCE_ROOT}"
@@ -42,16 +43,21 @@ python3 -m opsd_research.merge_fisher_guidance \
   --manifest "${manifests[@]}" \
   --output "${FISHER_GUIDANCE_ROOT}/plans.jsonl" \
   --manifest-output "${FISHER_GUIDANCE_ROOT}/manifest.json"
-python3 - "${FISHER_GUIDANCE_ROOT}/manifest.json" "${FISHER_GUIDANCE_MIN_ACCEPTED}" <<'PY'
+python3 - \
+  "${FISHER_GUIDANCE_ROOT}/manifest.json" \
+  "${FISHER_GUIDANCE_MIN_ACCEPTED}" \
+  "${FISHER_GUIDANCE_MIN_PER_DOMAIN}" <<'PY'
 import json
 import sys
 
+from opsd_research.fisher_guidance import enforce_guidance_capacity
+
 manifest = json.load(open(sys.argv[1], encoding="utf-8"))
-if int(manifest["accepted_records"]) < int(sys.argv[2]):
-    raise SystemExit(
-        f"guidance accepted {manifest['accepted_records']}, "
-        f"fewer than required {sys.argv[2]}"
-    )
+enforce_guidance_capacity(
+    manifest,
+    min_accepted=int(sys.argv[2]),
+    min_per_domain=int(sys.argv[3]),
+)
 PY
 sha256sum \
   "${FISHER_GUIDANCE_ROOT}/plans.jsonl" \

@@ -111,6 +111,30 @@ def classify_problem_domain(question: str) -> str:
     return "other"
 
 
+def enforce_guidance_capacity(
+    manifest: Mapping[str, Any],
+    *,
+    min_accepted: int,
+    min_per_domain: int,
+) -> None:
+    """Reject a cache that cannot support an equal-domain training subset."""
+    accepted = int(manifest.get("accepted_records", 0))
+    if accepted < min_accepted:
+        raise ValueError(
+            f"guidance accepted {accepted}, fewer than required {min_accepted}"
+        )
+    by_domain = manifest.get("accepted_by_domain")
+    if not isinstance(by_domain, Mapping):
+        raise ValueError("guidance manifest lacks accepted_by_domain")
+    for domain in AIME_DOMAINS:
+        available = int(by_domain.get(domain, 0))
+        if available < min_per_domain:
+            raise ValueError(
+                f"domain {domain} has {available} accepted records, fewer "
+                f"than required {min_per_domain}"
+            )
+
+
 def select_representative_fisher_indices(
     rows: Sequence[Mapping[str, Any]],
     *,

@@ -45,9 +45,13 @@ directly on AIME 2025: 66.39% (base), 64.72% (step 50), 56.39% (step 100),
 | Fluid context | 77.50% | 74.17% | -3.33 pp | negative |
 | FiNOD, 5 steps | 73.89% | 73.89% | 0 | Avg flat; majority/pass +3.33 pp |
 
-The pending zero-scale LoRA control is required before interpreting a
-few-point AIME 2024 change. It runs the same LoRA/Punica inference path while
-mathematically multiplying the adapter contribution by zero.
+The zero-scale LoRA control ran the same LoRA/Punica inference path while
+mathematically multiplying the adapter contribution by zero. All 180 paired
+AIME 2024 responses were byte-identical to the no-LoRA baseline: zero answer,
+length, finish-reason, or formatting changes and zero correctness flips.
+Avg@6 remained 73.89%, Maj@6 76.67%, and Pass@6 86.67%. Consequently, the
+historical treatment effects are not explained by merely enabling the adapter
+runtime path.
 
 ## 3. What the exact rollouts show
 
@@ -155,6 +159,42 @@ True guide text does imprint the completion: its lexical overlap with the first
 guide wins 99.2% of comparisons. The problem is not that the teacher ignores
 the guide. The problem is that imprint strength does not predict completion or
 correctness.
+
+### 3.5 Domain imbalance explains part of the cross-benchmark instability
+
+The original 1,024-example FiNOD subset was selected by data source and
+reference-response length, not by mathematical domain. It contained 728
+`olympiads` rows, 165 Chinese-contest rows, 91 AoPS rows, and only 21
+AMC/AIME rows. A problem-text diagnostic found 371 geometry-like rows but only
+71 number-theory-like and 76 combinatorics-like rows; the remaining rows were
+mostly unclassified or algebra/sequence/probability. This was not a balanced
+AIME curriculum.
+
+AIME 2025 has official MathArena multi-label types: 9 algebra, 8 geometry,
+6 number theory, and 9 combinatorics problems. AIME 2026 lacks type metadata
+in the pinned revision, so its 30 public problem statements were manually
+assigned the same taxonomy: approximately 6 algebra, 10 geometry, 5 number
+theory, and 12 combinatorics labels, including three cross-domain problems.
+Per-domain paired rollout changes were:
+
+| Method | Benchmark | Algebra | Geometry | Number theory | Combinatorics |
+|---|---|---:|---:|---:|---:|
+| G4 | AIME 2025 | -0.93 pp | +6.25 pp | -1.39 pp | +6.48 pp |
+| G4 | AIME 2026 | +1.39 pp | +6.67 pp | 0.00 pp | +0.69 pp |
+| Legacy G1 | AIME 2025 | -6.48 pp | +1.04 pp | -1.39 pp | 0.00 pp |
+| Legacy G1 | AIME 2026 | +2.78 pp | +5.00 pp | +1.67 pp | +7.64 pp |
+| FRGD v2 | AIME 2025 | -5.56 pp | -4.17 pp | 0.00 pp | +0.93 pp |
+| FRGD v2 | AIME 2026 | +5.56 pp | +5.83 pp | +1.67 pp | +6.94 pp |
+| FiNOD, 32 steps | AIME 2025 | -9.26 pp | +8.33 pp | 0.00 pp | +14.81 pp |
+| FiNOD, 32 steps | AIME 2026 | 0.00 pp | -1.67 pp | -3.33 pp | -4.17 pp |
+| FiNOD, 5 steps | AIME 2025 | -9.26 pp | +2.08 pp | -2.78 pp | +16.67 pp |
+| FiNOD, 5 steps | AIME 2026 | -11.11 pp | 0.00 pp | -3.33 pp | -8.33 pp |
+
+Multi-label AIME problems contribute to each applicable row. These are
+descriptive subgroup estimates, not independent significance tests. The
+consistent fact is that aggregate movement hides large, opposing domain
+effects. In particular, FiNOD's AIME 2025 gain came from geometry and
+combinatorics while algebra sharply regressed.
 
 ## 4. Objective and implementation defects
 
@@ -334,12 +374,20 @@ The new builder:
   in the builder process;
 - creates three separately sampled plans with different seeds and planning
   lenses;
+- assigns one primary standard AIME domain using a separate deterministic
+  problem-only classification prompt;
 - rejects boxed expressions, answer/result claims, prompt injection, explicit
   numeric equalities, and numerals not already present in the problem;
 - stores no answer or reference field;
 - cryptographically binds every saved problem and the complete records file;
 - constructs negative controls by deterministic source/length-matched
-  derangements.
+  derangements within the same mathematical domain.
+
+The Fisher trainer and selector now also use the problem-only PyArrow
+projection. Unlike the inherited FiNOD launcher, they never materialize a
+reference response or use reference-response length for partitioning. The
+screen is exactly balanced across algebra, geometry, number theory, and
+combinatorics, then source- and question-length-stratified within each domain.
 
 The training row contains exactly:
 
@@ -351,7 +399,8 @@ The training row contains exactly:
 The first screen uses:
 
 - Qwen3-4B at immutable revision `1cfa9a7`;
-- 192 AMC/AIME + AoPS examples selected from a 512-problem plan cache;
+- 192 AMC/AIME + AoPS examples selected as exactly 48 examples from each of
+  algebra, geometry, number theory, and combinatorics;
 - five optimizer steps, effective batch 32;
 - fused PyTorch AdamW, learning rate \(5\times10^{-6}\), betas
   \((0.9,0.999)\), epsilon \(10^{-8}\), zero weight decay;
