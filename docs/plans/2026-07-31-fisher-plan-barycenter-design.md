@@ -1,0 +1,120 @@
+# Fisher Plan Barycenter Design
+
+## Diagnosis
+
+The answer-free guidance plans and matched controls both contain generic
+contest-solving procedure: introduce a representation, test an invariant,
+check edge cases, and recover from a failed route. Subtracting an unrelated
+control therefore removes not only nuisance style but also the transferable
+procedural component the student is meant to learn.
+
+The resulting guide-minus-control residual is problem-specific. This explains
+all current observations:
+
+- within-problem plans agree and produce nonzero Fisher targets;
+- learned residuals are nearly orthogonal on a new problem;
+- stronger targets improve signal-to-drift scale but not alignment;
+- cross-problem vocabulary-edge weighting does not help, because it acts
+  after the shared component has already been cancelled.
+
+## Alternatives
+
+1. **Soft control subtraction.** Use
+   \(u=\bar u_{\text{guide}}-\alpha\bar u_{\text{control}}\) with
+   \(0<\alpha<1\). This adds an unidentified coefficient and leaves the same
+   cancellation failure in weaker form.
+2. **Return to the historical G4 scaffold teacher.** G4 improved both AIME
+   years, but its older cache has partial answer-seep and only 22 unique
+   active problems.
+3. **Answer-free Fisher plan barycenter.** Distill the common direction among
+   three independently generated, strictly answer-free positive plans.
+   Controls remain an experimental placebo and cache audit, not a term in the
+   training direction. This is the recommended method.
+
+## Method
+
+For frozen deploy logits \(z_0\) and logits \(z_k^+\) conditioned on
+answer-free plan \(k\), define centered categorical-Fisher score directions
+
+\[
+u_k = (z_k^+-z_0)
+-\mathbb E_{a\sim p_0}[z_k^+(a)-z_0(a)].
+\]
+
+The within-problem coherence is unchanged:
+
+\[
+A=
+\frac{\|\bar u\|_{F,p_0}^2}
+{\frac1K\sum_k\|u_k\|_{F,p_0}^2},
+\qquad
+\bar u=\frac1K\sum_k u_k.
+\]
+
+The retained direction is \(r=A\bar u\), and
+
+\[
+q(a)\propto p_0(a)\exp(\eta r(a)).
+\]
+
+The screen uses \(\eta=1\), with bisection enforcing both
+\(D_{\mathrm{KL}}(p_0\|q)\le0.01\) and
+\(D_{\mathrm{KL}}(q\|p_0)\le0.01\). The student objective remains
+
+\[
+D_{\mathrm{KL}}(q\|p_\theta)
++D_{\mathrm{KL}}(p_0\|p_\theta).
+\]
+
+There is no cross-problem edge weighting in this screen. The method tests one
+claim only: positive plan agreement contains a transferable procedural
+direction that control subtraction destroyed.
+
+## Leakage and Style Boundary
+
+Every plan was generated from the problem text alone and was rejected if it
+contained:
+
+- a boxed expression or answer/result claim;
+- a derived numerical equality;
+- a numeral absent from the problem;
+- reference-solution language or prompt injection.
+
+The barycenter can teach procedural wording, but this is now intentional:
+problem-solving procedure is the target capability. Three independently
+sampled lenses and Fisher agreement suppress plan-specific phrasing. The
+frozen-policy proximal and two-sided KL cap prevent an unconstrained style
+takeover.
+
+## Implementation
+
+Add one registered direction mode to target construction:
+
+- `matched_control_residual`: historical guide-minus-control behavior;
+- `positive_plan_barycenter`: guide-minus-frozen-base behavior.
+
+The control tensors remain loaded for exact data parity but are not consulted
+in barycenter target construction. Runtime logs record the mode, and a unit
+test proves that changing controls cannot change a barycenter target.
+
+No optimizer, data, prompt, seed, batch, position, or rollout setting changes
+relative to the strong-target proximal control.
+
+## Screen and Gate
+
+Run one exact 192-example epoch: 48 problems each from algebra, geometry,
+number theory, and combinatorics/probability.
+
+Promotion requires:
+
+1. nonzero loss and active gradients;
+2. maximum two-sided target KL at or below 0.01;
+3. noncollapsed positive-plan agreement;
+4. mean post-initial target-loss/frozen-anchor ratio below one;
+5. positive Fisher three-point alignment;
+6. no target or metric dependence on control logits.
+
+If the ratio remains above one, answer-free plan-conditioned next-token
+distillation itself lacks transfer at this scale. The next step then reuses
+Fisher only as a selection/confidence layer around the empirically successful
+G4 objective rather than continuing to alter local logit targets.
