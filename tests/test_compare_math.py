@@ -98,6 +98,25 @@ def test_paired_math_comparison_reports_problem_clustered_deltas() -> None:
     }
     assert comparison["pairing_verified"] is True
     assert comparison["evaluation_protocol"] == "development"
+    assert comparison["problem_diagnostics"]["0"] == {
+        "baseline_correct": 1,
+        "treatment_correct": 2,
+        "correct_delta": 1,
+        "baseline_pass": 1,
+        "treatment_pass": 1,
+        "pass_delta": 0,
+        "baseline_majority": 1,
+        "treatment_majority": 1,
+        "majority_delta": 0,
+        "improved": 1,
+        "degraded": 0,
+        "baseline_cutoffs": 0,
+        "treatment_cutoffs": 0,
+        "cutoff_delta": 0,
+        "mean_output_token_delta": 0,
+    }
+    assert comparison["problem_diagnostics"]["1"]["correct_delta"] == 2
+    assert comparison["problem_diagnostics"]["1"]["pass_delta"] == 1
 
 
 def test_explicit_prefix_subset_reuses_first_samples_from_larger_run() -> None:

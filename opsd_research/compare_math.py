@@ -141,6 +141,57 @@ def _generation_diagnostics(
     return aggregate, localized
 
 
+def _problem_diagnostics(
+    baseline: dict[tuple[str, int], dict[str, Any]],
+    treatment: dict[tuple[str, int], dict[str, Any]],
+    baseline_metrics: dict[str, dict[str, float]],
+    treatment_metrics: dict[str, dict[str, float]],
+) -> dict[str, dict[str, float | int]]:
+    result: dict[str, dict[str, float | int]] = {}
+    for problem_id in sorted(baseline_metrics, key=lambda value: int(value)):
+        keys = sorted(
+            (key for key in baseline if key[0] == problem_id),
+            key=lambda key: key[1],
+        )
+        base_rows = [baseline[key] for key in keys]
+        treatment_rows = [treatment[key] for key in keys]
+        baseline_correct = sum(bool(row["correct"]) for row in base_rows)
+        treatment_correct = sum(bool(row["correct"]) for row in treatment_rows)
+        baseline_cutoffs = sum(_is_cutoff(row) for row in base_rows)
+        treatment_cutoffs = sum(_is_cutoff(row) for row in treatment_rows)
+        improved = sum(
+            not bool(base["correct"]) and bool(candidate["correct"])
+            for base, candidate in zip(base_rows, treatment_rows, strict=True)
+        )
+        degraded = sum(
+            bool(base["correct"]) and not bool(candidate["correct"])
+            for base, candidate in zip(base_rows, treatment_rows, strict=True)
+        )
+        base_problem = baseline_metrics[problem_id]
+        treatment_problem = treatment_metrics[problem_id]
+        result[problem_id] = {
+            "baseline_correct": baseline_correct,
+            "treatment_correct": treatment_correct,
+            "correct_delta": treatment_correct - baseline_correct,
+            "baseline_pass": int(base_problem["pass"]),
+            "treatment_pass": int(treatment_problem["pass"]),
+            "pass_delta": int(treatment_problem["pass"] - base_problem["pass"]),
+            "baseline_majority": int(base_problem["maj"]),
+            "treatment_majority": int(treatment_problem["maj"]),
+            "majority_delta": int(treatment_problem["maj"] - base_problem["maj"]),
+            "improved": improved,
+            "degraded": degraded,
+            "baseline_cutoffs": baseline_cutoffs,
+            "treatment_cutoffs": treatment_cutoffs,
+            "cutoff_delta": treatment_cutoffs - baseline_cutoffs,
+            "mean_output_token_delta": mean(
+                _output_tokens(candidate) - _output_tokens(base)
+                for base, candidate in zip(base_rows, treatment_rows, strict=True)
+            ),
+        }
+    return result
+
+
 def _paired_bootstrap(
     baseline: dict[str, dict[str, float]],
     treatment: dict[str, dict[str, float]],
@@ -257,6 +308,12 @@ def compare_paired_math(
         treatment_by_key,
         transition_rows,
     )
+    problem_diagnostics = _problem_diagnostics(
+        baseline_by_key,
+        treatment_by_key,
+        baseline_problem,
+        treatment_problem,
+    )
 
     suffix = str(samples_per_problem)
     intervals = _paired_bootstrap(
@@ -304,6 +361,7 @@ def compare_paired_math(
         },
         "generation_diagnostics": generation_diagnostics,
         "transition_diagnostics": transition_diagnostics,
+        "problem_diagnostics": problem_diagnostics,
     }
 
 
