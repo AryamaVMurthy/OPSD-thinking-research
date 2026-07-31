@@ -6,8 +6,8 @@
 #SBATCH --qos=high
 #SBATCH --nodelist=node03
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=96G
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=48G
 #SBATCH --time=01:00:00
 #SBATCH --output=/home/aryama.murthy/finod-control/finod-specificity-%j.out
 
