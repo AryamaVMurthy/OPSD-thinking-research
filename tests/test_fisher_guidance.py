@@ -8,7 +8,9 @@ import pytest
 from opsd_research.fisher_guidance import (
     answer_free_guidance_row,
     assign_matched_controls,
+    classify_problem_domain,
     load_guidance_ensemble,
+    select_representative_fisher_indices,
     validate_answer_free_plan,
     validate_guidance_ensemble,
 )
@@ -110,6 +112,7 @@ def test_controls_are_distinct_source_matched_derangements():
         rows,
         ensembles=ensembles,
         selected_indices=list(range(8)),
+        domains_by_index={index: "algebra" for index in range(8)},
     )
 
     for index, plans in controls.items():
@@ -118,12 +121,69 @@ def test_controls_are_distinct_source_matched_derangements():
         assert len(set(plans)) == 3
 
 
+@pytest.mark.parametrize(
+    "question,expected",
+    [
+        ("A triangle is inscribed in a circle. Find its area.", "geometry"),
+        ("How many permutations have no adjacent equal colors?", "combinatorics"),
+        ("Find the prime divisor satisfying the congruence.", "number_theory"),
+        ("A fair die is rolled. Find the probability.", "probability"),
+        ("The polynomial has three real roots. Find their sum.", "algebra"),
+        ("A sequence satisfies a recurrence relation.", "sequences"),
+        ("Determine the requested integer.", "other"),
+    ],
+)
+def test_problem_domain_classifier_uses_question_only(
+    question, expected
+):
+    assert classify_problem_domain(question) == expected
+
+
+def test_fisher_selection_is_equal_across_aime_domains_without_responses():
+    domains = {
+        "geometry": "A triangle is inscribed in a circle.",
+        "combinatorics": "How many permutations satisfy the condition?",
+        "number_theory": "Find a prime divisor modulo the integer.",
+        "algebra": "A polynomial has real roots.",
+    }
+    rows = []
+    labels = {}
+    for source in ("amc_aime", "aops_forum"):
+        for domain, stem in domains.items():
+            for copy in range(8):
+                # Deliberately omit every answer/response field.
+                labels[len(rows)] = domain
+                rows.append(
+                    {
+                        "data_source": source,
+                        "question": f"{stem} Variant label {copy}: " + "x" * copy,
+                    }
+                )
+
+    selected, manifest = select_representative_fisher_indices(
+        rows,
+        eligible_indices=range(len(rows)),
+        limit=40,
+        seed=73,
+        domains_by_index=labels,
+    )
+
+    assert len(selected) == 40
+    assert set(manifest["selected_by_problem_domain"]) == set(domains)
+    assert set(manifest["selected_by_problem_domain"].values()) == {10}
+    assert "response" not in json.dumps(manifest).lower()
+    assert manifest["selection_protocol"] == (
+        "data-source-problem-domain-question-length-quartile-v1"
+    )
+
+
 def test_cache_loader_checks_hash_and_never_requires_reference(tmp_path):
     records = tmp_path / "plans.jsonl"
     payload = {
         "source_index": 4,
         "problem": "question",
         "problem_sha256": hashlib.sha256(b"question").hexdigest(),
+        "domain": "algebra",
         "plans": [
             "Factor the symbolic expression and verify its domain.",
             "Compare invariant quantities across the allowed cases.",
@@ -137,7 +197,7 @@ def test_cache_loader_checks_hash_and_never_requires_reference(tmp_path):
     manifest.write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "cache_kind": "answer-free-guidance-ensemble",
                 "answer_access": False,
                 "reference_solution_access": False,
@@ -155,6 +215,7 @@ def test_cache_loader_checks_hash_and_never_requires_reference(tmp_path):
 
     assert loaded[4] == payload["plans"]
     assert metadata["answer_access"] is False
+    assert metadata["_domains_by_source_index"] == {4: "algebra"}
     assert "reference" not in payload
 
     leaked = dict(payload)

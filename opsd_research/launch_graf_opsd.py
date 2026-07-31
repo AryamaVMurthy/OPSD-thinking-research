@@ -161,17 +161,34 @@ def main() -> None:
     os.environ["OPSD_HELDOUT_DIAGNOSTIC_FRACTION"] = str(heldout_fraction)
     from .training_data import (
         load_math_cot_20k,
+        load_math_cot_questions_only,
         partition_indices,
+        problem_partition_indices,
         write_partition_manifest,
+        write_problem_partition_manifest,
     )
-    raw_dataset = load_math_cot_20k(
-        str(config["dataset_revision"]), heldout_fraction=0.0
-    )["train"]
-    train_indices, heldout_indices = partition_indices(raw_dataset, heldout_fraction)
+    if config["graph_mode"] == "fisher_consensus":
+        raw_dataset = load_math_cot_questions_only(
+            str(config["dataset_revision"])
+        )
+        train_indices, heldout_indices = problem_partition_indices(
+            raw_dataset, heldout_fraction
+        )
+        manifest_writer = write_problem_partition_manifest
+    else:
+        raw_dataset = load_math_cot_20k(
+            str(config["dataset_revision"]), heldout_fraction=0.0
+        )["train"]
+        train_indices, heldout_indices = partition_indices(
+            raw_dataset, heldout_fraction
+        )
+        manifest_writer = write_partition_manifest
     manifest_path = os.environ.get("OPSD_TRAINING_PARTITION_MANIFEST")
     is_primary = os.environ.get("RANK", os.environ.get("LOCAL_RANK", "0")) == "0"
     if manifest_path and is_primary:
-        manifest = write_partition_manifest(Path(manifest_path), raw_dataset, heldout_fraction)
+        manifest = manifest_writer(
+            Path(manifest_path), raw_dataset, heldout_fraction
+        )
     else:
         manifest = {
             "source_examples": len(raw_dataset),
@@ -250,6 +267,7 @@ def main() -> None:
         from .fisher_guidance import (
             install_fisher_guidance_dataset_redirect,
             load_guidance_ensemble,
+            select_representative_fisher_indices,
         )
 
         available, guidance_metadata = load_guidance_ensemble(
@@ -261,11 +279,14 @@ def main() -> None:
             eligible_indices=eligible,
             data_sources=config["fisher_data_sources"],
         )
-        eligible, selection_manifest = select_representative_finod_indices(
+        eligible, selection_manifest = select_representative_fisher_indices(
             raw_dataset,
             eligible_indices=eligible,
             limit=int(config["fisher_max_records"]),
             seed=int(config["fisher_selection_seed"]),
+            domains_by_index=guidance_metadata[
+                "_domains_by_source_index"
+            ],
         )
         selection_path = os.environ.get(
             "OPSD_FISHER_SELECTION_MANIFEST"

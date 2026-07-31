@@ -40,6 +40,20 @@ def _row_digest(row: dict[str, object]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _problem_row_digest(row: dict[str, object]) -> str:
+    """Return an identity using only public problem/provenance fields."""
+    payload = json.dumps(
+        {
+            "question": str(row["question"]),
+            "data_source": str(row.get("data_source") or "unknown"),
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def partition_indices(
     dataset: Sequence[dict[str, object]], heldout_fraction: float
 ) -> tuple[list[int], list[int]]:
@@ -55,6 +69,26 @@ def partition_indices(
     if not train or not heldout:
         raise ValueError(
             "content-hash partition produced an empty split; choose a usable heldout fraction"
+        )
+    return train, heldout
+
+
+def problem_partition_indices(
+    dataset: Sequence[dict[str, object]], heldout_fraction: float
+) -> tuple[list[int], list[int]]:
+    """Partition rows without materializing an answer or reference response."""
+    fraction = _validate_fraction(heldout_fraction)
+    if fraction == 0.0:
+        return list(range(len(dataset))), []
+    threshold = int(fraction * (1 << 64))
+    train, heldout = [], []
+    for index, row in enumerate(dataset):
+        value = int(_problem_row_digest(row)[:16], 16)
+        (heldout if value < threshold else train).append(index)
+    if not train or not heldout:
+        raise ValueError(
+            "problem-only hash partition produced an empty split; choose a "
+            "usable heldout fraction"
         )
     return train, heldout
 
@@ -79,12 +113,53 @@ def partition_manifest(
     }
 
 
+def problem_partition_manifest(
+    dataset: Sequence[dict[str, object]], heldout_fraction: float
+) -> dict[str, object]:
+    """Describe a split whose inputs contain no response/answer column."""
+    train, heldout = problem_partition_indices(dataset, heldout_fraction)
+    heldout_digests = [
+        _problem_row_digest(dataset[index]) for index in heldout
+    ]
+    return {
+        "schema_version": 1,
+        "dataset": DATASET_ID,
+        "dataset_revision": DATASET_REVISION,
+        "partition_protocol": (
+            "problem-provenance-sha256-first64-threshold-v1"
+        ),
+        "heldout_diagnostic_fraction": heldout_fraction,
+        "source_examples": len(dataset),
+        "train_examples": len(train),
+        "heldout_diagnostic_examples": len(heldout),
+        "heldout_problem_sha256": hashlib.sha256(
+            "\n".join(heldout_digests).encode("utf-8")
+        ).hexdigest(),
+        "answer_access": False,
+        "reference_solution_access": False,
+    }
+
+
 def write_partition_manifest(
     path: Path, dataset: Sequence[dict[str, object]], heldout_fraction: float
 ) -> dict[str, object]:
     manifest = partition_manifest(dataset, heldout_fraction)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return manifest
+
+
+def write_problem_partition_manifest(
+    path: Path,
+    dataset: Sequence[dict[str, object]],
+    heldout_fraction: float,
+) -> dict[str, object]:
+    manifest = problem_partition_manifest(dataset, heldout_fraction)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return manifest
 
 

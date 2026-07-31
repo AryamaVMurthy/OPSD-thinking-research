@@ -7,7 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from .fisher_guidance import load_guidance_ensemble
+from .fisher_guidance import CACHE_SCHEMA_VERSION, load_guidance_ensemble
 
 
 _IDENTITY_FIELDS = (
@@ -58,9 +58,14 @@ def merge_guidance_shards(
     records: dict[int, dict[str, object]] = {}
     rejected = 0
     requested = 0
+    accepted_by_domain: dict[str, int] = {}
     for path, ensembles, metadata in loaded:
         rejected += int(metadata.get("rejected_records", 0))
         requested += int(metadata["requested_records"])
+        for domain, count in metadata.get("accepted_by_domain", {}).items():
+            accepted_by_domain[str(domain)] = (
+                accepted_by_domain.get(str(domain), 0) + int(count)
+            )
         records_path = path.parent / str(metadata["records_file"])
         by_index = {
             int(record["source_index"]): record
@@ -94,9 +99,10 @@ def merge_guidance_shards(
             )
     digest = hashlib.sha256(output.read_bytes()).hexdigest()
     result: dict[str, object] = {
-        "schema_version": 1,
+        "schema_version": CACHE_SCHEMA_VERSION,
         **{field: reference.get(field) for field in _IDENTITY_FIELDS},
         "accepted_records": len(records),
+        "accepted_by_domain": dict(sorted(accepted_by_domain.items())),
         "rejected_records": rejected,
         "requested_records": requested,
         "records_file": output.name,

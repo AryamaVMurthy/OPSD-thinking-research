@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +16,9 @@ from .build_graf_cache import (
     TRAINING_DATASET_REVISION,
 )
 from .fisher_guidance import (
+    AIME_DOMAINS,
     CACHE_KIND,
+    CACHE_SCHEMA_VERSION,
     GUIDANCE_INPUT_PROTOCOL,
     validate_answer_free_plan,
     validate_guidance_ensemble,
@@ -23,6 +27,7 @@ from .fisher_guidance import (
 
 MAX_MODEL_LEN = 8192
 MAX_PLAN_TOKENS = 320
+DOMAIN_SEED_OFFSET = 9000
 
 
 def _plan_prompt(tokenizer: Any, problem: str, plan_index: int) -> str:
@@ -52,6 +57,35 @@ def _plan_prompt(tokenizer: Any, problem: str, plan_index: int) -> str:
     if "</think>" not in rendered:
         raise RuntimeError("plan builder chat template did not disable thinking")
     return rendered
+
+
+def _domain_prompt(tokenizer: Any, problem: str) -> str:
+    """Render a problem-only four-way AIME domain classification request."""
+    instruction = (
+        "Classify the primary mathematical domain of the contest problem "
+        "below. Choose exactly one of: algebra, geometry, number_theory, "
+        "combinatorics. Probability and counting belong to combinatorics; "
+        "sequences and functional equations belong to algebra. Do not solve "
+        "the problem or explain the classification. Output only the one "
+        "lowercase label.\n\n"
+        f"Problem:\n{problem}"
+    )
+    rendered = tokenizer.apply_chat_template(
+        [{"role": "user", "content": instruction}],
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False,
+    )
+    if "</think>" not in rendered:
+        raise RuntimeError("domain builder chat template did not disable thinking")
+    return rendered
+
+
+def _parse_domain(text: str) -> str:
+    normalized = re.sub(r"[.!]+$", "", str(text).strip().lower())
+    if normalized not in AIME_DOMAINS:
+        raise ValueError("domain classifier did not return one exact label")
+    return normalized
 
 
 def _parse_args() -> argparse.Namespace:
@@ -146,6 +180,9 @@ def main() -> None:
     plans: list[list[str | None]] = [
         [None] * args.plans_per_problem for _ in range(len(selected))
     ]
+    plan_seeds: list[list[int | None]] = [
+        [None] * args.plans_per_problem for _ in range(len(selected))
+    ]
     errors: dict[tuple[int, int], str] = {}
     for plan_index in range(args.plans_per_problem):
         pending = list(range(len(selected)))
@@ -177,18 +214,47 @@ def main() -> None:
                 try:
                     validate_answer_free_plan(problem, candidate)
                     plans[row_index][plan_index] = candidate
+                    plan_seeds[row_index][plan_index] = (
+                        args.seed + 1000 * plan_index + attempt
+                    )
                 except ValueError as error:
                     errors[(row_index, plan_index)] = str(error)
                     retry.append(row_index)
             pending = retry
 
+    domain_seed = args.seed + DOMAIN_SEED_OFFSET
+    domain_outputs = llm.generate(
+        [
+            _domain_prompt(
+                tokenizer,
+                str(selected[row_index]["question"]).strip(),
+            )
+            for row_index in range(len(selected))
+        ],
+        SamplingParams(
+            temperature=0.0,
+            max_tokens=12,
+            seed=domain_seed,
+        ),
+    )
+    domains: list[str | None] = [None] * len(selected)
+    for row_index, output in enumerate(domain_outputs):
+        try:
+            domains[row_index] = _parse_domain(output.outputs[0].text)
+        except ValueError as error:
+            errors[(row_index, -2)] = str(error)
+
     args.output.parent.mkdir(parents=True, exist_ok=True)
     accepted = 0
     rejected = 0
+    accepted_by_domain: Counter[str] = Counter()
     with args.output.open("w", encoding="utf-8") as handle:
         for row_index, row_plans in enumerate(plans):
             problem = str(selected[row_index]["question"]).strip()
-            if any(plan is None for plan in row_plans):
+            if (
+                any(plan is None for plan in row_plans)
+                or domains[row_index] is None
+            ):
                 rejected += 1
                 continue
             complete_plans = [str(plan) for plan in row_plans]
@@ -205,25 +271,26 @@ def main() -> None:
                 "problem_sha256": hashlib.sha256(
                     problem.encode("utf-8")
                 ).hexdigest(),
+                "domain": domains[row_index],
                 "plans": complete_plans,
-                "seeds": [
-                    args.seed + 1000 * pair
-                    for pair in range(args.plans_per_problem)
-                ],
+                "seeds": [int(seed) for seed in plan_seeds[row_index]],
+                "domain_seed": domain_seed,
             }
             handle.write(
                 json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
             )
             accepted += 1
+            accepted_by_domain[str(domains[row_index])] += 1
     digest = hashlib.sha256(args.output.read_bytes()).hexdigest()
     manifest = {
-        "schema_version": 1,
+        "schema_version": CACHE_SCHEMA_VERSION,
         "cache_kind": CACHE_KIND,
         "answer_access": False,
         "reference_solution_access": False,
         "guidance_input_protocol": GUIDANCE_INPUT_PROTOCOL,
         "plans_per_problem": args.plans_per_problem,
         "accepted_records": accepted,
+        "accepted_by_domain": dict(sorted(accepted_by_domain.items())),
         "rejected_records": rejected,
         "requested_records": len(selected),
         "requested_global_records": args.limit,
@@ -241,7 +308,7 @@ def main() -> None:
         "rejection_reasons": {
             f"{row}:{pair}": reason
             for (row, pair), reason in sorted(errors.items())
-            if pair == -1 or plans[row][pair] is None
+            if pair < 0 or plans[row][pair] is None
         },
     }
     args.manifest.write_text(
